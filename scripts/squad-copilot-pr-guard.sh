@@ -79,8 +79,14 @@ if issue_has_deliverable_marker 2>/dev/null; then
   has_marker=true
 fi
 
-if [[ "$has_marker" == false ]]; then
-  attempts="${SQUAD_PR_GUARD_WAIT_ATTEMPTS:-18}"
+PR_BODY="$(gh pr view "$PR" --repo "$REPO" --json body,title -q '[.title,.body]|join("\n")' 2>/dev/null || true)"
+PR_HAS_MARKER=false
+if [[ -n "$PR_BODY" ]] && grep -qiF "$marker" <<<"$PR_BODY"; then
+  PR_HAS_MARKER=true
+fi
+
+if [[ "$has_marker" == false && "$PR_HAS_MARKER" == false ]]; then
+  attempts="${SQUAD_PR_GUARD_WAIT_ATTEMPTS:-6}"
   interval="${SQUAD_PR_GUARD_WAIT_INTERVAL_SEC:-10}"
   echo "Waiting up to $((attempts * interval))s for deliverable on issue #${ISSUE} (${marker})..."
   for ((i = 1; i <= attempts; i++)); do
@@ -91,6 +97,8 @@ if [[ "$has_marker" == false ]]; then
       break
     fi
   done
+elif [[ "$has_marker" == false && "$PR_HAS_MARKER" == true ]]; then
+  echo "PR body contains ${marker} but issue does not — closing planning PR (issue-first policy)."
 fi
 
 PR_URL="$(gh pr view "$PR" --repo "$REPO" --json url -q .url)"
@@ -116,7 +124,10 @@ gh pr comment "$PR" --repo "$REPO" --body "$MSG"
 gh pr close "$PR" --repo "$REPO" --comment "Closed by squad PR guard — deliverable belongs on issue #${ISSUE}. See issue comment."
 echo "Closed PR #$PR (phase=${phase}, has_marker=${has_marker})"
 
-chmod +x "${ROOT}/scripts/squad-nudge-stuck.sh" "${ROOT}/scripts/squad-sync-planning-labels.sh"
+chmod +x "${ROOT}/scripts/squad-nudge-stuck.sh" \
+  "${ROOT}/scripts/squad-sync-planning-labels.sh" \
+  "${ROOT}/scripts/squad-approve-copilot-workflows.sh"
+"${ROOT}/scripts/squad-approve-copilot-workflows.sh" "$REPO" "$PR" || true
 if [[ "$has_marker" == true ]]; then
   "${ROOT}/scripts/squad-sync-planning-labels.sh" "$REPO" "$ISSUE" || true
 else

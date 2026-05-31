@@ -10,7 +10,6 @@ LABEL="${3:?lifecycle label required}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIND="${ROOT}/scripts/squad-find-subissues.py"
 DISPATCH="${ROOT}/scripts/squad-dispatch-subissue.sh"
-VALIDATION="${ROOT}/scripts/squad-dispatch-validation.sh"
 
 TARGET_REPO="${TARGET_REPO:-$REPO}"
 AGENT=""
@@ -34,8 +33,10 @@ Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning
    The file MUST start with a line exactly: # Business Analysis
 4. Add label awaiting-approval and remove label new (use gh issue edit)
 5. Comment on the issue: Squad deliverable complete on this issue.
-6. **Do NOT open a pull request** on ai-alpha-squad. Copilot cannot satisfy this task with a PR-only handoff.
-7. If you already opened a draft PR, close it after steps 3–5.
+6. **Do NOT open a pull request, branch, or commit** on ai-alpha-squad. No files in this repo — issue comment + labels only.
+7. If you already opened a draft PR, close it immediately after steps 3–5.
+
+You have read/search tools only on this repo. Use \`gh issue comment\` and \`gh issue edit\` from the shell.
 
 GitHub Copilot coding agent often cannot post issue comments — if blocked, output the full BA in your final message and stop; do not claim the issue was updated.
 EOF
@@ -56,9 +57,11 @@ Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning
 5. Map every FR-* requirement to BR-* from the BA
 6. Add label designed and remove director-approved
 7. Comment on the issue: Squad deliverable complete on this issue.
-8. Do NOT open a pull request on ai-alpha-squad. Do NOT commit spec-only files. Issue comment + sub-issues are the deliverable.
+8. Do NOT open a pull request, branch, or commit on ai-alpha-squad. Issue comment + sub-issues are the deliverable.
 
-If a draft PR exists, close it after steps 3–7.
+You have read/search tools only on this repo. Use \`gh issue comment\`, \`gh issue create\`, and \`gh issue edit\`.
+
+If a draft PR exists, close it immediately after steps 3–7.
 
 Do NOT add director-approved or approved labels. Do NOT implement application code in product repos.
 EOF
@@ -100,8 +103,11 @@ After PR is merged by the Director, the orchestrator will advance the parent to 
 EOF
     ;;
   implemented)
-    chmod +x "$VALIDATION"
-    "$VALIDATION" "$REPO" "$ISSUE"
+    # Phase 4 fan-out runs in squad-orchestrator.yml matrix job (parallel).
+    echo "implemented label — validation matrix dispatch handled by workflow"
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+      echo "dispatched=false" >> "$GITHUB_OUTPUT"
+    fi
     exit 0
     ;;
   validation)

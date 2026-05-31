@@ -25,6 +25,7 @@ Use environment-specific secrets (`production`, `staging`) once workflows exist.
 - `GITHUB_TOKEN` is provided automatically inside GitHub Actions. Do **not** store it as a repository secret.
 - Verify each workflow's `permissions:` block matches the job needs before relying on `GITHUB_TOKEN` for writes, releases, or issue/PR automation.
 - Use `SQUAD_ORCHESTRATOR_TOKEN` only when a workflow needs cross-repo access or permissions the default `GITHUB_TOKEN` cannot provide.
+- `SQUAD_ORCHESTRATOR_TOKEN` should include **`actions:write`** so `squad-approve-copilot-workflows.sh` can clear "workflow awaiting approval" on Copilot PRs. See [docs/copilot-workflow-approval.md](../docs/copilot-workflow-approval.md).
 
 ## Repository variables (non-secret)
 
