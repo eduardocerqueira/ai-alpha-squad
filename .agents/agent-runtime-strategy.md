@@ -58,7 +58,7 @@ Repository agents UI: [github.com/eduardocerqueira/ai-alpha-squad/agents](https:
 
 | Squad agent | Primary runtime | How to trigger |
 | ----------- | --------------- | -------------- |
-| Business Owner | Copilot custom `business-owner` **or** Cursor cloud | Issue `new` → assign session / `@copilot` with agent; post BA; `awaiting-approval` |
+| Business Owner | **Cursor** (local/cloud) **preferred**; Copilot `business-owner` only if it posts `# Business Analysis` on the issue via `gh issue comment` | Issue `new` → BA comment; `awaiting-approval` — **not** a planning PR on queue repo |
 | Architect | Copilot `architect` (read/edit docs) **or** Cursor | Issue `director-approved` → tech spec + sub-issues on queue repo |
 | Developer | **Copilot cloud on target repo** | Sub-issue on product repo → assign Copilot `developer` |
 | QA | Copilot `qa` on target repo | Sub-issue after PR exists |

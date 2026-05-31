@@ -29,14 +29,15 @@ Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning
 
 1. Read .agents/agent-business-owner.md and .agents/templates/business-analysis-template.md
 2. Complete Business Analysis for issue #${ISSUE} (read the issue body and comments)
-3. Post the FULL report as an issue comment — heading must include: # Business Analysis
-4. Add label awaiting-approval and remove label new
+3. **FIRST — post on the issue (required before any git branch or PR):**
+   gh issue comment ${ISSUE} --repo ${REPO} --body-file ba.md
+   The file MUST start with a line exactly: # Business Analysis
+4. Add label awaiting-approval and remove label new (use gh issue edit)
 5. Comment on the issue: Squad deliverable complete on this issue.
-6. Do NOT open a pull request on ai-alpha-squad. Do NOT commit BA-only files. Issue comment is the deliverable.
+6. **Do NOT open a pull request** on ai-alpha-squad. Copilot cannot satisfy this task with a PR-only handoff.
+7. If you already opened a draft PR, close it after steps 3–5.
 
-If a draft PR exists, close it after step 3–5.
-
-After posting BA, the orchestrator will notify the Director on WhatsApp.
+GitHub Copilot coding agent often cannot post issue comments — if blocked, output the full BA in your final message and stop; do not claim the issue was updated.
 EOF
     ;;
   director-approved|approved)

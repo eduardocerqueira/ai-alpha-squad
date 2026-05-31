@@ -2,6 +2,16 @@
 
 Business Owner and Architect on **ai-alpha-squad** deliver on the **GitHub issue**, not via pull request.
 
+## Copilot coding agent limitation
+
+[GitHub Copilot coding agent](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent) works through **branches and pull requests**. It often **does not post issue comments** even when instructed. For Business Owner / Architect on this queue repo:
+
+- **Preferred:** Cursor (local/cloud) agent posts `# Business Analysis` / `# Technical Specification` via `gh issue comment`
+- **Fallback:** Director or Cursor posts using `./scripts/squad-post-issue-deliverable.sh`
+- **Not sufficient:** Copilot PR on `ai-alpha-squad` with BA only in the PR body (Squad PR guard closes it)
+
+Developer, QA, Security, DevOps, and Tech Writer on **target product repos** remain Copilot-first (PR-based).
+
 ## Rule
 
 | Order | Action |
