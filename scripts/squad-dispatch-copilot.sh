@@ -41,6 +41,7 @@ GitHub Copilot coding agent often cannot post issue comments — if blocked, out
 EOF
     ;;
   director-approved|approved)
+    export SQUAD_ALLOW_COPILOT_REASSIGN=1
     AGENT="architect"
     INSTRUCTIONS_FILE="$(mktemp)"
     cat > "$INSTRUCTIONS_FILE" <<EOF
@@ -63,6 +64,7 @@ Do NOT add director-approved or approved labels. Do NOT implement application co
 EOF
     ;;
   designed)
+    export SQUAD_ALLOW_COPILOT_REASSIGN=1
     AGENT="developer"
     if gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' 2>/dev/null | grep -qx 'developer'; then
       DEV_ISSUE="$ISSUE"
@@ -103,6 +105,7 @@ EOF
     exit 0
     ;;
   validation)
+    export SQUAD_ALLOW_COPILOT_REASSIGN=1
     AGENT="release-manager"
     if gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' | grep -qx 'release-candidate'; then
       echo "Parent #$ISSUE already release-candidate — skip release-manager dispatch"

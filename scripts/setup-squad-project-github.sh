@@ -11,29 +11,19 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="${1:-${GITHUB_OWNER:-eduardocerqueira}/${SQUAD_WORK_QUEUE_REPO:-ai-alpha-squad}}"
 
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-  echo "Unset GITHUB_TOKEN first — it often lacks read:project/project scopes." >&2
-  echo "  unset GITHUB_TOKEN" >&2
-  echo "  gh auth refresh -s read:project,project,repo,workflow" >&2
-  exit 1
-fi
-
-if ! gh auth status >/dev/null 2>&1; then
-  echo "Run: gh auth login" >&2
-  exit 1
-fi
-
-if ! gh api graphql -f query='query { viewer { login } }' >/dev/null 2>&1; then
-  echo "gh auth failed" >&2
+  export GH_TOKEN="${GITHUB_TOKEN}"
+elif ! gh auth status >/dev/null 2>&1; then
+  echo "Run: gh auth login — or set GITHUB_TOKEN in .env" >&2
   exit 1
 fi
 
 if ! gh api graphql -f query='query { user(login: "eduardocerqueira") { projectV2(number: 6) { id } } }' >/dev/null 2>&1; then
-  echo "Token missing read:project. Run:" >&2
+  echo "Token missing read:project. Add project scopes to GITHUB_TOKEN or run:" >&2
   echo "  gh auth refresh -s read:project,project,repo,workflow" >&2
   exit 1
 fi
 
-TOKEN="$(gh auth token)"
+TOKEN="${GH_TOKEN:-$(gh auth token)}"
 echo "Updating SQUAD_ORCHESTRATOR_TOKEN on $REPO (project scopes)..."
 printf '%s' "$TOKEN" | gh secret set SQUAD_ORCHESTRATOR_TOKEN --repo "$REPO"
 

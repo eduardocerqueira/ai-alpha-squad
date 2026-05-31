@@ -26,17 +26,23 @@ INSTRUCTIONS="$(cat "$INSTRUCTIONS_FILE")"
 
 if gh issue view "$ISSUE" --repo "$REPO" --json assignees -q \
   '.assignees[].login' 2>/dev/null | grep -qiE '^(copilot|copilot-swe-agent\[bot\])$'; then
-  if [[ "${SQUAD_FORCE_NUDGE:-}" != "1" ]]; then
+  if [[ "${SQUAD_FORCE_NUDGE:-}" == "1" || "${SQUAD_ALLOW_COPILOT_REASSIGN:-}" == "1" ]]; then
+    echo "Copilot already assigned on #$ISSUE — reassigning for ${AGENT}"
+    gh api --method DELETE \
+      -H "Accept: application/vnd.github+json" \
+      "/repos/${OWNER}/${NAME}/issues/${ISSUE}/assignees" \
+      -f 'assignees[]=copilot-swe-agent[bot]' 2>/dev/null || true
+    gh api --method DELETE \
+      -H "Accept: application/vnd.github+json" \
+      "/repos/${OWNER}/${NAME}/issues/${ISSUE}/assignees" \
+      -f 'assignees[]=Copilot' 2>/dev/null || true
+  else
     echo "Copilot already assigned on #$ISSUE — skip"
     if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
       echo "dispatched=false" >> "$GITHUB_OUTPUT"
     fi
     exit 0
   fi
-  gh api --method DELETE \
-    -H "Accept: application/vnd.github+json" \
-    "/repos/${OWNER}/${NAME}/issues/${ISSUE}/assignees" \
-    -f 'assignees[]=copilot-swe-agent[bot]' 2>/dev/null || true
 fi
 
 export REPO AGENT INSTRUCTIONS TARGET_REPO
