@@ -2,6 +2,47 @@
 
 Autonomous multi-agent software delivery squad. All documentation is under [.agents/](.agents/README.md).
 
+## End-to-end cycle
+
+Work is tracked on **GitHub Issues** (`ai-alpha-squad`); code ships from the **target repository**. Label flow: `new` → `awaiting-approval` → `approved` → `designed` → `implemented` → `validation` → `release-candidate` → `released`. Details: [issue lifecycle](.agents/issue-lifecycle.md).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Director
+    participant GH as GitHub Issues<br/>(work queue)
+    participant BO as Business Owner
+    participant ARC as Architect
+    participant DEV as Developer
+    participant VAL as QA · Security · DevOps · Tech Writer
+    participant RM as Release Manager
+    participant TR as Target repo
+
+    Director->>GH: Create business request (new)
+    GH->>BO: Analyze request
+    BO->>GH: Business Analysis + awaiting-approval
+    BO->>Director: Approval request (issue / WhatsApp)
+    Director->>GH: approved
+    GH->>ARC: Design solution
+    ARC->>GH: Tech spec, sub-issues, designed
+    GH->>DEV: Implement (e.g. Copilot cloud)
+    DEV->>TR: Branch, commits, pull request
+    DEV->>GH: implemented
+    par Validation
+        VAL->>GH: QA report
+        VAL->>GH: Security report
+        VAL->>TR: CI/CD, deploy prep
+        VAL->>GH: Documentation
+    end
+    VAL->>GH: validation
+    GH->>RM: Release readiness check
+    RM->>GH: release-candidate
+    RM->>Director: Release approval request
+    Director->>GH: Release approved
+    RM->>TR: Tag, publish release, changelog
+    RM->>GH: released — close issue
+```
+
 | Resource | Path |
 | -------- | ---- |
 | Documentation index | [.agents/README.md](.agents/README.md) |
