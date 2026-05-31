@@ -92,9 +92,10 @@ Needed when tech spec includes Workers, R2, D1, DNS, or WhatsApp webhook hosting
 ### Director setup
 
 1. Account at [dash.cloudflare.com](https://dash.cloudflare.com).
-2. Create API token: **Edit Cloudflare Workers** (+ R2/D1 if used) → `CLOUDFLARE_API_TOKEN`.
-3. Account ID → `CLOUDFLARE_ACCOUNT_ID`.
-4. Local: `npm i -g wrangler` then `wrangler login` **or** use token: `export CLOUDFLARE_API_TOKEN=...`
+2. Create API token: **Edit Cloudflare Workers** (+ Zone/DNS if using a custom webhook hostname) → `CLOUDFLARE_API_TOKEN`.
+3. Account ID → `CLOUDFLARE_ACCOUNT_ID` on the **ai-alpha-squad** Cloudflare account only (not the Bmhp org account — that is a separate project).
+4. Optional: `CLOUDFLARE_EXPECT_ACCOUNT_NAME` in `.env` so `deploy-whatsapp-webhook.sh` refuses the wrong account.
+5. Local: `npm i -g wrangler` then `wrangler login` **or** use token: `export CLOUDFLARE_API_TOKEN=...`
 
 Agents use skills: `wrangler`, `cloudflare`, `workers-best-practices`, `agents-sdk`.
 

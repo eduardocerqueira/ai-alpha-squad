@@ -107,7 +107,15 @@ When complete:
 
 awaiting-approval
 
-3. Notify Director (GitHub @mention and optional WhatsApp per above).
+3. Notify Director on WhatsApp (required):
+
+   ```bash
+   ./scripts/notify-director-awaiting-approval.sh <issue_number> "One-line summary from Executive Summary"
+   ```
+
+   Uses template in [skills/whatsapp-director/SKILL.md](skills/whatsapp-director/SKILL.md). Post an issue comment if send fails (e.g. outside 24h window — Director must message the business number first, or use an approved template).
+
+4. Notify Director on GitHub (@mention on the issue).
 
 Wait until label:
 

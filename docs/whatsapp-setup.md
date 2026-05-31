@@ -74,15 +74,62 @@ python3 -m pytest tests/ -q
 
 Meta must reach a public **HTTPS** URL.
 
+### HTTPS / `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`
+
+If `*.eduardomcerqueira.workers.dev` TLS is not ready yet (new account) or the browser shows **unsupported protocol**, use a **custom domain** on this same Cloudflare account. See [whatsapp-webhook-hostname.md](whatsapp-webhook-hostname.md).
+
+```bash
+./scripts/check-whatsapp-webhook-url.sh
+```
+
 ### Option A — Cloudflare Worker (recommended)
 
 1. Ensure `wrangler login` or `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in `.env`.
-2. Deploy the squad webhook Worker (DevOps deliverable; scaffold in `workers/whatsapp-webhook/` when added).
+2. Deploy:
+
+   ```bash
+   chmod +x scripts/deploy-whatsapp-webhook.sh
+   ./scripts/deploy-whatsapp-webhook.sh
+   ```
+
+   See [workers/whatsapp-webhook/README.md](../workers/whatsapp-webhook/README.md).
+
 3. In Meta → WhatsApp → **Configuration** → **Webhook**:
-   - **Callback URL:** `https://<your-worker>.workers.dev/webhook`
+   - **Callback URL:** `https://whatsapp-webhook.aialphasquad.com/webhook` (set `WHATSAPP_WEBHOOK_HOSTNAME` in `.env`, then deploy)
    - **Verify token:** same as `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
-   - Subscribe to **messages** (and **message_echoes** if needed).
-4. Click **Verify and save** — Meta sends `hub.mode=subscribe`; Worker must return `hub.challenge`.
+   - Subscribe to **messages**
+4. Set Meta **App secret** in App settings → Basic → add as `WHATSAPP_APP_SECRET` (Worker secret + `.env`).
+5. Click **Verify and save** — Meta sends `hub.mode=subscribe`; Worker returns `hub.challenge`.
+
+### Unpublished app / Development mode
+
+Meta may show:
+
+> *Apps will only be able to receive test webhooks sent from the app dashboard while the app is unpublished…*
+
+That warning applies to the **generic App → Webhooks → Test** button. It does **not** mean WhatsApp `messages` webhooks are disabled entirely.
+
+For **AI Alpha Squad (pilot)** while the app is still **Development**:
+
+| Works without App Review | Requires publish / Live mode |
+| ------------------------ | ---------------------------- |
+| Callback URL verify (subscribe) | Messaging arbitrary customers at scale |
+| Director number listed under **WhatsApp → API Setup → test recipients** | Production traffic from anyone not on the test list |
+| Inbound text from that Director to your **test / business number** → your Worker | Some advanced permissions if you add more products |
+
+**Pilot checklist (Development):**
+
+1. App mode: **Development** (default) is fine for now.
+2. **WhatsApp → API Setup** → add Director phone as allowed **test recipient**.
+3. Subscribe webhook field **`messages`** (not every field in the list).
+4. Director sends a **text** to the Meta test business number (not only “Send test” from dashboard).
+5. Confirm issue comment on GitHub (default issue `#1` until KV correlation exists).
+
+**When to publish:** before treating WhatsApp as production for non-test users, or if webhooks never arrive despite correct URL + `messages` subscription. Publishing usually means **App Review** for `whatsapp_business_messaging` (and related) permissions — plan that as a separate milestone.
+
+### Outbound message types
+
+Outside the 24-hour customer window, use a **template** (e.g. `hello_world`). Free-form `text` works after the Director messages the business number or within the session window.
 
 ### Option B — Kapso
 
@@ -105,7 +152,17 @@ See [.github/SECRETS_AND_VARIABLES.md](../.github/SECRETS_AND_VARIABLES.md).
 
 ---
 
-## Step 6 — Test outbound (manual)
+## Step 6 — Business Owner notifies Director
+
+When `awaiting-approval` is set on an issue:
+
+```bash
+./scripts/notify-director-awaiting-approval.sh <issue_number> "Short summary for WhatsApp"
+```
+
+Requires an open **24-hour session** (Director has messaged the business number recently) or an approved template for first contact.
+
+## Step 7 — Test outbound (manual)
 
 Send a test text via curl (replace IDs and token):
 
@@ -148,6 +205,6 @@ Skill references: `whatsapp-cloud-api`, `observe-whatsapp` (Kapso).
 
 ## Next implementation tasks
 
-- [ ] Cloudflare Worker: webhook + optional auto-comment on GitHub issue
-- [ ] GitHub Action: smoke test on PR (pytest + optional dry-run send)
-- [ ] Issue context store (KV/D1) mapping last outbound → issue number
+- [x] Cloudflare Worker: webhook + GitHub issue comment ([workers/whatsapp-webhook](../workers/whatsapp-webhook/))
+- [ ] Issue context store (KV/D1) mapping last outbound → issue number (replace `WHATSAPP_DEFAULT_ISSUE_NUMBER`)
+- [ ] GitHub Action: smoke test on PR (pytest + worker tests)

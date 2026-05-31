@@ -1,0 +1,11 @@
+{
+  "name": "ai-alpha-squad-whatsapp-webhook",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-04-01",
+  "observability": { "enabled": true },
+  "vars": {
+    "GITHUB_OWNER": "eduardocerqueira",
+    "SQUAD_WORK_QUEUE_REPO": "ai-alpha-squad",
+    "WHATSAPP_DEFAULT_ISSUE_NUMBER": "1"
+  }
+}

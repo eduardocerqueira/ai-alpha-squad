@@ -220,3 +220,7 @@ __marimo__/
 
 #TODO
 TODO.md
+
+# Worker build artifacts
+workers/**/node_modules/
+workers/**/.wrangler/
