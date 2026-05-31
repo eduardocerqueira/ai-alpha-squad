@@ -150,6 +150,7 @@ activemq-data/
 # Environments
 .env
 .envrc
+.agents/squad-config.yaml
 .venv
 env/
 venv/

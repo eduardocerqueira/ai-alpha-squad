@@ -10,6 +10,8 @@ Agent-specific instructions supplement this document and never override it.
 
 Also read: [project-specification.md](project-specification.md), [definition-of-done.md](definition-of-done.md), [issue-lifecycle.md](issue-lifecycle.md), and the template index at [templates/README.md](templates/README.md). Documentation index: [README.md](README.md).
 
+Director: complete [infrastructure-prerequisites.md](infrastructure-prerequisites.md) before the first business request leaves intake (GitHub auth, `.env`, optional WhatsApp/Cloudflare/HF).
+
 ---
 
 # Core Mission

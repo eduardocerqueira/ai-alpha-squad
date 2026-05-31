@@ -16,6 +16,11 @@ devops
 
 - Technical specification
 - Infrastructure requirements
+- [infrastructure-prerequisites.md](infrastructure-prerequisites.md) (org-wide baseline; extend per job)
+
+## Prerequisites (Director)
+
+Before your first sub-issue: confirm [.env.example](../.env.example) items and [GitHub secrets](../.github/SECRETS_AND_VARIABLES.md) needed for the tech spec. Run `./scripts/verify-prerequisites.sh` from repo root.
 
 ## Responsibilities
 

@@ -13,6 +13,8 @@ All squad documentation lives in this directory. The former `doc/` folder has be
 | [templates/README.md](templates/README.md) | Fill-in templates by phase |
 | [skills/README.md](skills/README.md) | Installed agent skills (VS Code, iOS, Cloudflare, CI, …) |
 | [whatsapp-director-channel.md](whatsapp-director-channel.md) | Director WhatsApp approvals (Business Owner, Release Manager) |
+| [infrastructure-prerequisites.md](infrastructure-prerequisites.md) | Credentials, Cloudflare, GitHub, job-specific secrets (before first job) |
+| [agent-runtime-strategy.md](agent-runtime-strategy.md) | Cloud (GitHub Copilot agent) vs local Cursor |
 
 ## Agent definitions
 

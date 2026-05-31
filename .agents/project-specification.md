@@ -8,6 +8,8 @@ The system receives business requests as GitHub Issues and autonomously progress
 
 The goal is to produce production-ready software following engineering best practices while maintaining clear accountability, traceability, and human oversight.
 
+Agents may run on **GitHub Copilot cloud** (recommended for code), **Cursor** (optional), or orchestration Workers — see [agent-runtime-strategy.md](agent-runtime-strategy.md).
+
 ---
 
 # 2. Repository

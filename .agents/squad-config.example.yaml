@@ -1,0 +1,29 @@
+# Non-secret squad defaults. Copy to squad-config.yaml (gitignored) or set in GitHub Variables.
+# Secrets stay in .env / GitHub Secrets — see infrastructure-prerequisites.md
+
+github:
+  owner: eduardocerqueira
+  work_queue_repo: ai-alpha-squad
+  issues_url: https://github.com/eduardocerqueira/ai-alpha-squad/issues
+
+director:
+  github_handle: eduardocerqueira
+  # whatsapp_phone: set in .env as WHATSAPP_DIRECTOR_PHONE
+
+cloudflare:
+  account_id: ""  # fill when using Workers
+  default_compatibility_date: "2025-01-01"
+
+release:
+  changelog_path: CHANGELOG.md
+  default_release_branch: main
+
+# Target repos for example jobs (issues still opened on work_queue_repo)
+example_targets:
+  vscode_extension:
+    delivery: marketplace_and_open_vsx
+  modernize:
+    - eduardocerqueira/seeker
+    - eduardocerqueira/cloudbitsgo
+  ios_game:
+    delivery: apple_app_store
