@@ -95,6 +95,24 @@ check_env WHATSAPP_DIRECTOR_PHONE optional
 check_env WHATSAPP_PHONE_NUMBER_ID optional
 check_env WHATSAPP_ACCESS_TOKEN optional
 
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  GH_REPO="${GITHUB_OWNER:-eduardocerqueira}/${SQUAD_WORK_QUEUE_REPO:-ai-alpha-squad}"
+  for gh_key in WHATSAPP_ACCESS_TOKEN WHATSAPP_PHONE_NUMBER_ID; do
+    if gh secret list --repo "$GH_REPO" --json name -q '.[].name' 2>/dev/null | grep -qx "$gh_key"; then
+      ok "GitHub secret $gh_key set on $GH_REPO"
+    elif [[ -n "${WHATSAPP_ACCESS_TOKEN:-}" || -n "${WHATSAPP_PHONE_NUMBER_ID:-}" ]]; then
+      warn "GitHub secret $gh_key missing on $GH_REPO — run ./scripts/setup-squad-whatsapp-github.sh"
+    else
+      warn "GitHub secret $gh_key missing on $GH_REPO (optional until WhatsApp enabled)"
+    fi
+  done
+  if gh variable list --repo "$GH_REPO" --json name -q '.[].name' 2>/dev/null | grep -qx 'WHATSAPP_DIRECTOR_PHONE'; then
+    ok "GitHub variable WHATSAPP_DIRECTOR_PHONE set on $GH_REPO"
+  elif [[ -n "${WHATSAPP_DIRECTOR_PHONE:-}" ]]; then
+    warn "GitHub variable WHATSAPP_DIRECTOR_PHONE missing — run ./scripts/setup-squad-whatsapp-github.sh"
+  fi
+fi
+
 echo "--- Cloudflare (optional until used) ---"
 check_env CLOUDFLARE_API_TOKEN optional
 check_env CLOUDFLARE_ACCOUNT_ID optional

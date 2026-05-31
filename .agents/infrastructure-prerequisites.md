@@ -75,6 +75,7 @@ Required only if Business Owner / Release Manager should notify the Director out
 4. Set `WHATSAPP_DIRECTOR_PHONE` (Director personal E.164).
 5. Deploy inbound webhook (Cloudflare Worker recommended) — DevOps first-job deliverable if not done early.
 6. `WHATSAPP_WEBHOOK_VERIFY_TOKEN` — random string for GET verification.
+7. Sync to GitHub Actions: `./scripts/setup-squad-whatsapp-github.sh` (validates token; required for orchestrator WhatsApp notify).
 
 ### Kapso (alternative)
 

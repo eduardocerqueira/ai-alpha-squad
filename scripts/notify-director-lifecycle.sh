@@ -23,7 +23,11 @@ fi
 
 for key in WHATSAPP_ACCESS_TOKEN WHATSAPP_PHONE_NUMBER_ID WHATSAPP_DIRECTOR_PHONE; do
   if [[ -z "${!key:-}" ]]; then
-    echo "Skip WhatsApp ($STEP): missing $key"
+    echo "WhatsApp notify ($STEP): missing $key" >&2
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+      echo "Run ./scripts/setup-squad-whatsapp-github.sh from a machine with .env configured." >&2
+      exit 1
+    fi
     exit 0
   fi
 done

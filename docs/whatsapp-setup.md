@@ -148,6 +148,12 @@ gh secret set WHATSAPP_WEBHOOK_VERIFY_TOKEN --repo eduardocerqueira/ai-alpha-squ
 gh variable set WHATSAPP_DIRECTOR_PHONE --repo eduardocerqueira/ai-alpha-squad --body "+1..."
 ```
 
+Or from `.env` (validates token before upload):
+
+```bash
+./scripts/setup-squad-whatsapp-github.sh
+```
+
 See [.github/SECRETS_AND_VARIABLES.md](../.github/SECRETS_AND_VARIABLES.md).
 
 ---
