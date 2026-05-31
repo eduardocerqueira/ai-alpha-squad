@@ -68,9 +68,78 @@
       <p>From the Director's first signal to a production release on the target repository:</p>
     </article>
 
+    <!-- FLOW-DIAGRAM-START -->
     <figure class="flow-wrap">
-      <img src="/assets/images/squad-flow.svg" width="900" height="520" alt="Diagram: Director submits via GitHub Issue, REST API, or WhatsApp. Work flows through GitHub Issues to Business Owner, Architect, Developer, validation agents, Release Manager, and finally the target repository. Dashed line shows Director approval loop." loading="lazy">
+      <svg class="flow-diagram" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-labelledby="flowTitle flowDesc">
+  <title id="flowTitle">AI Alpha Squad delivery flow</title>
+  <desc id="flowDesc">Director submits work via GitHub Issues, API, or WhatsApp. Agents analyze, design, implement, validate, and release to the target repository.</desc>
+  <defs>
+    <marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#888"/>
+    </marker>
+    <linearGradient id="flow-boxGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#111"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="520" fill="#141414" stroke="#2a2a2a" stroke-width="1" rx="6"/>
+  <!-- Director -->
+  <rect x="30" y="200" width="120" height="56" rx="4" fill="url(#flow-boxGrad)" stroke="#666"/>
+  <text x="90" y="225" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">DIRECTOR</text>
+  <text x="90" y="242" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="9">Human authority</text>
+  <!-- Comm channels -->
+  <rect x="190" y="60" width="130" height="44" rx="4" fill="#1a1a1a" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="255" y="87" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">GitHub Issue</text>
+  <rect x="190" y="120" width="130" height="44" rx="4" fill="#1a1a1a" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="255" y="147" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">REST API</text>
+  <rect x="190" y="180" width="130" height="44" rx="4" fill="#1a1a1a" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="255" y="207" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">WhatsApp</text>
+  <!-- GH Issues hub -->
+  <rect x="360" y="185" width="140" height="66" rx="4" fill="url(#flow-boxGrad)" stroke="#666"/>
+  <text x="430" y="212" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">GitHub Issues</text>
+  <text x="430" y="230" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="9">Work queue - source of truth</text>
+  <!-- Agent pipeline -->
+  <rect x="540" y="40" width="120" height="48" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="600" y="68" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Business Owner</text>
+  <rect x="540" y="100" width="120" height="48" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="600" y="128" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Architect</text>
+  <rect x="540" y="160" width="120" height="48" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="600" y="188" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Developer</text>
+  <rect x="540" y="220" width="120" height="48" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="600" y="242" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9">QA - Security</text>
+  <text x="600" y="254" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9">DevOps - Docs</text>
+  <rect x="540" y="280" width="120" height="48" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="600" y="308" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Release Mgr</text>
+  <!-- Target repo -->
+  <rect x="710" y="185" width="150" height="66" rx="4" fill="url(#flow-boxGrad)" stroke="#777"/>
+  <text x="785" y="212" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Target Repo</text>
+  <text x="785" y="230" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="9">PR - CI/CD - Release</text>
+  <!-- Arrows -->
+  <line x1="150" y1="210" x2="185" y2="120" stroke="#666" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="150" y1="220" x2="185" y2="142" stroke="#666" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="150" y1="230" x2="185" y2="202" stroke="#666" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="320" y1="82" x2="355" y2="200" stroke="#777" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="320" y1="142" x2="355" y2="210" stroke="#777" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="320" y1="202" x2="355" y2="218" stroke="#777" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="500" y1="218" x2="535" y2="64" stroke="#777" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="660" y1="64" x2="660" y2="95" stroke="#666" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="660" y1="148" x2="660" y2="155" stroke="#666" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="660" y1="208" x2="660" y2="215" stroke="#666" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="660" y1="268" x2="660" y2="275" stroke="#666" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <line x1="660" y1="328" x2="705" y2="230" stroke="#777" stroke-width="1.5" marker-end="url(#flow-arrow)"/>
+  <!-- Approval loop -->
+  <path d="M 430 251 L 430 380 L 90 380 L 90 256" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#flow-arrow)"/>
+  <text x="260" y="400" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="9">Approvals - status - WhatsApp replies</text>
+  <!-- Legend -->
+  <rect x="30" y="450" width="12" height="12" fill="none" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="50" y="460" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Supported intake channels</text>
+  <rect x="250" y="450" width="12" height="12" fill="#1a1a1a" stroke="#666"/>
+  <text x="270" y="460" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Autonomous agents</text>
+  <line x1="450" y1="456" x2="480" y2="456" stroke="#555" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="490" y="460" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Director feedback loop</text>
+</svg>
     </figure>
+    <!-- FLOW-DIAGRAM-END -->
 
     <article class="prose">
       <h2 id="communication">Supported communication</h2>

@@ -34,6 +34,7 @@ if [[ -n "${CLOUDFLARE_EXPECT_ACCOUNT_NAME:-}" && "${ACCOUNT_NAME}" != "${CLOUDF
   exit 1
 fi
 
+python3 "$ROOT/scripts/embed-flow-diagram.py"
 npm install
 
 if [[ -n "${TURNSTILE_SECRET_KEY:-}" ]]; then

@@ -343,12 +343,19 @@ h1 .sub {
 }
 
 .flow-wrap img,
-.flow-wrap svg {
+.flow-wrap svg,
+.flow-diagram {
   display: block;
   width: 100%;
   max-width: 900px;
+  min-height: 200px;
   margin: 0 auto;
   height: auto;
+  aspect-ratio: 900 / 520;
+}
+
+.flow-diagram {
+  overflow: visible;
 }
 
 .comm-highlight {
