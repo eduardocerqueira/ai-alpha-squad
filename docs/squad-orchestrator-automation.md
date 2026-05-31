@@ -28,6 +28,7 @@ flowchart TD
 | [squad-phase-watch.yml](../.github/workflows/squad-phase-watch.yml) | schedule 15m, `repository_dispatch`, sub-issue closed, comments | Advance phases, sync labels, nudge stuck agents |
 | [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Copilot PR opened | Close planning PRs; nudge agent or sync labels |
 | [director-gate.yml](../.github/workflows/director-gate.yml) | `director-approved`, Director comments | Enforce approval gates |
+| [squad-project-sync.yml](../.github/workflows/squad-project-sync.yml) | Issue opened / labeled | Sync [Director project board](director-project-board.md) fields |
 
 ## Orchestrator nudge (recovery)
 

@@ -1,0 +1,43 @@
+# Keep GitHub Project fields in sync for Director pipeline views.
+# See docs/director-project-board.md
+name: Squad project sync
+
+permissions:
+  contents: read
+  issues: read
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled, reopened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number (optional — sync all open when empty)
+        required: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'eduardocerqueira/ai-alpha-squad'
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      SQUAD_PROJECT_OWNER: eduardocerqueira
+      SQUAD_PROJECT_NUMBER: "6"
+      SQUAD_WORK_QUEUE_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync project item
+        run: |
+          if [ -n "${{ inputs.issue_number }}" ]; then
+            python3 scripts/squad_project_sync.py sync-issue "${{ inputs.issue_number }}"
+          elif [ "${{ github.event_name }}" = "issues" ]; then
+            python3 scripts/squad_project_sync.py sync-issue "${{ github.event.issue.number }}"
+          else
+            python3 scripts/squad_project_sync.py sync-all
+          fi
