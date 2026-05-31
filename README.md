@@ -55,7 +55,7 @@ sequenceDiagram
 | Infrastructure setup | [.agents/infrastructure-prerequisites.md](.agents/infrastructure-prerequisites.md) |
 | Cloud agent runtime | [.agents/agent-runtime-strategy.md](.agents/agent-runtime-strategy.md) |
 
-**Before the first job:** copy [.env.example](.env.example) → `.env`, then run `./scripts/verify-prerequisites.sh`.
+**Before the first job:** copy [.env.example](.env.example) → `.env`, then run `./scripts/verify-prerequisites.sh`. **Branch protection:** [docs/branch-protection.md](docs/branch-protection.md) · `./scripts/setup-branch-protection.sh`
 
 **WhatsApp setup:** [docs/whatsapp-setup.md](docs/whatsapp-setup.md) · **Landing site:** [site/README.md](site/README.md) · `./scripts/deploy-landing.sh`
 
