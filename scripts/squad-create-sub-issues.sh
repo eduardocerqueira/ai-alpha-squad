@@ -147,11 +147,11 @@ ${objective}
 
 ## Acceptance Criteria
 
-\`\`\`gherkin
+```gherkin
 Given parent issue #${PARENT_ISSUE} is in designed phase
 When ${ac_when}
 Then ${ac_then}
-\`\`\`
+```
 
 ## Handoff Notes
 
