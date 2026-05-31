@@ -6,8 +6,6 @@ accepts or rejects cron expressions, thereby documenting the expected
 scheduled-run contract for the seeker modernization.
 """
 
-from __future__ import annotations
-
 import pytest
 
 from ai_alpha_squad.seeker_qa import ScheduleValidationResult, validate_cron_schedule

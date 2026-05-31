@@ -6,8 +6,6 @@ and redacts sensitive values, thereby documenting the expected
 obfuscation contract for the seeker modernization.
 """
 
-from __future__ import annotations
-
 import pytest
 
 from ai_alpha_squad.seeker_qa import (

@@ -14,18 +14,28 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+__all__ = [
+    "OBFUSCATION_PATTERNS",
+    "REDACTED",
+    "ObfuscationValidationResult",
+    "ScheduleValidationResult",
+    "redact_sensitive_data",
+    "validate_cron_schedule",
+    "validate_obfuscated_output",
+]
+
 # ---------------------------------------------------------------------------
 # FR-005 — Scheduled collection
 # ---------------------------------------------------------------------------
 
 # Cron patterns that are considered valid for seeker schedule strings.
-_VALID_CRON_RE: list[re.Pattern[str]] = [
-    re.compile(r"^\*/\d+ \* \* \* \*$"),          # every N minutes
-    re.compile(r"^\d+ \*/\d+ \* \* \*$"),          # every N hours
-    re.compile(r"^\d+ \d+ \* \* \*$"),             # daily at HH:MM
-    re.compile(r"^\d+ \d+ \d+ \* \*$"),            # monthly
-    re.compile(r"^@(hourly|daily|weekly|monthly)$"),  # standard shortcuts
-]
+_VALID_CRON_RE = (
+    re.compile(r"^\*/\d+ \* \* \* \*$"),           # every N minutes
+    re.compile(r"^\d+ \*/\d+ \* \* \*$"),           # every N hours
+    re.compile(r"^\d+ \d+ \* \* \*$"),              # daily at HH:MM
+    re.compile(r"^\d+ \d+ \d+ \* \*$"),             # monthly
+    re.compile(r"^@(hourly|daily|weekly|monthly)$"), # standard shortcuts
+)
 
 
 @dataclass
