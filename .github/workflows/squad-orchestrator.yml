@@ -84,6 +84,7 @@ jobs:
         env:
           SQUAD_DIRECTOR_LOGIN: ${{ vars.SQUAD_DIRECTOR_LOGIN }}
           SQUAD_WHATSAPP_APPROVAL_LOGIN: ${{ vars.SQUAD_WHATSAPP_APPROVAL_LOGIN }}
+          SENDER_LOGIN: ${{ github.event.sender.login }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
@@ -94,7 +95,7 @@ jobs:
             exit 1
           fi
           chmod +x ./scripts/director-gate-is-authorized.sh
-          if ./scripts/director-gate-is-authorized.sh "${{ github.event.sender.login }}"; then
+          if ./scripts/director-gate-is-authorized.sh "$SENDER_LOGIN"; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "ok=false" >> "$GITHUB_OUTPUT"

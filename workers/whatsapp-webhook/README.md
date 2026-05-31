@@ -18,7 +18,6 @@ npm install
 npx wrangler secret put WHATSAPP_WEBHOOK_VERIFY_TOKEN
 npx wrangler secret put WHATSAPP_DIRECTOR_PHONE
 npx wrangler secret put GITHUB_TOKEN
-# Optional but recommended:
 npx wrangler secret put WHATSAPP_APP_SECRET
 npm run deploy
 ```
