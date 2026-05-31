@@ -54,10 +54,11 @@ api_err() {
 
 CONTACT_ADDR="contact@${DOMAIN}"
 
-echo "=== Preflight: ./scripts/verify-cloudflare-token.sh ==="
-if ! "$ROOT/scripts/verify-cloudflare-token.sh" 2>/dev/null; then
+echo ""
+echo "=== Preflight ==="
+if ! "$ROOT/scripts/verify-cloudflare-token.sh"; then
   echo ""
-  echo "Token missing zone permissions — fix token then rerun this script."
+  echo "Fix token permissions then rerun."
   exit 1
 fi
 
@@ -108,6 +109,8 @@ if [[ $(echo "$body" | api_ok) != "True" ]]; then
   err=$(echo "$body" | api_err)
   if echo "$body" | grep -qi "already exists\|duplicate"; then
     echo "  rule already exists"
+  elif curl -sS "${API}/zones/${ZONE_ID}/email/routing/rules" "${AUTH[@]}" | grep -q "contact@${DOMAIN}"; then
+    echo "  rule already present"
   else
     echo "  create failed: $err"
     exit 1
