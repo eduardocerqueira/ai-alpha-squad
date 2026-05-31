@@ -1,0 +1,95 @@
+name: Business Request
+description: Director intake for a new feature or problem (Business Owner agent)
+title: "[Request]: "
+labels:
+  - business-owner
+  - new
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Director:** Use this template only for new business requests. Do not include technical design.
+        After submit, add a **priority** label (`critical`, `high`, `medium`, or `low`) if not `medium`.
+        Agents: follow [.agents/templates/business-analysis-template.md](https://github.com/eduardocerqueira/ai-alpha-squad/blob/main/.agents/templates/business-analysis-template.md).
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Also add the matching priority label on the issue after creation
+      options:
+        - critical
+        - high
+        - medium
+        - low
+      default: 2
+
+  - type: input
+    id: target_date
+    attributes:
+      label: Target date (optional)
+      placeholder: YYYY-MM-DD
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One paragraph — what is needed and why now
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_situation
+    attributes:
+      label: Current situation
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired_outcome
+    attributes:
+      label: Desired outcome
+    validations:
+      required: true
+
+  - type: textarea
+    id: users_affected
+    attributes:
+      label: Users or stakeholders affected
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints (budget, timeline, compliance, known technical limits)
+      placeholder: |
+        Budget / cost:
+        Timeline:
+        Compliance:
+        Technical:
+
+  - type: textarea
+    id: success_criteria
+    attributes:
+      label: Success criteria
+      description: How the Director will judge success (measurable if possible)
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      placeholder: Related issues, docs, examples, competitors
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope (initial)
+
+  - type: textarea
+    id: director_notes
+    attributes:
+      label: Director notes
+      description: Priorities or non-negotiables for the Business Owner agent

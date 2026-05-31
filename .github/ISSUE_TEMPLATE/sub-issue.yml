@@ -1,0 +1,94 @@
+name: Sub-Issue (work breakdown)
+description: Architect creates a role-specific task from the Technical Specification
+title: "[Sub-issue]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Architect:** Link the parent issue and tech spec. After submit, add the **agent label** for the role and any workflow label if needed.
+        Template: [.agents/templates/sub-issue-template.md](https://github.com/eduardocerqueira/ai-alpha-squad/blob/main/.agents/templates/sub-issue-template.md)
+
+  - type: input
+    id: parent_issue
+    attributes:
+      label: Parent issue number
+      description: e.g. 42 (without #)
+    validations:
+      required: true
+
+  - type: input
+    id: tech_spec_link
+    attributes:
+      label: Technical specification link
+      description: URL to spec comment or document
+    validations:
+      required: true
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Role (add matching agent label after submit)
+      options:
+        - developer
+        - qa
+        - security
+        - devops
+        - tech-writer
+    validations:
+      required: true
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What this sub-issue must accomplish
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope_in
+    attributes:
+      label: In scope
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope_out
+    attributes:
+      label: Out of scope
+
+  - type: textarea
+    id: traceability
+    attributes:
+      label: Requirements traceability
+      placeholder: |
+        FR-001 — ...
+        BR-001 — ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Expected deliverables
+      placeholder: e.g. PR, qa-report-template.md, security-report-template.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      placeholder: Issue # — Blocked / Ready
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes for assignee

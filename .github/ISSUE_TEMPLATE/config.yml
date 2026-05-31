@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Squad documentation
+    url: https://github.com/eduardocerqueira/ai-alpha-squad/blob/main/.agents/README.md
+    about: Agent roles, workflow, and artifact templates
+  - name: Issue lifecycle
+    url: https://github.com/eduardocerqueira/ai-alpha-squad/blob/main/.agents/issue-lifecycle.md
+    about: Status labels and transitions for every issue
