@@ -7,13 +7,20 @@ Issue labels alone are hard to read in a pipeline: an issue can carry both `busi
 ## Quick setup (5 minutes)
 
 ```bash
-gh auth refresh -s read:project,project
+unset GITHUB_TOKEN
+gh auth refresh -s read:project,project,repo,workflow
+./scripts/setup-squad-project-github.sh
+```
+
+That updates `SQUAD_ORCHESTRATOR_TOKEN` (for CI sync), creates project fields, syncs open issues, and prints view instructions.
+
+Manual only:
+
+```bash
 ./scripts/setup-squad-project-board.sh setup
 ```
 
-Then open the project and add the views printed by the script (**+ New view** for each tab).
-
-Optional: add `project` scope to `SQUAD_ORCHESTRATOR_TOKEN` so [squad-project-sync.yml](../.github/workflows/squad-project-sync.yml) keeps fields updated on every label change.
+Requires `gh` authenticated with `read:project` and `project` scopes (not a bare `GITHUB_TOKEN` with repo-only scopes).
 
 ## Project fields (auto-synced)
 
