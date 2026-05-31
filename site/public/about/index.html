@@ -72,21 +72,21 @@
 
     <!-- FLOW-DIAGRAM-START -->
     <figure class="flow-wrap">
-      <svg class="flow-diagram" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 580" role="img" aria-labelledby="flowTitle flowDesc">
+      <svg class="flow-diagram" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 580" role="img" aria-labelledby="flowTitle flowDesc">
   <title id="flowTitle">AI Alpha Squad automated delivery flow</title>
   <desc id="flowDesc">Director submits work via GitHub Issues, API, or WhatsApp. The squad orchestrator dispatches agents by lifecycle label through analysis, design, implementation on the target repo, parallel validation, and release, with Director approval gates only where required.</desc>
   <defs>
-    <marker id="flow-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-      <path d="M0,0 L6,3.5 L0,7 Z" fill="#9ca3af"/>
+    <marker id="arr-gray" viewBox="0 0 4 4" markerWidth="4" markerHeight="4" refX="3.2" refY="2" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L4,2 L0,4 Z" fill="#888"/>
     </marker>
-    <marker id="flow-arrow-sdlc" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-      <path d="M0,0 L6,3.5 L0,7 Z" fill="#22c55e"/>
+    <marker id="arr-green" viewBox="0 0 4 4" markerWidth="4" markerHeight="4" refX="3.2" refY="2" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L4,2 L0,4 Z" fill="#22c55e"/>
     </marker>
-    <marker id="flow-arrow-auto" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-      <path d="M0,0 L6,3.5 L0,7 Z" fill="#38bdf8"/>
+    <marker id="arr-blue" viewBox="0 0 4 4" markerWidth="4" markerHeight="4" refX="3.2" refY="2" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L4,2 L0,4 Z" fill="#38bdf8"/>
     </marker>
-    <marker id="flow-arrow-intake" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-      <path d="M0,0 L6,3.5 L0,7 Z" fill="#888"/>
+    <marker id="arr-lgreen" viewBox="0 0 4 4" markerWidth="4" markerHeight="4" refX="3.2" refY="2" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L4,2 L0,4 Z" fill="#86efac"/>
     </marker>
     <linearGradient id="flow-boxGrad" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#1a1a1a"/>
@@ -94,158 +94,167 @@
     </linearGradient>
   </defs>
 
-  <rect width="1180" height="580" fill="#141414" stroke="#2a2a2a" stroke-width="1" rx="6"/>
+  <rect width="1280" height="580" fill="#141414" stroke="#2a2a2a" stroke-width="1" rx="6"/>
 
-  <!-- Connectors (under blocks; routed around obstacles) -->
-  <g id="connectors" fill="none">
-    <!-- Intake / queue / orchestrator -->
-    <path d="M 132 274 L 156 274" stroke="#666" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#flow-arrow-intake)"/>
-    <path d="M 296 274 L 310 274" stroke="#777" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#flow-arrow-intake)"/>
-    <path d="M 440 274 L 454 274" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
-    <path d="M 574 274 L 588 274 L 588 113 L 598 113" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
+  <!-- Connectors -->
+  <g id="connectors" fill="none" stroke-linecap="butt" stroke-linejoin="miter">
+    <!-- Left pipeline (y=284) -->
+    <path d="M 132 284 H 164" stroke="#888" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#arr-gray)"/>
+    <path d="M 304 228 H 312 V 284 H 318" stroke="#888" stroke-width="1.25" stroke-dasharray="4 3"/>
+    <path d="M 304 284 H 318" stroke="#888" stroke-width="1.25" stroke-dasharray="4 3"/>
+    <path d="M 304 340 H 312 V 284" stroke="#888" stroke-width="1.25" stroke-dasharray="4 3"/>
+    <path d="M 318 284 H 346" stroke="#888" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#arr-gray)"/>
+    <path d="M 476 284 H 504" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
 
-    <!-- Row 1: Business Owner to Architect (above Director gate) -->
-    <path d="M 698 113 L 698 72 L 826 72 L 826 88" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
+    <!-- Orchestrator to Phase 1 -->
+    <path d="M 624 284 H 642 V 117 H 660" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
 
-    <!-- Architect to Developer (below gate 1, above Auto) -->
-    <path d="M 876 138 L 876 168 L 648 168 L 648 178" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
+    <!-- Phase 1 to Phase 2 (above Director gate) -->
+    <path d="M 760 117 H 772 V 76 H 896 V 117" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
 
-    <!-- Developer to Target Repo (above Auto PR merged) -->
-    <path d="M 698 203 L 698 170 L 998 170 L 998 178" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
+    <!-- Phase 2 to Phase 3 -->
+    <path d="M 946 142 V 167 H 710 V 192" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
 
-    <!-- Developer to Auto PR merged -->
-    <path d="M 698 203 L 718 203" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#flow-arrow-auto)"/>
+    <!-- Phase 3 to Target Repo -->
+    <path d="M 760 217 H 912" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
 
-    <!-- Auto PR merged to validation -->
-    <path d="M 762 228 L 762 268" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#flow-arrow-auto)"/>
+    <!-- Phase 3 to Auto PR merged -->
+    <path d="M 760 217 H 784" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-blue)"/>
 
-    <!-- Validation to Auto reports -->
-    <path d="M 756 376 L 756 390 L 642 390 L 642 396" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#flow-arrow-auto)"/>
+    <!-- Auto PR merged to Phase 4 -->
+    <path d="M 828 242 V 292" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-blue)"/>
 
-    <!-- Release lane below Director gate 2 (y=468) -->
-    <path d="M 686 446 L 686 468 L 756 468 L 756 446" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#flow-arrow-auto)"/>
-    <path d="M 806 446 L 806 468 L 976 468 L 976 446" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
-    <path d="M 1020 446 L 1036 446" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
+    <!-- Orchestrator to Phase 4 -->
+    <path d="M 624 330 H 660" stroke="#86efac" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arr-lgreen)"/>
 
-    <!-- Orchestrator to validation -->
-    <path d="M 574 290 L 598 290" stroke="#86efac" stroke-width="1.5" stroke-dasharray="3 2" marker-end="url(#flow-arrow-sdlc)"/>
+    <!-- Phase 4 to Auto reports -->
+    <path d="M 880 400 V 415 H 704 V 430" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-blue)"/>
+
+    <!-- Auto reports to Release Mgr -->
+    <path d="M 748 455 H 772" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-blue)"/>
+
+    <!-- Release Mgr to Released (above Director gate 2) -->
+    <path d="M 872 455 V 418 H 1008 V 455" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
+
+    <!-- Released to Ship -->
+    <path d="M 1096 455 H 1124" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
   </g>
 
   <!-- Column labels -->
   <text x="78" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Authority</text>
-  <text x="233" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Intake</text>
-  <text x="375" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Work Queue</text>
-  <text x="514" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Orchestrator</text>
-  <text x="820" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">SDLC Pipeline</text>
-  <text x="1060" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Delivery</text>
+  <text x="241" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Intake</text>
+  <text x="411" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Work Queue</text>
+  <text x="564" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Orchestrator</text>
+  <text x="880" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">SDLC Pipeline</text>
+  <text x="1184" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.08em">Delivery</text>
 
   <!-- Director -->
-  <rect x="24" y="248" width="108" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#666"/>
-  <text x="78" y="272" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Director</text>
-  <text x="78" y="288" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9">Approval gates only</text>
+  <rect x="24" y="258" width="108" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#666"/>
+  <text x="78" y="282" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Director</text>
+  <text x="78" y="298" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9">Approval gates only</text>
 
   <!-- Intake -->
-  <rect x="156" y="184" width="154" height="180" rx="8" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4"/>
-  <rect x="170" y="198" width="126" height="40" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="233" y="222" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">GH Issue</text>
-  <rect x="170" y="254" width="126" height="40" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="233" y="278" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">REST API</text>
-  <rect x="170" y="310" width="126" height="40" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="233" y="334" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">WhatsApp</text>
+  <rect x="164" y="194" width="154" height="180" rx="8" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <rect x="178" y="208" width="126" height="40" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="241" y="232" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">GH Issue</text>
+  <rect x="178" y="264" width="126" height="40" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="241" y="288" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">REST API</text>
+  <rect x="178" y="320" width="126" height="40" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="241" y="344" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="10" font-weight="600">WhatsApp</text>
 
   <!-- Work queue -->
-  <rect x="310" y="248" width="130" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#666"/>
-  <text x="375" y="268" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">GH Issues</text>
-  <text x="375" y="284" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9">Labels = phases</text>
+  <rect x="346" y="258" width="130" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#666"/>
+  <text x="411" y="278" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">GH Issues</text>
+  <text x="411" y="294" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9">Labels = phases</text>
 
   <!-- Orchestrator -->
-  <rect x="454" y="214" width="120" height="120" rx="8" fill="#152018" stroke="#22c55e" stroke-width="1.5"/>
-  <text x="514" y="242" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Orchestrator</text>
-  <text x="514" y="260" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9">squad-orchestrator</text>
-  <text x="514" y="276" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9">squad-phase-watch</text>
-  <text x="514" y="298" text-anchor="middle" fill="#aaa" font-family="system-ui,sans-serif" font-size="8">Label &#8594; dispatch</text>
-  <text x="514" y="312" text-anchor="middle" fill="#aaa" font-family="system-ui,sans-serif" font-size="8">Auto-advance phases</text>
+  <rect x="504" y="224" width="120" height="120" rx="8" fill="#152018" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="564" y="252" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Orchestrator</text>
+  <text x="564" y="270" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9">squad-orchestrator</text>
+  <text x="564" y="286" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9">squad-phase-watch</text>
+  <text x="564" y="308" text-anchor="middle" fill="#aaa" font-family="system-ui,sans-serif" font-size="8">Label &#8594; dispatch</text>
+  <text x="564" y="322" text-anchor="middle" fill="#aaa" font-family="system-ui,sans-serif" font-size="8">Auto-advance phases</text>
 
   <!-- SDLC row 1 -->
-  <rect x="598" y="88" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="648" y="108" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 1</text>
-  <text x="648" y="124" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Business Owner</text>
-  <text x="648" y="148" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: new</text>
+  <rect x="660" y="92" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="710" y="112" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 1</text>
+  <text x="710" y="128" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Business Owner</text>
+  <text x="710" y="152" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: new</text>
 
-  <rect x="718" y="88" width="88" height="50" rx="4" fill="#1f1508" stroke="#d97706" stroke-width="1.5"/>
-  <text x="762" y="110" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Director</text>
-  <text x="762" y="126" text-anchor="middle" fill="#fbbf24" font-family="system-ui,sans-serif" font-size="9">APPROVE</text>
-  <text x="762" y="148" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">awaiting-approval</text>
+  <rect x="784" y="92" width="88" height="50" rx="4" fill="#1f1508" stroke="#d97706" stroke-width="1.5"/>
+  <text x="828" y="114" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Director</text>
+  <text x="828" y="130" text-anchor="middle" fill="#fbbf24" font-family="system-ui,sans-serif" font-size="9">APPROVE</text>
+  <text x="828" y="152" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">awaiting-approval</text>
 
-  <rect x="826" y="88" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="876" y="108" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 2</text>
-  <text x="876" y="124" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Architect</text>
-  <text x="876" y="148" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">director-approved</text>
+  <rect x="896" y="92" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="946" y="112" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 2</text>
+  <text x="946" y="128" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Architect</text>
+  <text x="946" y="152" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">director-approved</text>
 
   <!-- SDLC row 2 -->
-  <rect x="598" y="178" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="648" y="198" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 3</text>
-  <text x="648" y="214" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Developer</text>
-  <text x="648" y="238" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: designed</text>
+  <rect x="660" y="192" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="710" y="212" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 3</text>
+  <text x="710" y="228" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Developer</text>
+  <text x="710" y="252" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: designed</text>
 
-  <rect x="718" y="178" width="88" height="50" rx="4" fill="#0c1929" stroke="#38bdf8" stroke-width="1.5"/>
-  <text x="762" y="200" text-anchor="middle" fill="#38bdf8" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Auto</text>
-  <text x="762" y="216" text-anchor="middle" fill="#7dd3fc" font-family="system-ui,sans-serif" font-size="9">PR merged</text>
-  <text x="762" y="238" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">&#8594; implemented</text>
+  <rect x="784" y="192" width="88" height="50" rx="4" fill="#0c1929" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="828" y="214" text-anchor="middle" fill="#38bdf8" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Auto</text>
+  <text x="828" y="230" text-anchor="middle" fill="#7dd3fc" font-family="system-ui,sans-serif" font-size="9">PR merged</text>
+  <text x="828" y="252" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">&#8594; implemented</text>
 
-  <rect x="998" y="178" width="120" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#777"/>
-  <text x="1058" y="202" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Target Repo</text>
-  <text x="1058" y="218" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9">PR / CI/CD</text>
+  <rect x="912" y="192" width="120" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#777"/>
+  <text x="972" y="216" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Target Repo</text>
+  <text x="972" y="232" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9">PR / CI/CD</text>
 
   <!-- SDLC row 3 -->
-  <rect x="598" y="268" width="408" height="108" rx="8" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4"/>
-  <text x="802" y="288" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9" font-weight="600" letter-spacing="0.06em">PHASE 4 - PARALLEL VALIDATION</text>
-  <text x="802" y="302" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: implemented &#8594; orchestrator dispatches all</text>
+  <rect x="660" y="292" width="440" height="108" rx="8" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="880" y="312" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9" font-weight="600" letter-spacing="0.06em">PHASE 4 - PARALLEL VALIDATION</text>
+  <text x="880" y="326" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: implemented &#8594; orchestrator dispatches all</text>
 
-  <rect x="614" y="314" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="658" y="336" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">QA</text>
+  <rect x="676" y="338" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="720" y="360" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">QA</text>
 
-  <rect x="712" y="314" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="756" y="336" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Security</text>
+  <rect x="780" y="338" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="824" y="360" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Security</text>
 
-  <rect x="810" y="314" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="854" y="336" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">DevOps</text>
+  <rect x="884" y="338" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="928" y="360" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">DevOps</text>
 
-  <rect x="902" y="314" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="946" y="336" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Tech Writer</text>
+  <rect x="988" y="338" width="88" height="34" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="1032" y="360" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="10">Tech Writer</text>
 
   <!-- SDLC row 4 -->
-  <rect x="598" y="396" width="88" height="50" rx="4" fill="#0c1929" stroke="#38bdf8" stroke-width="1.5"/>
-  <text x="642" y="418" text-anchor="middle" fill="#38bdf8" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Auto</text>
-  <text x="642" y="434" text-anchor="middle" fill="#7dd3fc" font-family="system-ui,sans-serif" font-size="9">Reports in</text>
-  <text x="642" y="456" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">&#8594; validation</text>
+  <rect x="660" y="430" width="88" height="50" rx="4" fill="#0c1929" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="704" y="452" text-anchor="middle" fill="#38bdf8" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Auto</text>
+  <text x="704" y="468" text-anchor="middle" fill="#7dd3fc" font-family="system-ui,sans-serif" font-size="9">Reports in</text>
+  <text x="704" y="490" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">&#8594; validation</text>
 
-  <rect x="706" y="396" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="756" y="416" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 5</text>
-  <text x="756" y="432" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Release Mgr</text>
-  <text x="756" y="456" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: validation</text>
+  <rect x="772" y="430" width="100" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="822" y="450" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 5</text>
+  <text x="822" y="466" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="10">Release Mgr</text>
+  <text x="822" y="490" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: validation</text>
 
-  <rect x="824" y="396" width="88" height="50" rx="4" fill="#1f1508" stroke="#d97706" stroke-width="1.5"/>
-  <text x="868" y="418" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Director</text>
-  <text x="868" y="434" text-anchor="middle" fill="#fbbf24" font-family="system-ui,sans-serif" font-size="9">APPROVE</text>
-  <text x="868" y="456" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">release-candidate</text>
+  <rect x="896" y="430" width="88" height="50" rx="4" fill="#1f1508" stroke="#d97706" stroke-width="1.5"/>
+  <text x="940" y="452" text-anchor="middle" fill="#d97706" font-family="system-ui,sans-serif" font-size="9" font-weight="600">Director</text>
+  <text x="940" y="468" text-anchor="middle" fill="#fbbf24" font-family="system-ui,sans-serif" font-size="9">APPROVE</text>
+  <text x="940" y="490" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">release-candidate</text>
 
-  <rect x="932" y="396" width="88" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
-  <text x="976" y="416" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 6</text>
-  <text x="976" y="432" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10">Released</text>
-  <text x="976" y="456" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: released</text>
+  <rect x="1008" y="430" width="88" height="50" rx="4" fill="#1a1a1a" stroke="#666"/>
+  <text x="1052" y="450" text-anchor="middle" fill="#e5e5e5" font-family="system-ui,sans-serif" font-size="9" font-weight="600">PHASE 6</text>
+  <text x="1052" y="466" text-anchor="middle" fill="#22c55e" font-family="system-ui,sans-serif" font-size="10">Released</text>
+  <text x="1052" y="490" text-anchor="middle" fill="#888" font-family="system-ui,sans-serif" font-size="8">label: released</text>
 
-  <rect x="1036" y="396" width="120" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#22c55e" stroke-width="1.5"/>
-  <text x="1096" y="420" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Ship</text>
-  <text x="1096" y="436" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9">Tag / Release</text>
+  <rect x="1124" y="430" width="120" height="52" rx="4" fill="url(#flow-boxGrad)" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="1184" y="454" text-anchor="middle" fill="#f0f0f0" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Ship</text>
+  <text x="1184" y="470" text-anchor="middle" fill="#86efac" font-family="system-ui,sans-serif" font-size="9">Tag / Release</text>
 
   <!-- Legend -->
   <rect x="24" y="518" width="12" height="12" rx="2" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2"/>
   <text x="44" y="528" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Agent teams / validation</text>
-  <line x1="200" y1="524" x2="230" y2="524" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#flow-arrow-sdlc)"/>
-  <text x="240" y="528" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Orchestrator dispatch</text>
-  <line x1="390" y1="524" x2="420" y2="524" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#flow-arrow-auto)"/>
-  <text x="430" y="528" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Auto-advance (phase watch)</text>
+  <line x1="200" y1="524" x2="224" y2="524" stroke="#22c55e" stroke-width="1.25" stroke-dasharray="5 3" marker-end="url(#arr-green)"/>
+  <text x="234" y="528" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Orchestrator dispatch</text>
+  <line x1="390" y1="524" x2="414" y2="524" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr-blue)"/>
+  <text x="424" y="528" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Auto-advance (phase watch)</text>
   <rect x="590" y="516" width="12" height="12" rx="2" fill="#1f1508" stroke="#d97706" stroke-width="1.5"/>
   <text x="610" y="528" fill="#aaa" font-family="system-ui,sans-serif" font-size="10">Director gate (human)</text>
   <rect x="740" y="516" width="12" height="12" fill="#1a1a1a" stroke="#666"/>
