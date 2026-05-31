@@ -59,9 +59,9 @@ if gh issue view "$ISSUE" --repo "$REPO" --json assignees -q \
 fi
 
 export REPO AGENT INSTRUCTIONS
+export INSTRUCTIONS_JSON="$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' <<<"$INSTRUCTIONS")"
 
 BODY_FILE="$(mktemp)"
-INSTRUCTIONS_JSON="$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' <<<"$INSTRUCTIONS")"
 python3 -c "
 import json, os
 payload = {
@@ -75,7 +75,6 @@ payload = {
 }
 print(json.dumps(payload))
 " > "$BODY_FILE"
-export INSTRUCTIONS_JSON
 
 if gh api --method POST \
   -H "Accept: application/vnd.github+json" \
