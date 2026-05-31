@@ -348,12 +348,13 @@ One-time UI steps (Project → + New view):
 
 2. **Pipeline by phase** (Board)
    - Filter: `is:issue is:open repo:{repo}`
-   - Group by: {FIELD_LIFECYCLE}
+   - Column field: {FIELD_LIFECYCLE}
    - Sort: Updated (newest first)
 
 3. **Pipeline by agent** (Board)
    - Filter: `is:issue is:open repo:{repo}`
-   - Group by: {FIELD_ACTIVE_AGENT}
+   - Fields: show {FIELD_ACTIVE_AGENT}, {FIELD_LIFECYCLE}, {FIELD_NEEDS_DIRECTOR}
+   - Column field: {FIELD_ACTIVE_AGENT}  (Board uses Column field, not Group)
    - Sort: Updated (newest first)
 
 4. **Needs you** (Board) — optional narrow view

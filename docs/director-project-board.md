@@ -61,14 +61,23 @@ Use this as your daily starting point.
 
 ### 2. Pipeline by agent (Board)
 
-See work grouped by squad role.
+See work in columns per squad role.
 
-- **Layout:** Board
-- **Filter:** `is:issue is:open repo:eduardocerqueira/ai-alpha-squad`
-- **Group by:** Active agent
-- **Sort:** Updated ↓
+> **GitHub quirk:** On **Board** layout, vertical columns use **Column field**, not **Group**.  
+> **Group** on a board creates horizontal *rows* (secondary). Our docs previously said "Group by" — use **Column field** below.
 
-Columns appear as: Director, business-owner, architect, developer, qa, security, devops, tech-writer, release-manager, Blocked, Done.
+1. Open the **Pipeline by agent** tab (Board layout).
+2. Click **View** (top-right menu on the project).
+3. **Fields** → enable **Active agent**, **Lifecycle**, **Needs Director** (must be visible before they appear in column picker).
+4. **Column field** → **Active agent** (replace default **Status**).
+5. **Save** the view (GitHub shows an unsaved-changes banner until you save).
+
+Optional: **Filter** → `is:issue is:open repo:eduardocerqueira/ai-alpha-squad`  
+Optional: **Sort** → Updated ↓
+
+Columns: Director, business-owner, architect, developer, qa, security, devops, tech-writer, release-manager, Blocked, Done, plus **No value** for items not synced yet.
+
+**Table alternative:** Layout **Table** → **Group** → **Active agent** (true "group by" works on table views).
 
 ### 3. Pipeline by phase (Board)
 
@@ -76,7 +85,7 @@ Classic SDLC swimlanes.
 
 - **Layout:** Board
 - **Filter:** `is:issue is:open repo:eduardocerqueira/ai-alpha-squad`
-- **Group by:** Lifecycle
+- **Column field:** Lifecycle (not Group)
 - **Sort:** Updated ↓
 
 ### 4. Needs you (Board) — optional
@@ -84,7 +93,16 @@ Classic SDLC swimlanes.
 Narrow view for approvals only.
 
 - **Filter:** `is:issue is:open repo:eduardocerqueira/ai-alpha-squad label:awaiting-approval,release-candidate`
-- **Group by:** Lifecycle
+- **Column field:** Lifecycle
+
+## Troubleshooting
+
+| Problem | Fix |
+| ------- | --- |
+| **Active agent** missing from Column field / Group menu | View menu → **Fields** → show **Active agent** first |
+| Board still shows Status columns | View menu → **Column field** → **Active agent** (not Status) |
+| Cards stuck in wrong column after sync | Drag card once in UI (known GitHub Projects API quirk) or re-save Column field |
+| Most items in **No value** | Run `./scripts/setup-squad-project-board.sh sync-all` (only open queue issues get squad fields) |
 
 ## Automation
 
