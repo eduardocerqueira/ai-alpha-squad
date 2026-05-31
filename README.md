@@ -57,4 +57,6 @@ sequenceDiagram
 
 **Before the first job:** copy [.env.example](.env.example) → `.env`, then run `./scripts/verify-prerequisites.sh`.
 
+**WhatsApp setup:** [docs/whatsapp-setup.md](docs/whatsapp-setup.md) · Unit tests: `python3 -m venv .venv && .venv/bin/pip install pytest && .venv/bin/pytest tests/ -q`
+
 **Work queue:** [GitHub Issues](https://github.com/eduardocerqueira/ai-alpha-squad/issues)

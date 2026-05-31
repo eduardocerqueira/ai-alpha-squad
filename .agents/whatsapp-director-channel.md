@@ -74,6 +74,8 @@ Inbound Director messages require a deployed webhook (Worker, API route, or Kaps
 
 Until webhooks exist, agents poll or use manual paste of Director replies into the issue comment and still run classification.
 
+**Director setup guide:** [docs/whatsapp-setup.md](../docs/whatsapp-setup.md). Reply classification is implemented in `src/ai_alpha_squad/whatsapp/` with tests in `tests/test_whatsapp_*.py`.
+
 ## Audit
 
 Every approval or rejection via WhatsApp must appear on the issue as:
