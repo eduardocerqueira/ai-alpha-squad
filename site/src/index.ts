@@ -5,6 +5,9 @@ export interface Env {
   TURNSTILE_SITE_KEY: string;
   CONTACT_TO_EMAIL: string;
   CONTACT_FROM_EMAIL: string;
+  CONTACT_DELIVERY_EMAIL: string;
+  CLOUDFLARE_ACCOUNT_ID: string;
+  CLOUDFLARE_EMAIL_SEND_TOKEN: string;
 }
 
 interface ContactPayload {
@@ -91,20 +94,63 @@ async function handleContact(request: Request, env: Env): Promise<Response> {
   `;
 
   try {
-    await env.EMAIL.send({
-      to: env.CONTACT_TO_EMAIL,
-      from: { email: env.CONTACT_FROM_EMAIL, name: "AI Alpha Squad" },
-      replyTo: { email, name },
-      subject,
-      text,
-      html,
-    });
+    await sendContactEmail(env, { name, email, subject, text, html });
   } catch (err) {
     console.error("Email send failed:", err);
     return json({ error: "Unable to send message. Please email us directly." }, 502);
   }
 
   return json({ ok: true, message: "Message sent. We will respond soon." });
+}
+
+interface OutboundEmail {
+  name: string;
+  email: string;
+  subject: string;
+  text: string;
+  html: string;
+}
+
+/** Workers EMAIL binding fails when zone sending isn't enabled; account REST API works. */
+async function sendContactEmail(env: Env, msg: OutboundEmail): Promise<void> {
+  const to = env.CONTACT_DELIVERY_EMAIL || env.CONTACT_TO_EMAIL;
+  const from = { address: env.CONTACT_FROM_EMAIL, name: "AI Alpha Squad" };
+
+  if (env.CLOUDFLARE_EMAIL_SEND_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/email/sending/send`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.CLOUDFLARE_EMAIL_SEND_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to,
+          from,
+          reply_to: { address: msg.email, name: msg.name },
+          subject: msg.subject,
+          text: msg.text,
+          html: msg.html,
+        }),
+      },
+    );
+    const data = (await res.json()) as {
+      success?: boolean;
+      errors?: { message?: string }[];
+    };
+    if (data.success) return;
+    throw new Error(data.errors?.[0]?.message ?? `Email API HTTP ${res.status}`);
+  }
+
+  await env.EMAIL.send({
+    to,
+    from: { email: from.address, name: from.name },
+    replyTo: { email: msg.email, name: msg.name },
+    subject: msg.subject,
+    text: msg.text,
+    html: msg.html,
+  });
 }
 
 async function verifyTurnstile(

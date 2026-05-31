@@ -9,6 +9,8 @@ AI Alpha Squad is an experimental delivery lab that orchestrates specialized AI 
 - Home: https://aialphasquad.com/
 - About: https://aialphasquad.com/about/
 - Contact: https://aialphasquad.com/contact/
+- Sitemap: https://aialphasquad.com/sitemap.xml
+- Robots: https://aialphasquad.com/robots.txt
 - Repository: https://github.com/eduardocerqueira/ai-alpha-squad
 - Work queue: https://github.com/users/eduardocerqueira/projects/6/views/1
 

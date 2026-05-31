@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
+    "predeploy": "python3 ../scripts/sync-site-version.py --bump && python3 ../scripts/embed-flow-diagram.py && python3 ../scripts/generate-sitemap.py",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit"
   },

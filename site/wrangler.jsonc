@@ -8,6 +8,8 @@
   "vars": {
     "CONTACT_TO_EMAIL": "contact@aialphasquad.com",
     "CONTACT_FROM_EMAIL": "noreply@aialphasquad.com",
+    "CONTACT_DELIVERY_EMAIL": "",
+    "CLOUDFLARE_ACCOUNT_ID": "",
     "TURNSTILE_SITE_KEY": "1x00000000000000000000AA"
   },
   "assets": {

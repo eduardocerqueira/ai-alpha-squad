@@ -47,7 +47,6 @@ if [[ -n "${CLOUDFLARE_EXPECT_ACCOUNT_NAME:-}" && "${ACCOUNT_NAME}" != "${CLOUDF
   exit 1
 fi
 
-python3 "$ROOT/scripts/embed-flow-diagram.py"
 npm install
 
 if [[ -n "${TURNSTILE_SECRET_KEY:-}" ]]; then
@@ -58,8 +57,20 @@ else
   echo "Warning: TURNSTILE_SECRET_KEY not set — contact form uses secret from prior deploy"
 fi
 
+EMAIL_TOKEN="${CLOUDFLARE_EMAIL_SEND_TOKEN:-${CLOUDFLARE_API_TOKEN:-}}"
+if [[ -n "$EMAIL_TOKEN" ]]; then
+  if ! echo "$EMAIL_TOKEN" | npx wrangler secret put CLOUDFLARE_EMAIL_SEND_TOKEN 2>/dev/null; then
+    echo "Warning: could not update CLOUDFLARE_EMAIL_SEND_TOKEN — contact form email may fail"
+  fi
+else
+  echo "Warning: set CLOUDFLARE_API_TOKEN (or CLOUDFLARE_EMAIL_SEND_TOKEN) for contact form email"
+fi
+
 DOMAIN="${SQUAD_DOMAIN:-}"
-DEPLOY_ARGS=()
+DEPLOY_ARGS=(--var "CLOUDFLARE_ACCOUNT_ID:${CLOUDFLARE_ACCOUNT_ID}")
+if [[ -n "${CONTACT_EMAIL_FORWARD_TO:-}" ]]; then
+  DEPLOY_ARGS+=(--var "CONTACT_DELIVERY_EMAIL:${CONTACT_EMAIL_FORWARD_TO}")
+fi
 if [[ -n "${TURNSTILE_SITE_KEY:-}" ]]; then
   DEPLOY_ARGS+=(--var "TURNSTILE_SITE_KEY:${TURNSTILE_SITE_KEY}")
 fi
