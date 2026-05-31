@@ -16,6 +16,8 @@ on:
         description: Pull request number to guard
         required: true
 
+# New workflow — first run may require repo Actions approval in GitHub UI.
+
 jobs:
   guard:
     runs-on: ubuntu-latest

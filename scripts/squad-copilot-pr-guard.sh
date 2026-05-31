@@ -38,7 +38,6 @@ if [[ -z "$ISSUE" ]]; then
 fi
 
 LABELS="$(gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' | tr '\n' ' ')"
-COMMENTS="$(gh issue view "$ISSUE" --repo "$REPO" --json comments -q '.comments[].body' | tr '\n' ' ')"
 
 phase=""
 marker=""
@@ -53,8 +52,29 @@ else
   exit 0
 fi
 
+export MARKER="$marker"
+export ISSUE
+
 has_marker=false
-if grep -qF "$marker" <<<"$COMMENTS"; then
+if python3 -c "
+import json, os, re, subprocess, sys
+repo = os.environ['REPO']
+issue = os.environ['ISSUE']
+marker = os.environ['MARKER']
+proc = subprocess.run(
+    ['gh', 'issue', 'view', issue, '--repo', repo, '--json', 'comments'],
+    capture_output=True, text=True, check=True,
+)
+comments = json.loads(proc.stdout)['comments']
+pat = re.compile(rf'(?m)^{re.escape(marker)}\s')
+for c in comments:
+    body = c.get('body') or ''
+    if 'Squad PR guard' in body:
+        continue
+    if pat.search(body):
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null; then
   has_marker=true
 fi
 
