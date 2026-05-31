@@ -55,9 +55,10 @@ Registration is **billable and non-refundable** once it succeeds.
    WHATSAPP_WEBHOOK_HOSTNAME=whatsapp-webhook.aialphasquad.com
    ```
 
-2. Deploy webhook with custom domain:
+2. Deploy landing page and webhook:
 
    ```bash
+   ./scripts/deploy-landing.sh
    ./scripts/deploy-whatsapp-webhook.sh
    ./scripts/check-whatsapp-webhook-url.sh
    ```

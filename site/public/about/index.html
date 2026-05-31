@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — AI Alpha Squad</title>
+  <meta name="description" content="The story behind AI Alpha Squad: an experimental lab where autonomous agents deliver software from Director intake through release, via GitHub Issues, API, and WhatsApp.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://aialphasquad.com/about/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://aialphasquad.com/about/">
+  <meta property="og:title" content="About AI Alpha Squad">
+  <meta property="og:description" content="An experimental multi-agent delivery lab — from Director to release.">
+  <meta property="og:image" content="https://aialphasquad.com/assets/images/squad-flow.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    "name": "About AI Alpha Squad",
+    "url": "https://aialphasquad.com/about/",
+    "description": "Experimental multi-agent software delivery lab.",
+    "isPartOf": { "@type": "WebSite", "url": "https://aialphasquad.com/" },
+    "about": {
+      "@type": "Organization",
+      "name": "AI Alpha Squad",
+      "email": "contact@aialphasquad.com"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="grid" aria-hidden="true"></canvas>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="glow" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="logo" href="/">AI Alpha Squad</a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="/">Home</a>
+      <a href="/about/" aria-current="page">About</a>
+      <a href="/contact/">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="badge">The lab</div>
+    <h1>About the squad</h1>
+    <p class="lead" style="margin-bottom:2rem">A living experiment in autonomous software delivery.</p>
+
+    <article class="prose">
+      <p>
+        AI Alpha Squad started as a question: what if a small team of specialized agents could run a full delivery cycle — from a vague business ask to a tagged release — with a human Director keeping final authority?
+      </p>
+      <p>
+        This is not a demo chatbot. It is a governed pipeline. Every decision is auditable on GitHub Issues. Every agent has a narrow mandate. Business Owner analyzes and seeks approval. Architect designs. Developer ships code to a target repository. QA, Security, DevOps, and Tech Writer validate in parallel. Release Manager gates production.
+      </p>
+      <p>
+        The lab is intentionally experimental. We iterate on orchestration, agent prompts, and cloud runtimes while keeping the same contract: <strong style="color:var(--text);font-weight:500">Issues are truth. Releases need Director sign-off. WhatsApp is for speed, not for secrets.</strong>
+      </p>
+
+      <h2 id="flow">Delivery flow</h2>
+      <p>From the Director's first signal to a production release on the target repository:</p>
+    </article>
+
+    <figure class="flow-wrap">
+      <img src="/assets/images/squad-flow.svg" width="900" height="520" alt="Diagram: Director submits via GitHub Issue, REST API, or WhatsApp. Work flows through GitHub Issues to Business Owner, Architect, Developer, validation agents, Release Manager, and finally the target repository. Dashed line shows Director approval loop." loading="lazy">
+    </figure>
+
+    <article class="prose">
+      <h2 id="communication">Supported communication</h2>
+      <p>Three intake paths converge on the same work queue. Pick what fits your workflow:</p>
+    </article>
+
+    <div class="comm-highlight">
+      <div class="comm-item">
+        <strong>GitHub Issues</strong>
+        <span>The canonical queue. Labels track lifecycle: new → awaiting-approval → approved → designed → implemented → validation → release-candidate → released.</span>
+      </div>
+      <div class="comm-item">
+        <strong>REST API</strong>
+        <span>Automate issue creation, labeling, and project board updates with the GitHub REST API. Ideal for CI hooks, internal tools, and agent-to-agent handoffs.</span>
+      </div>
+      <div class="comm-item">
+        <strong>WhatsApp</strong>
+        <span>Director channel for approvals and release go/no-go. Only Business Owner and Release Manager agents send outbound messages; inbound replies are classified and posted back to the issue within minutes.</span>
+      </div>
+    </div>
+
+    <nav class="btn-row" style="margin-top:2.5rem">
+      <a class="btn btn-primary" href="https://github.com/eduardocerqueira/ai-alpha-squad/issues/new/choose">Start a request</a>
+      <a class="btn" href="/contact/">Contact the lab</a>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <a href="mailto:contact@aialphasquad.com">contact@aialphasquad.com</a>
+    · aialphasquad.com
+  </footer>
+
+  <script src="/assets/js/grid.js" defer></script>
+</body>
+</html>

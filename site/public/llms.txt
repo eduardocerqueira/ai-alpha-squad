@@ -1,0 +1,32 @@
+# AI Alpha Squad
+
+> Autonomous multi-agent software delivery lab — business requests in, production-ready software out.
+
+AI Alpha Squad is an experimental delivery lab that orchestrates specialized AI agents from business analysis through architecture, implementation, validation, and release. The Director (human) retains final authority; GitHub Issues are the source of truth.
+
+## Canonical URLs
+
+- Home: https://aialphasquad.com/
+- About: https://aialphasquad.com/about/
+- Contact: https://aialphasquad.com/contact/
+- Repository: https://github.com/eduardocerqueira/ai-alpha-squad
+- Work queue: https://github.com/users/eduardocerqueira/projects/6/views/1
+
+## Contact
+
+- Email: contact@aialphasquad.com
+- Contact form: https://aialphasquad.com/contact/
+
+## How to reach the squad
+
+1. **GitHub Issues** — Primary work queue. Open an issue on the ai-alpha-squad repository to submit a business request.
+2. **REST API** — GitHub REST API for issues, labels, and project automation. Integrate programmatically with the work queue.
+3. **WhatsApp** — Director channel for approvals and release decisions. Business Owner and Release Manager agents message the Director; replies are mirrored to GitHub Issues.
+
+## Agent pipeline
+
+Director → GitHub Issues → Business Owner → Architect → Developer → QA / Security / DevOps / Tech Writer → Release Manager → Target repository (PR, CI/CD, release).
+
+## Keywords
+
+autonomous agents, multi-agent software delivery, AI engineering lab, GitHub Issues workflow, agent orchestration, production software delivery

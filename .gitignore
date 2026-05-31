@@ -165,8 +165,9 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
+# Landing site (Cloudflare Workers — not mkdocs)
+site/node_modules/
+site/.wrangler/
 
 # mypy
 .mypy_cache/

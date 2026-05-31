@@ -1,0 +1,20 @@
+{
+  "name": "ai-alpha-squad-landing",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-04-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "send_email": [{ "name": "EMAIL" }],
+  "vars": {
+    "CONTACT_TO_EMAIL": "contact@aialphasquad.com",
+    "CONTACT_FROM_EMAIL": "noreply@aialphasquad.com",
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA"
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  }
+}
