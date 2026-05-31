@@ -20,6 +20,12 @@ Setup guide: [.agents/infrastructure-prerequisites.md](../.agents/infrastructure
 
 Use environment-specific secrets (`production`, `staging`) once workflows exist.
 
+## Workflow token guidance
+
+- `GITHUB_TOKEN` is provided automatically inside GitHub Actions. Do **not** store it as a repository secret.
+- Verify each workflow's `permissions:` block matches the job needs before relying on `GITHUB_TOKEN` for writes, releases, or issue/PR automation.
+- Use `SQUAD_ORCHESTRATOR_TOKEN` only when a workflow needs cross-repo access or permissions the default `GITHUB_TOKEN` cannot provide.
+
 ## Repository variables (non-secret)
 
 | Name | Example |

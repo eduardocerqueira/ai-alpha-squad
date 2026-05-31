@@ -73,15 +73,18 @@ EOF
       cat > "$instructions_file" <<EOF
 You are the DevOps agent for AI Alpha Squad.
 
-Read: .agents/agent-devops.md and .agents/templates/deployment-checklist-template.md
+Read: .agents/agent-devops.md, .agents/templates/deployment-checklist-template.md, .agents/templates/runbook-template.md, .agents/templates/pull-request-template.md, and .github/SECRETS_AND_VARIABLES.md
 Parent issue: ${PARENT_URL}
 Sub-issue: #${sub_issue}
 
-1. Review and fix CI/CD on ${TARGET_REPO} (workflows, secrets, scheduled jobs, broken release.yml if present)
-2. Open PR(s) on ${TARGET_REPO} for pipeline fixes; link parent #${PARENT} and sub-issue #${sub_issue}
-3. Post deployment checklist on sub-issue #${sub_issue} — heading must include: # Deployment Checklist
-4. Close sub-issue #${sub_issue} when deliverable is posted
-5. Ensure CI runs on push to copilot/* branches where workflow approval blocks PR checks
+1. Review and harden CI/CD on ${TARGET_REPO} (workflow permissions, runtime/tooling consistency, secrets usage, scheduled jobs, broken release.yml if present)
+2. Verify default GITHUB_TOKEN permissions/config in each affected workflow; use SQUAD_ORCHESTRATOR_TOKEN only if cross-repo or elevated access is required
+3. Open PR(s) on ${TARGET_REPO} for pipeline fixes using the PR template; link parent #${PARENT}, sub-issue #${sub_issue}, and the technical spec
+4. Post deployment checklist on sub-issue #${sub_issue} — heading must include: # Deployment Checklist — and include PR links plus rollback/runbook notes
+5. Comment summary + deliverable links on parent #${PARENT}
+6. Close sub-issue #${sub_issue} when deliverable is posted
+7. Ensure CI runs on push to copilot/* branches where workflow approval blocks PR checks
+8. Do not merge to production without Director approval
 EOF
       ;;
     tech-writer)
