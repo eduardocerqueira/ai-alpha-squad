@@ -100,3 +100,10 @@ gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY"
 gh pr comment "$PR" --repo "$REPO" --body "$MSG"
 gh pr close "$PR" --repo "$REPO" --comment "Closed by squad PR guard — deliverable belongs on issue #${ISSUE}. See issue comment."
 echo "Closed PR #$PR (phase=${phase}, has_marker=${has_marker})"
+
+chmod +x "${ROOT}/scripts/squad-nudge-stuck.sh" "${ROOT}/scripts/squad-sync-planning-labels.sh"
+if [[ "$has_marker" == true ]]; then
+  "${ROOT}/scripts/squad-sync-planning-labels.sh" "$REPO" "$ISSUE" || true
+else
+  "${ROOT}/scripts/squad-nudge-stuck.sh" "$REPO" "$ISSUE" --phase "$phase" --force --reason "$REASON"
+fi

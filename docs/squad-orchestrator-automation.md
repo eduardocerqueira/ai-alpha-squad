@@ -25,8 +25,24 @@ flowchart TD
 | Workflow | Trigger | Action |
 | -------- | ------- | ------ |
 | [squad-orchestrator.yml](../.github/workflows/squad-orchestrator.yml) | `issues: labeled`, `opened` | Dispatch Copilot agent for lifecycle label |
-| [squad-phase-watch.yml](../.github/workflows/squad-phase-watch.yml) | schedule 15m, `repository_dispatch`, sub-issue closed, comments | Advance `designed`→`implemented`, `implemented`→`validation` |
+| [squad-phase-watch.yml](../.github/workflows/squad-phase-watch.yml) | schedule 15m, `repository_dispatch`, sub-issue closed, comments | Advance phases, sync labels, nudge stuck agents |
+| [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Copilot PR opened | Close planning PRs; nudge agent or sync labels |
 | [director-gate.yml](../.github/workflows/director-gate.yml) | `director-approved`, Director comments | Enforce approval gates |
+
+## Orchestrator nudge (recovery)
+
+When an agent stalls or Copilot opens a planning PR on `ai-alpha-squad` by mistake:
+
+| Trigger | Action |
+| ------- | ------ |
+| PR guard closes a planning PR | **Immediate** re-dispatch of `business-owner` or `architect` (or label sync if deliverable already on issue) |
+| Phase watch (15m) or issue comment | Scan stuck issues; re-dispatch after cooldown (default 30m, min age 15m) |
+| `# Business Analysis` posted on issue | Auto-apply `awaiting-approval` (Director WhatsApp notify follows) |
+| Tech spec + all sub-issues present | Auto-apply `designed` (Developer dispatch follows) |
+
+Env overrides: `SQUAD_NUDGE_COOLDOWN_MINUTES`, `SQUAD_NUDGE_MIN_AGE_MINUTES`.
+
+Scripts: `squad-nudge-stuck.sh`, `squad-sync-planning-labels.sh`.
 
 ## Label → action map
 

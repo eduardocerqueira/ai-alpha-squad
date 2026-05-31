@@ -63,12 +63,21 @@ jobs:
           fi
           echo "number=${PARENT}" >> "$GITHUB_OUTPUT"
 
+      - name: Sync planning labels from issue comments
+        if: github.event_name == 'issue_comment'
+        run: |
+          chmod +x ./scripts/squad-sync-planning-labels.sh
+          ISSUE="${{ github.event.issue.number }}"
+          ./scripts/squad-sync-planning-labels.sh "$REPO" "$ISSUE"
+
       - name: Run phase tick
         run: |
           chmod +x ./scripts/squad-phase-tick.sh \
             ./scripts/squad-advance-implemented.sh \
             ./scripts/squad-advance-validation.sh \
-            ./scripts/squad-find-subissues.py
+            ./scripts/squad-find-subissues.py \
+            ./scripts/squad-nudge-stuck.sh \
+            ./scripts/squad-sync-planning-labels.sh
           PARENT="${{ steps.parent.outputs.number }}"
           if [ -n "$PARENT" ]; then
             ./scripts/squad-phase-tick.sh "$REPO" "$PARENT"
