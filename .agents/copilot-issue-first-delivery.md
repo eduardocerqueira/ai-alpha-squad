@@ -35,6 +35,6 @@ If you already opened a draft PR by mistake: post the artifact on the issue, com
 
 ## Enforcement
 
-[`.github/workflows/squad-copilot-pr-guard.yml`](../.github/workflows/squad-copilot-pr-guard.yml) closes Copilot planning PRs on this repo when the issue deliverable is missing or redundant, then **nudges** the agent to retry on the issue thread.
+[`.github/workflows/squad-copilot-pr-guard.yml`](../.github/workflows/squad-copilot-pr-guard.yml) closes Copilot planning PRs on this repo when the issue deliverable is missing or redundant. The guard **polls the issue for up to ~3 minutes** (Copilot often opens the PR before posting the comment), then **nudges** the agent to retry on the issue thread if the marker is still missing.
 
 [`.github/workflows/squad-phase-watch.yml`](../.github/workflows/squad-phase-watch.yml) runs `squad-nudge-stuck.sh` on a schedule and when issue comments arrive.

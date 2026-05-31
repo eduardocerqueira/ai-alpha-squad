@@ -54,10 +54,14 @@ fi
 
 export MARKER="$marker"
 export ISSUE
+export REPO
 
-has_marker=false
-if python3 -c "
-import json, os, re, subprocess, sys
+issue_has_deliverable_marker() {
+  python3 -c "
+import json, os, subprocess, sys
+sys.path.insert(0, '${ROOT}/src')
+from ai_alpha_squad.nudge import issue_has_deliverable
+
 repo = os.environ['REPO']
 issue = os.environ['ISSUE']
 marker = os.environ['MARKER']
@@ -66,16 +70,27 @@ proc = subprocess.run(
     capture_output=True, text=True, check=True,
 )
 comments = json.loads(proc.stdout)['comments']
-pat = re.compile(rf'(?m)^{re.escape(marker)}\s')
-for c in comments:
-    body = c.get('body') or ''
-    if 'Squad PR guard' in body:
-        continue
-    if pat.search(body):
-        sys.exit(0)
-sys.exit(1)
-" 2>/dev/null; then
+sys.exit(0 if issue_has_deliverable(comments, marker) else 1)
+"
+}
+
+has_marker=false
+if issue_has_deliverable_marker 2>/dev/null; then
   has_marker=true
+fi
+
+if [[ "$has_marker" == false ]]; then
+  attempts="${SQUAD_PR_GUARD_WAIT_ATTEMPTS:-18}"
+  interval="${SQUAD_PR_GUARD_WAIT_INTERVAL_SEC:-10}"
+  echo "Waiting up to $((attempts * interval))s for deliverable on issue #${ISSUE} (${marker})..."
+  for ((i = 1; i <= attempts; i++)); do
+    sleep "$interval"
+    if issue_has_deliverable_marker 2>/dev/null; then
+      has_marker=true
+      echo "Found ${marker} on issue #${ISSUE} after ${i} poll(s)."
+      break
+    fi
+  done
 fi
 
 PR_URL="$(gh pr view "$PR" --repo "$REPO" --json url -q .url)"
