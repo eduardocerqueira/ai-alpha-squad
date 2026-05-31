@@ -98,5 +98,5 @@ Please assign **Copilot** with custom agent **\`${AGENT}\`** on this issue.
 ${INSTRUCTIONS}
 \`\`\`
 EOF
-)"
+)" || echo "Could not post fallback comment (check token permissions)"
 exit 0

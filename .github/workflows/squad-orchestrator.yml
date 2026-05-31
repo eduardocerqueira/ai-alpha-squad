@@ -2,6 +2,9 @@
 # See docs/squad-orchestrator-automation.md
 name: Squad orchestrator
 
+permissions:
+  issues: write
+
 on:
   issues:
     types: [labeled, opened]
