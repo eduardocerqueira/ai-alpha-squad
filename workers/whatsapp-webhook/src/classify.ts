@@ -1,3 +1,5 @@
+import { agentIconImg, formatSquadComment } from "./squad-comment";
+
 export type DirectorReplyIntent = "approve" | "reject" | "changes" | "ambiguous";
 
 const APPROVE_PHRASES = [
@@ -50,15 +52,18 @@ export function formatAuditComment(opts: {
   message: string;
   agent: string;
 }): string {
-  return [
+  const agentIcon = agentIconImg(opts.agent);
+  const body = [
     "## Director response (WhatsApp)",
+    "",
     `**Received:** ${opts.receivedAt}`,
     `**Classification:** ${opts.classification}`,
     `**Message:** ${opts.message.trim()}`,
-    `**Agent:** ${opts.agent}`,
+    `**Agent:** ${agentIcon} \`${opts.agent}\``,
     "",
     "_Posted automatically by Cloudflare Worker `whatsapp-webhook`._",
   ].join("\n");
+  return formatSquadComment(body, "director");
 }
 
 export function normalizePhone(phone: string): string {

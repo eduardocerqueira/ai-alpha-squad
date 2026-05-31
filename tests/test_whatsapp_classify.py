@@ -37,4 +37,5 @@ def test_format_audit_comment() -> None:
     )
     assert "## Director response (WhatsApp)" in body
     assert "**Classification:** approve" in body
-    assert "business-owner" in body
+    assert "business-owner.svg" in body
+    assert "<table>" in body

@@ -44,6 +44,8 @@ sequenceDiagram
 
 Dispatcher: [`scripts/squad-dispatch-copilot.sh`](../scripts/squad-dispatch-copilot.sh)
 
+Issue comments use line SVG avatars from [`assets/agents/`](../assets/agents/) via [`src/ai_alpha_squad/comments.py`](../src/ai_alpha_squad/comments.py) (or `scripts/format-squad-comment.py`).
+
 ### Label → action map
 
 | Label added | Auto action | Copilot custom agent | Director gate |

@@ -7,6 +7,11 @@ REPO="${1:?repo required}"
 ISSUE="${2:?issue number required}"
 LABEL="${3:?lifecycle label required}"
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FORMAT_COMMENT="${ROOT}/scripts/format-squad-comment.py"
+export SQUAD_ICON_REPO="${SQUAD_ICON_REPO:-$REPO}"
+export SQUAD_ICON_REF="${SQUAD_ICON_REF:-main}"
+
 OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
 
@@ -82,21 +87,18 @@ if gh api --method POST \
   "/repos/${OWNER}/${NAME}/issues/${ISSUE}/assignees" \
   --input "$BODY_FILE" 2>/dev/null; then
   rm -f "$BODY_FILE"
-  gh issue comment "$ISSUE" --repo "$REPO" --body "**Squad orchestrator** assigned Copilot agent \`${AGENT}\` for label \`${LABEL}\`."
+  COMMENT_BODY="$(python3 "$FORMAT_COMMENT" dispatch "$AGENT" "$LABEL" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
+  gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY"
   echo "Dispatched $AGENT on $REPO#$ISSUE"
   exit 0
 fi
 
 rm -f "$BODY_FILE"
 echo "Copilot assign API failed — posting manual instructions"
-gh issue comment "$ISSUE" --repo "$REPO" --body "$(cat <<EOF
-**Squad orchestrator** could not auto-assign Copilot (check \`SQUAD_ORCHESTRATOR_TOKEN\` / Copilot agent API).
-
-Please assign **Copilot** with custom agent **\`${AGENT}\`** on this issue.
-
-\`\`\`
-${INSTRUCTIONS}
-\`\`\`
-EOF
-)" || echo "Could not post fallback comment (check token permissions)"
+INSTRUCTIONS_FILE="$(mktemp)"
+printf '%s' "$INSTRUCTIONS" > "$INSTRUCTIONS_FILE"
+COMMENT_BODY="$(python3 "$FORMAT_COMMENT" fallback "$AGENT" --instructions-file "$INSTRUCTIONS_FILE" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
+rm -f "$INSTRUCTIONS_FILE"
+gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY" \
+  || echo "Could not post fallback comment (check token permissions)"
 exit 0

@@ -3,6 +3,8 @@
 from enum import Enum
 import re
 
+from ai_alpha_squad.comments import agent_icon_img, format_squad_comment
+
 
 class DirectorReplyIntent(str, Enum):
     APPROVE = "approve"
@@ -84,12 +86,22 @@ def format_audit_comment(
     classification: DirectorReplyIntent,
     message: str,
     agent: str,
+    repo: str | None = None,
+    ref: str | None = None,
 ) -> str:
     """GitHub issue comment body for a WhatsApp Director response."""
-    return (
-        "## Director response (WhatsApp)\n"
+    agent_icon = agent_icon_img(agent, repo=repo, ref=ref)
+    body = (
+        "## Director response (WhatsApp)\n\n"
         f"**Received:** {received_at}\n"
         f"**Classification:** {classification.value}\n"
         f"**Message:** {message.strip()}\n"
-        f"**Agent:** {agent}\n"
+        f"**Agent:** {agent_icon} `{agent}`\n\n"
+        f"_Posted automatically by Cloudflare Worker `whatsapp-webhook`._"
+    )
+    return format_squad_comment(
+        body,
+        avatar="director",
+        repo=repo,
+        ref=ref,
     )

@@ -66,8 +66,10 @@ jobs:
           SQUAD_WORK_QUEUE_REPO: ${{ github.event.repository.name }}
         run: |
           if [ -z "$WHATSAPP_ACCESS_TOKEN" ] || [ -z "$WHATSAPP_DIRECTOR_PHONE" ]; then
-            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body \
-              "**Squad orchestrator:** \`awaiting-approval\` — configure WhatsApp secrets/vars or run \`./scripts/notify-director-awaiting-approval.sh\` locally."
+            BODY="$(python3 ./scripts/format-squad-comment.py notice \
+              --message "**Squad orchestrator:** \`awaiting-approval\` — configure WhatsApp secrets/vars or run \`./scripts/notify-director-awaiting-approval.sh\` locally." \
+              --repo "$REPO")"
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$BODY"
             exit 0
           fi
           chmod +x ./scripts/notify-director-awaiting-approval.sh
