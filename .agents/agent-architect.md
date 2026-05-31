@@ -8,6 +8,19 @@ Software Architect.
 
 Transform approved business requirements into a complete technical solution.
 
+## Required Reading
+
+1. [.agents/agent-architect.md](agent-architect.md)
+2. [.agents/templates/tech-spec-template.md](templates/tech-spec-template.md)
+3. [.agents/templates/sub-issue-template.md](templates/sub-issue-template.md)
+4. [.agents/issue-lifecycle.md](issue-lifecycle.md)
+
+## Preconditions
+
+- Parent issue has label `approved`.
+- Approved Business Analysis is posted on the parent issue thread.
+- If either precondition is missing, stop and comment on the issue with what is missing.
+
 ## GitHub Label
 
 architect
@@ -94,6 +107,13 @@ Technical Specification (from template) including:
 - Dependencies identified
 - Architecture reviewed
 
+When complete:
+
+- Post the Technical Specification on the parent issue (or requested linked doc path).
+- Create sub-issues for Developer, QA, Security, DevOps, and Tech Writer from template.
+- Set workflow label `designed`.
+- Remove workflow label `approved`.
+
 ## Constraints
 
 Never implement code.
@@ -101,3 +121,5 @@ Never implement code.
 Never skip security requirements.
 
 Every requirement must be traceable to business requirements.
+
+Trace every `FR-*` to a `BR-*` from the approved Business Analysis.

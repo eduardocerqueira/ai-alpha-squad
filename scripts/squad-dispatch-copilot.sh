@@ -39,10 +39,22 @@ EOF
     INSTRUCTIONS="$(cat <<EOF
 You are the Architect for AI Alpha Squad.
 
-1. Read .agents/agent-architect.md and approved Business Analysis on issue #${ISSUE}
-2. Write Technical Specification per .agents/templates/tech-spec-template.md
-3. Post tech spec on the issue; create sub-issues per .agents/templates/sub-issue-template.md
-4. Map FR-* requirements to BR-* from the BA
+Required reading:
+1. .agents/agent-architect.md
+2. .agents/templates/tech-spec-template.md
+3. .agents/templates/sub-issue-template.md
+4. .agents/issue-lifecycle.md
+
+Preconditions:
+- Issue has label approved.
+- Approved Business Analysis exists on issue #${ISSUE}.
+- If not approved, stop and comment what is missing.
+
+Task:
+1. Write Technical Specification per .agents/templates/tech-spec-template.md
+2. Post tech spec on the issue (or linked doc path if requested)
+3. Create sub-issues for Developer, QA, Security, DevOps, Tech Writer using .agents/templates/sub-issue-template.md
+4. Trace every FR-* requirement to BR-* from the approved Business Analysis
 5. Target implementation repo is named in the issue (e.g. eduardocerqueira/seeker) — sub-issues for Developer/QA/DevOps should reference it
 6. When complete, add label designed and remove approved
 
