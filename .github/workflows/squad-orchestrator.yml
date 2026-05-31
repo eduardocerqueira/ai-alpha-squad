@@ -64,6 +64,8 @@ jobs:
       - name: Notify Director (lifecycle step)
         if: >-
           contains(fromJSON('["new","awaiting-approval","director-approved","designed","implemented","validation","release-candidate","released","blocked"]'), steps.label.outputs.name)
+        env:
+          SQUAD_WHATSAPP_NOTIFY: ${{ vars.SQUAD_WHATSAPP_NOTIFY }}
         run: |
           STEP="${{ steps.label.outputs.name }}"
           EXTRA=""
@@ -71,12 +73,7 @@ jobs:
             EXTRA="Summary: Business Analysis ready for your review."
           fi
           chmod +x ./scripts/notify-director-lifecycle.sh
-          if ! ./scripts/notify-director-lifecycle.sh "$STEP" "$ISSUE_NUMBER" "$REPO" "$EXTRA"; then
-            BODY="$(python3 ./scripts/format-squad-comment.py notice \
-              --message "**Squad orchestrator:** WhatsApp notify failed for \`$STEP\` — check WHATSAPP_* secrets/vars." \
-              --repo "$REPO")"
-            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$BODY" || true
-          fi
+          ./scripts/notify-director-lifecycle.sh "$STEP" "$ISSUE_NUMBER" "$REPO" "$EXTRA" || true
 
       - name: Verify director-approved sender
         id: director_ok
@@ -124,6 +121,8 @@ jobs:
 
       - name: Notify Director (agent dispatched)
         if: steps.dispatch.outputs.dispatched == 'true'
+        env:
+          SQUAD_WHATSAPP_NOTIFY: ${{ vars.SQUAD_WHATSAPP_NOTIFY }}
         run: |
           chmod +x ./scripts/notify-director-lifecycle.sh
           ./scripts/notify-director-lifecycle.sh "dispatched-${{ steps.dispatch.outputs.agent }}" "$ISSUE_NUMBER" "$REPO" || true
