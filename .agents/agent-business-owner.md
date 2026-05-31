@@ -102,12 +102,11 @@ Create a Business Analysis Report containing:
 
 When complete:
 
-1. Post report on issue.
-2. Add label:
-
-awaiting-approval
-
-3. Notify Director on WhatsApp (required):
+1. Post **full** Business Analysis on the issue (heading `# Business Analysis`).
+2. Add label `awaiting-approval`; remove `new`.
+3. Comment: `Squad deliverable complete on this issue.`
+4. **Do not open a PR** on ai-alpha-squad — see [copilot-issue-first-delivery.md](copilot-issue-first-delivery.md).
+5. Notify Director on WhatsApp (required):
 
    ```bash
    ./scripts/notify-director-awaiting-approval.sh <issue_number> "One-line summary from Executive Summary"
@@ -125,10 +124,11 @@ is added (Director only — see [docs/director-gate.md](../../docs/director-gate
 
 ## Definition of Done
 
-- Requirements are complete
-- Acceptance criteria defined
-- Risks documented
-- Director approval received
+- Business Analysis posted on the **issue** as a comment (`# Business Analysis`)
+- Label `awaiting-approval` applied
+- No open Copilot planning PR on ai-alpha-squad for this handoff
+- Requirements are complete; acceptance criteria defined; risks documented
+- Director approval received (`director-approved`)
 
 ## Escalation
 

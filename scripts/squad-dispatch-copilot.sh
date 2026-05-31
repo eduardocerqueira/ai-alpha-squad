@@ -24,11 +24,16 @@ case "$LABEL" in
     INSTRUCTIONS="$(cat <<EOF
 You are the Business Owner for AI Alpha Squad.
 
+Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning PR).
+
 1. Read .agents/agent-business-owner.md and .agents/templates/business-analysis-template.md
 2. Complete Business Analysis for issue #${ISSUE} (read the issue body and comments)
-3. Post the full report as an issue comment
+3. Post the FULL report as an issue comment — heading must include: # Business Analysis
 4. Add label awaiting-approval and remove label new
-5. Do NOT implement code. Do NOT open a PR on ai-alpha-squad for BA-only work.
+5. Comment on the issue: Squad deliverable complete on this issue.
+6. Do NOT open a pull request on ai-alpha-squad. Do NOT commit BA-only files. Issue comment is the deliverable.
+
+If a draft PR exists, close it after step 3–5.
 
 After posting BA, the orchestrator will notify the Director on WhatsApp.
 EOF
@@ -39,14 +44,20 @@ EOF
     INSTRUCTIONS="$(cat <<EOF
 You are the Architect for AI Alpha Squad.
 
+Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning PR).
+
 1. Read .agents/agent-architect.md and Director-approved Business Analysis on issue #${ISSUE}
 2. Write Technical Specification per .agents/templates/tech-spec-template.md
-3. Post tech spec on the issue; create sub-issues per .agents/templates/sub-issue-template.md
-4. Map FR-* requirements to BR-* from the BA
-5. Target implementation repo is named in the issue (e.g. eduardocerqueira/seeker) — sub-issues for Developer/QA/DevOps should reference it
-6. When complete, add label designed and remove director-approved
+3. Post the FULL tech spec as an issue comment — heading must include: # Technical Specification
+4. Create GitHub sub-issues (gh issue create) for Developer, QA, Security, DevOps, Tech Writer using .agents/templates/sub-issue-template.md — reference parent #${ISSUE} and target repo from the issue body
+5. Map every FR-* requirement to BR-* from the BA
+6. Add label designed and remove director-approved
+7. Comment on the issue: Squad deliverable complete on this issue.
+8. Do NOT open a pull request on ai-alpha-squad. Do NOT commit spec-only files. Issue comment + sub-issues are the deliverable.
 
-Do NOT add director-approved or approved labels. Do NOT implement application code in product repos in this session.
+If a draft PR exists, close it after steps 3–7.
+
+Do NOT add director-approved or approved labels. Do NOT implement application code in product repos.
 EOF
 )"
     ;;

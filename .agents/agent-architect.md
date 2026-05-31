@@ -89,14 +89,18 @@ Technical Specification (from template) including:
 
 ## Definition of Done
 
-- Technical specification completed
-- Sub-issues created
-- Dependencies identified
-- Architecture reviewed
+- Technical specification posted on the **parent issue** as a comment (`# Technical Specification`)
+- Sub-issues **created on GitHub** (Developer, QA, Security, DevOps, Tech Writer)
+- Label `designed` applied; `director-approved` removed
+- No open Copilot planning PR on ai-alpha-squad for this handoff
+
+See [.agents/copilot-issue-first-delivery.md](copilot-issue-first-delivery.md).
 
 ## Constraints
 
 Never implement code.
+
+Never open a pull request on ai-alpha-squad for planning-only architecture work — the issue is the deliverable.
 
 Never skip security requirements.
 

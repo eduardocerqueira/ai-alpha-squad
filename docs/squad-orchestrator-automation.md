@@ -91,6 +91,7 @@ HF Jobs / Spaces are for **GPU training, batch inference, datasets** — not Git
 | Phase | Deliverable |
 | ----- | ----------- |
 | **2a (now)** | `director-gate.yml` + `squad-orchestrator.yml` + `squad-dispatch-copilot.sh` for `new`, `awaiting-approval`, `director-approved` |
+| **2a-guard** | `squad-copilot-pr-guard.yml` closes Copilot planning PRs — [copilot-issue-first-delivery.md](../.agents/copilot-issue-first-delivery.md) |
 | **2b** | Sub-issue dispatch on `designed` (target repo + issue number in body) |
 | **2c** | Validation matrix (`implemented` → QA/Security/DevOps sub-issues) |
 | **3** | Cloudflare Workflow durable orchestration + WhatsApp + GH (optional) |

@@ -1,0 +1,38 @@
+# Close Copilot planning PRs that bypass issue-first delivery.
+# See .agents/copilot-issue-first-delivery.md
+name: Squad Copilot PR guard
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to guard
+        required: true
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'eduardocerqueira/ai-alpha-squad'
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Guard Copilot planning PR
+        run: |
+          chmod +x ./scripts/squad-copilot-pr-guard.sh
+          ./scripts/squad-copilot-pr-guard.sh "$REPO" "$PR_NUMBER"
