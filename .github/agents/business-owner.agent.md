@@ -1,7 +1,8 @@
 ---
 name: business-owner
 description: AI Alpha Squad Business Owner — analyze requests, write Business Analysis, set awaiting-approval. Issue-first delivery; no planning PR.
-tools: ["read", "search", "edit"]
+# read/search only — no repo edits; deliver via gh issue comment (issue-first, no planning PR)
+tools: ["read", "search"]
 target: github-copilot
 ---
 

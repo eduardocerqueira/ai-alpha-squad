@@ -6,6 +6,7 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
+  actions: write
 
 on:
   pull_request:
@@ -40,5 +41,6 @@ jobs:
             ./scripts/squad-nudge-stuck.sh \
             ./scripts/squad-sync-planning-labels.sh \
             ./scripts/squad-dispatch-copilot.sh \
-            ./scripts/squad-dispatch-subissue.sh
+            ./scripts/squad-dispatch-subissue.sh \
+            ./scripts/squad-approve-copilot-workflows.sh
           ./scripts/squad-copilot-pr-guard.sh "$REPO" "$PR_NUMBER"

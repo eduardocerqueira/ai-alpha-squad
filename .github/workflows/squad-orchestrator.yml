@@ -1,5 +1,5 @@
 # Auto-dispatch squad agents when lifecycle labels change (Phase 2a).
-# See docs/squad-orchestrator-automation.md
+# Phase 4 validation runs in parallel matrix jobs — see docs/squad-orchestrator-automation.md
 name: Squad orchestrator
 
 permissions:
@@ -18,7 +18,7 @@ on:
         required: true
 
 concurrency:
-  group: squad-orchestrator-${{ github.event.issue.number }}
+  group: squad-orchestrator-${{ github.event.issue.number || inputs.issue_number }}
   cancel-in-progress: false
 
 jobs:
@@ -28,6 +28,9 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch') ||
       (github.event.issue.state == 'open')
+    outputs:
+      lifecycle_label: ${{ steps.label.outputs.name }}
+      issue_number: ${{ steps.issue.outputs.number }}
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
@@ -44,6 +47,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Resolve issue number
+        id: issue
+        run: echo "number=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve lifecycle label
         id: label
@@ -107,16 +114,12 @@ jobs:
         if: >-
           steps.label.outputs.name == 'new' ||
           steps.label.outputs.name == 'designed' ||
-          steps.label.outputs.name == 'implemented' ||
           steps.label.outputs.name == 'validation' ||
           (steps.label.outputs.name == 'director-approved' && steps.director_ok.outputs.ok == 'true')
         run: |
           chmod +x ./scripts/squad-dispatch-copilot.sh \
-            ./scripts/squad-dispatch-validation.sh \
             ./scripts/squad-dispatch-subissue.sh \
-            ./scripts/squad-find-subissues.py \
-            ./scripts/squad-advance-validation.sh \
-            ./scripts/squad-advance-implemented.sh
+            ./scripts/squad-find-subissues.py
           ./scripts/squad-dispatch-copilot.sh "$REPO" "$ISSUE_NUMBER" "${{ steps.label.outputs.name }}"
 
       - name: Notify Director (agent dispatched)
@@ -126,3 +129,41 @@ jobs:
         run: |
           chmod +x ./scripts/notify-director-lifecycle.sh
           ./scripts/notify-director-lifecycle.sh "dispatched-${{ steps.dispatch.outputs.agent }}" "$ISSUE_NUMBER" "$REPO" || true
+
+  # Phase 4 — parallel validation (QA, Security, DevOps, Tech Writer)
+  dispatch-validation:
+    needs: orchestrate
+    if: needs.orchestrate.outputs.lifecycle_label == 'implemented'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [qa, security, devops, tech-writer]
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ needs.orchestrate.outputs.issue_number }}
+      PYTHONPATH: ${{ github.workspace }}/src
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dispatch validation agent (${{ matrix.role }})
+        id: dispatch
+        run: |
+          chmod +x ./scripts/squad-dispatch-validation.sh \
+            ./scripts/squad-dispatch-subissue.sh \
+            ./scripts/squad-find-subissues.py
+          ./scripts/squad-dispatch-validation.sh "$REPO" "$ISSUE_NUMBER" "${{ matrix.role }}"
+
+      - name: Notify Director (validation dispatched)
+        if: steps.dispatch.outputs.dispatched == 'true'
+        env:
+          SQUAD_WHATSAPP_NOTIFY: ${{ vars.SQUAD_WHATSAPP_NOTIFY }}
+        run: |
+          chmod +x ./scripts/notify-director-lifecycle.sh
+          ./scripts/notify-director-lifecycle.sh "dispatched-${{ matrix.role }}" "$ISSUE_NUMBER" "$REPO" || true

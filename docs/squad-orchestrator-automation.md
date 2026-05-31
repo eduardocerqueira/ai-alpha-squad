@@ -37,7 +37,7 @@ When an agent stalls or Copilot opens a planning PR on `ai-alpha-squad` by mista
 | Trigger | Action |
 | ------- | ------ |
 | PR guard closes a planning PR | **Immediate** re-dispatch of `business-owner` or `architect` (or label sync if deliverable already on issue) |
-| Phase watch (15m) or issue comment | Scan stuck issues; re-dispatch after cooldown (default 30m, min age 15m) |
+| Phase watch (15m) or issue comment | Scan stuck issues; re-dispatch after cooldown (default 30m, min age 15m); **re-dispatch missing Phase 4 roles** on `implemented` |
 | `# Business Analysis` posted on issue | Auto-apply `awaiting-approval` (Director WhatsApp notify follows) |
 | Tech spec + all sub-issues present | Auto-apply `designed` (Developer dispatch follows) |
 
@@ -53,7 +53,7 @@ Scripts: `squad-nudge-stuck.sh`, `squad-sync-planning-labels.sh`.
 | `awaiting-approval` | Optional WhatsApp notify (GitHub comment `APPROVE` always works) | — |
 | `director-approved` | Dispatch (Director gate) | `architect` |
 | `designed` | Dispatch Developer sub-issue | `developer` on target repo |
-| `implemented` | Dispatch validation sub-issues | `qa`, `security`, `devops`, `tech-writer` |
+| `implemented` | **Parallel** dispatch (matrix job) on validation sub-issues | `qa`, `security`, `devops`, `tech-writer` (4 concurrent workflow jobs) |
 | `validation` | Dispatch | `release-manager` |
 | `release-candidate` | Optional WhatsApp notify | — |
 
@@ -89,7 +89,7 @@ When a squad-linked PR merges, the queue repo receives `repository_dispatch` →
 | ---- | --- |
 | Business Analysis | `awaiting-approval` → APPROVE |
 | Merge Developer PR | Production code |
-| Approve Copilot CI (GitHub UI) | GitHub security policy on bot PRs |
+| Approve Copilot CI (GitHub UI) | Only if auto-approve script cannot run — see [copilot-workflow-approval.md](copilot-workflow-approval.md) |
 | Release | `release-candidate` → final APPROVE |
 
 ## Scripts
@@ -97,7 +97,8 @@ When a squad-linked PR merges, the queue repo receives `repository_dispatch` →
 | Script | Purpose |
 | ------ | ------- |
 | `squad-dispatch-copilot.sh` | Label → Copilot assign |
-| `squad-dispatch-validation.sh` | Fan-out validation agents |
+| `squad-dispatch-validation.sh` | Fan-out validation agents (bash parallel locally; **matrix** in orchestrator workflow) |
+| `squad-approve-copilot-workflows.sh` | Approve pending Actions runs on Copilot PRs |
 | `squad-advance-implemented.sh` | Dev PR merged → `implemented` |
 | `squad-advance-validation.sh` | All validators done → `validation` |
 | `squad-phase-tick.sh` | Run advance checks for active jobs |

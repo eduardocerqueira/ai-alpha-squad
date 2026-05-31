@@ -80,8 +80,14 @@ if gh api --method POST \
 fi
 
 rm -f "$BODY_FILE"
-echo "Copilot assign API failed — posting manual instructions"
+echo "Copilot assign API failed — posting manual instructions" >&2
 COMMENT_BODY="$(python3 "$FORMAT_COMMENT" fallback "$AGENT" --instructions-file "$INSTRUCTIONS_FILE" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
 gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY" \
-  || echo "Could not post fallback comment (check token permissions)"
+  || echo "Could not post fallback comment (check token permissions)" >&2
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "dispatched=false" >> "$GITHUB_OUTPUT"
+fi
+if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+  exit 1
+fi
 exit 0

@@ -1,7 +1,8 @@
 ---
 name: architect
 description: AI Alpha Squad Architect — technical specification and sub-issues from approved business requirements. Issue-first delivery; no planning PR on ai-alpha-squad.
-tools: ["read", "search", "edit"]
+# read/search only — spec + sub-issues on the parent issue; no planning PR on ai-alpha-squad
+tools: ["read", "search"]
 target: github-copilot
 ---
 

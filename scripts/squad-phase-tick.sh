@@ -11,11 +11,29 @@ ADVANCE_DEV="${ROOT}/scripts/squad-advance-implemented.sh"
 ADVANCE_VAL="${ROOT}/scripts/squad-advance-validation.sh"
 NUDGE="${ROOT}/scripts/squad-nudge-stuck.sh"
 SYNC="${ROOT}/scripts/squad-sync-planning-labels.sh"
+VALIDATION="${ROOT}/scripts/squad-dispatch-validation.sh"
+
+dispatch_missing_validation() {
+  local parent="$1"
+  if ! gh issue view "$parent" --repo "$REPO" --json labels -q '.labels[].name' | grep -qx 'implemented'; then
+    return 0
+  fi
+  if gh issue view "$parent" --repo "$REPO" --json labels -q '.labels[].name' | grep -qx 'validation'; then
+    return 0
+  fi
+  chmod +x "$VALIDATION" "${ROOT}/scripts/squad-dispatch-subissue.sh" "${ROOT}/scripts/squad-find-subissues.py"
+  export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+  local role
+  for role in qa security devops tech-writer; do
+    "$VALIDATION" "$REPO" "$parent" "$role" || true
+  done
+}
 
 tick_parent() {
   local parent="$1"
   "$SYNC" "$REPO" "$parent" || true
   "$ADVANCE_DEV" "$REPO" "$parent" || true
+  dispatch_missing_validation "$parent" || true
   "$ADVANCE_VAL" "$REPO" "$parent" || true
 }
 
