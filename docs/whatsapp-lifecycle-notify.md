@@ -2,6 +2,8 @@
 
 Short, objective WhatsApp messages to the Director on every squad lifecycle step.
 
+**Optional:** If Meta credentials are unavailable ([ideas#1](https://github.com/eduardocerqueira/ideas/issues/1)), the pipeline continues on GitHub. Set repo variable `SQUAD_WHATSAPP_NOTIFY=0` or leave secrets unset (`auto` mode). Approvals via issue comment `APPROVE` still work.
+
 ## Message format
 
 ```

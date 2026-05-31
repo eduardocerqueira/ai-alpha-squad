@@ -12,7 +12,7 @@ Director-owned setup **before** the first business-request issue moves past inta
 | 2 | `gh` authenticated with `repo` scope | Director | `gh auth status` |
 | 3 | `.env` copied from `.env.example` and filled | Director | `./scripts/verify-prerequisites.sh` |
 | 4 | `squad-config.yaml` from [squad-config.example.yaml](squad-config.example.yaml) (optional) | Director | — |
-| 5 | WhatsApp Director channel (if using approvals via WhatsApp) | Director | [whatsapp-director-channel.md](whatsapp-director-channel.md) |
+| 5 | WhatsApp Director channel (**optional** — GitHub `APPROVE` works without it) | Director | [whatsapp-director-channel.md](whatsapp-director-channel.md) · blocked by [ideas#1](https://github.com/eduardocerqueira/ideas/issues/1) |
 | 6 | Cloudflare account + API token (if any job uses Workers/R2/D1) | Director / DevOps | `wrangler whoami` |
 | 7 | Hugging Face token (if agents use Hub/Jobs) | Director | `hf auth whoami` |
 | 8 | Copilot coding agent enabled (cloud) **or** local Cursor | Director | [agent-runtime-strategy.md](agent-runtime-strategy.md) |

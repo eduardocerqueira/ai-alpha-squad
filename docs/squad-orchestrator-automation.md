@@ -7,7 +7,7 @@ Goal: **end-to-end SDLC with minimal Director intervention** — agents start an
 ```mermaid
 flowchart TD
   A[new issue + new label] --> BO[Business Owner]
-  BO --> AA[awaiting-approval + WhatsApp]
+  BO --> AA[awaiting-approval + optional WhatsApp]
   AA -->|Director APPROVE| DA[director-approved]
   DA --> AR[Architect]
   AR --> DE[designed]
@@ -49,12 +49,26 @@ Scripts: `squad-nudge-stuck.sh`, `squad-sync-planning-labels.sh`.
 | Label added | Auto action | Copilot agent |
 | ----------- | ----------- | ------------- |
 | `new` | Dispatch | `business-owner` |
-| `awaiting-approval` | WhatsApp Director | — |
+| `awaiting-approval` | Optional WhatsApp notify (GitHub comment `APPROVE` always works) | — |
 | `director-approved` | Dispatch (Director gate) | `architect` |
 | `designed` | Dispatch Developer sub-issue | `developer` on target repo |
 | `implemented` | Dispatch validation sub-issues | `qa`, `security`, `devops`, `tech-writer` |
 | `validation` | Dispatch | `release-manager` |
-| `release-candidate` | WhatsApp Director | — |
+| `release-candidate` | Optional WhatsApp notify | — |
+
+## WhatsApp (optional — does not block pipeline)
+
+WhatsApp is a **convenience channel** for Director notifications. The squad pipeline runs on **GitHub Issues + labels** regardless.
+
+| Mode | Behavior |
+| ---- | -------- |
+| `SQUAD_WHATSAPP_NOTIFY` unset (`auto`) | Send only when all `WHATSAPP_*` secrets/vars are set; otherwise skip silently |
+| `SQUAD_WHATSAPP_NOTIFY=0` | Never send; no issue comments about failures |
+| `SQUAD_WHATSAPP_NOTIFY=1` | Attempt send; log skip to Actions if misconfigured (still exit 0) |
+
+Meta credential migration tracked in [ideas#1](https://github.com/eduardocerqueira/ideas/issues/1). Until fixed, approve on GitHub (`APPROVE` comment or `director-approve.sh`).
+
+Orchestrator **never** posts “WhatsApp notify failed” on the issue — Copilot dispatch and label advances continue.
 
 ## Target repo hook (instant dev-merge detection)
 
@@ -94,7 +108,8 @@ When a squad-linked PR merges, the queue repo receives `repository_dispatch` →
 | ------------ | ------- |
 | `SQUAD_ORCHESTRATOR_TOKEN` | PAT: issues, Copilot assign, workflow dispatch |
 | `SQUAD_DIRECTOR_LOGIN` | Director gate |
-| `WHATSAPP_*` | Director notifications |
+| `SQUAD_WHATSAPP_NOTIFY` | Optional: `0` off, `1` on, unset = auto (send only if `WHATSAPP_*` configured) |
+| `WHATSAPP_*` | Optional Director notifications (see [ideas#1](https://github.com/eduardocerqueira/ideas/issues/1)) |
 
 ## Related
 
