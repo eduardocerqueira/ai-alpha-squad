@@ -1,0 +1,77 @@
+# Auto-dispatch squad agents when lifecycle labels change (Phase 2a).
+# See docs/squad-orchestrator-automation.md
+name: Squad orchestrator
+
+on:
+  issues:
+    types: [labeled, opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to orchestrate
+        required: true
+      lifecycle_label:
+        description: Lifecycle label (new, awaiting-approval, approved)
+        required: true
+
+concurrency:
+  group: squad-orchestrator-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >-
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.issue.state == 'open')
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+      LABEL: ${{ github.event.label.name || inputs.lifecycle_label }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve lifecycle label
+        id: label
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.lifecycle_label }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "issues" ] && [ "${{ github.event.action }}" = "opened" ]; then
+            if gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json labels -q \
+              '.labels[].name' | grep -qx 'new'; then
+              echo "name=new" >> "$GITHUB_OUTPUT"
+            else
+              echo "name=" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "name=${LABEL}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Director (awaiting-approval)
+        if: steps.label.outputs.name == 'awaiting-approval'
+        env:
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_DIRECTOR_PHONE: ${{ vars.WHATSAPP_DIRECTOR_PHONE }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+          SQUAD_WORK_QUEUE_REPO: ${{ github.event.repository.name }}
+        run: |
+          if [ -z "$WHATSAPP_ACCESS_TOKEN" ] || [ -z "$WHATSAPP_DIRECTOR_PHONE" ]; then
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body \
+              "**Squad orchestrator:** \`awaiting-approval\` — configure WhatsApp secrets/vars or run \`./scripts/notify-director-awaiting-approval.sh\` locally."
+            exit 0
+          fi
+          chmod +x ./scripts/notify-director-awaiting-approval.sh
+          ./scripts/notify-director-awaiting-approval.sh "$ISSUE_NUMBER" "Business Analysis ready — reply APPROVE, REJECT, or CHANGES on WhatsApp."
+
+      - name: Dispatch Copilot agent
+        if: steps.label.outputs.name == 'new' || steps.label.outputs.name == 'approved'
+        run: |
+          chmod +x ./scripts/squad-dispatch-copilot.sh
+          ./scripts/squad-dispatch-copilot.sh "$REPO" "$ISSUE_NUMBER" "${{ steps.label.outputs.name }}"

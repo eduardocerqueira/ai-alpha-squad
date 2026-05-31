@@ -14,6 +14,8 @@ Setup guide: [.agents/infrastructure-prerequisites.md](../.agents/infrastructure
 | `HF_TOKEN` | HF Jobs or model access in CI |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp send/receive automation |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | WhatsApp webhook Worker |
+| `WHATSAPP_PHONE_NUMBER_ID` | Outbound WhatsApp from orchestrator |
+| `SQUAD_ORCHESTRATOR_TOKEN` | PAT with issues + Copilot agent assign (preferred over default `GITHUB_TOKEN`) |
 | `APP_STORE_CONNECT_API_KEY` | Base64 or JSON key for ASC API (prefer OIDC/env file in secure runner) |
 
 Use environment-specific secrets (`production`, `staging`) once workflows exist.
@@ -25,6 +27,7 @@ Use environment-specific secrets (`production`, `staging`) once workflows exist.
 | `GITHUB_OWNER` | `eduardocerqueira` |
 | `CLOUDFLARE_ACCOUNT_ID` | From Cloudflare dashboard |
 | `VSCE_PUBLISHER` | Marketplace publisher name |
+| `WHATSAPP_DIRECTOR_PHONE` | E.164 Director number for orchestrator notify |
 
 ## Configure via CLI
 

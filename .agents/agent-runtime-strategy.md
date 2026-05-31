@@ -94,12 +94,13 @@ Merge `.github/agents/*.agent.md` to `main` so agents appear in the dropdown.
 
 ---
 
-## Path to stronger autonomy (later)
+## Path to stronger autonomy
 
-1. **Phase 1 (now):** Cloud Copilot on target repos; queue repo for BA/spec; Director approvals unchanged.
-2. **Phase 2:** GitHub Action on `issues: labeled` — comment checklist, optionally call Cursor API or re-assign Copilot with next custom agent.
-3. **Phase 3:** Cloudflare Workflow coordinates WhatsApp + issue state + dispatch.
-4. **Phase 4:** Metrics (lead time, failure rate) from Issues/Actions.
+1. **Phase 1:** Cloud Copilot on target repos; queue repo for BA/spec; Director approvals unchanged.
+2. **Phase 2a (implemented):** [`.github/workflows/squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) on lifecycle labels — dispatches Copilot `business-owner` / `architect`, WhatsApp on `awaiting-approval`. See [docs/squad-orchestrator-automation.md](../docs/squad-orchestrator-automation.md).
+3. **Phase 2b:** Sub-issue dispatch on `designed` (target repo).
+4. **Phase 3:** Cloudflare Workflow durable orchestration (optional).
+5. **Phase 4:** Metrics from Issues/Actions.
 
 Do not skip Director gates until you explicitly trust full auto-release.
 
