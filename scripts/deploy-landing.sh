@@ -19,12 +19,25 @@ if [[ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
   exit 1
 fi
 export CLOUDFLARE_ACCOUNT_ID
-[[ -n "${CLOUDFLARE_API_TOKEN:-}" ]] && export CLOUDFLARE_API_TOKEN
+# Optional separate token with Account → Workers Scripts → Edit
+if [[ -n "${CLOUDFLARE_DEPLOY_TOKEN:-}" ]]; then
+  export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_DEPLOY_TOKEN}"
+elif [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+  export CLOUDFLARE_API_TOKEN
+fi
 
 cf_account_name() {
   curl -sS "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}" \
     -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin).get('result',{}).get('name','(unknown)'))"
+    | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+result = data.get('result')
+if isinstance(result, dict) and result.get('name'):
+    print(result['name'])
+else:
+    print('(zone-scoped token)')
+"
 }
 
 ACCOUNT_NAME="$(cf_account_name)"
@@ -38,11 +51,11 @@ python3 "$ROOT/scripts/embed-flow-diagram.py"
 npm install
 
 if [[ -n "${TURNSTILE_SECRET_KEY:-}" ]]; then
-  echo "$TURNSTILE_SECRET_KEY" | npx wrangler secret put TURNSTILE_SECRET_KEY
+  if ! echo "$TURNSTILE_SECRET_KEY" | npx wrangler secret put TURNSTILE_SECRET_KEY 2>/dev/null; then
+    echo "Warning: could not update TURNSTILE_SECRET_KEY (token needs Workers Scripts secrets or use existing secret)"
+  fi
 else
-  echo "Warning: TURNSTILE_SECRET_KEY not set — using wrangler secret from prior deploy or deploy will fail on contact form"
-  echo "  Test secret: 1x0000000000000000000000000000000AA"
-  echo "  1x0000000000000000000000000000000AA" | npx wrangler secret put TURNSTILE_SECRET_KEY 2>/dev/null || true
+  echo "Warning: TURNSTILE_SECRET_KEY not set — contact form uses secret from prior deploy"
 fi
 
 DOMAIN="${SQUAD_DOMAIN:-}"

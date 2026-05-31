@@ -56,17 +56,36 @@ else
 fi
 
 fail=0
+zone_fail=0
 check "Token verify" "$verify_url" || fail=1
-check "Account read" "${API}/accounts/${CLOUDFLARE_ACCOUNT_ID}" || fail=1
-check "Zone read" "${API}/zones/${CLOUDFLARE_ZONE_ID}" || fail=1
-check "DNS list (zone)" "${API}/zones/${CLOUDFLARE_ZONE_ID}/dns_records?per_page=1" || fail=1
-check "Email routing addresses (account)" "${API}/accounts/${CLOUDFLARE_ACCOUNT_ID}/email/routing/addresses" || fail=1
-check "Email routing rules (zone)" "${API}/zones/${CLOUDFLARE_ZONE_ID}/email/routing/rules" || fail=1
-check "Email routing DNS (zone)" "${API}/zones/${CLOUDFLARE_ZONE_ID}/email/routing/dns" || fail=1
+check "Account read" "${API}/accounts/${CLOUDFLARE_ACCOUNT_ID}" || echo "  skip Account read (optional for zone-scoped tokens)"
+
+check "Zone read" "${API}/zones/${CLOUDFLARE_ZONE_ID}" || zone_fail=1
+check "DNS list (zone)" "${API}/zones/${CLOUDFLARE_ZONE_ID}/dns_records?per_page=1" || zone_fail=1
+check "Email routing addresses (account)" "${API}/accounts/${CLOUDFLARE_ACCOUNT_ID}/email/routing/addresses" || echo "  skip Email routing addresses (optional if Gmail already verified)"
+check "Email routing rules (zone)" "${API}/zones/${CLOUDFLARE_ZONE_ID}/email/routing/rules" || zone_fail=1
+check "Email routing DNS (zone)" "${API}/zones/${CLOUDFLARE_ZONE_ID}/email/routing/dns" || zone_fail=1
+
+workers_fail=0
+check "Workers service read (deploy)" \
+  "${API}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/services/ai-alpha-squad-landing" || workers_fail=1
 
 echo ""
-if [[ $fail -eq 0 ]]; then
-  echo "All checks passed. Run: ./scripts/setup-squad-email.sh"
+if [[ $zone_fail -eq 0 ]]; then
+  echo "Zone email + DNS permissions: OK (enough for routing setup)"
+  if [[ $fail -ne 0 ]]; then
+    echo "Some optional account-level checks failed — add Account permissions if contact form sending fails."
+  fi
+  if [[ $workers_fail -ne 0 ]]; then
+    echo ""
+    echo "Workers deploy: FAIL — add Account → Workers Scripts → Edit (or set CLOUDFLARE_DEPLOY_TOKEN in .env)"
+    echo "  ./scripts/deploy-landing.sh and deploy-whatsapp-webhook.sh need Workers deploy, not zone-only tokens."
+    exit 1
+  fi
+  echo "Workers deploy: OK"
+  echo ""
+  echo "Run: ./scripts/setup-squad-email.sh"
+  echo "      ./scripts/deploy-landing.sh"
   exit 0
 fi
 
