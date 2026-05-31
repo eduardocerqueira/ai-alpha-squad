@@ -18,23 +18,25 @@ from ai_alpha_squad.comments import (  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", default=None, help="owner/name for icon URLs")
-    parser.add_argument("--ref", default=None, help="git ref (default: main)")
+    parent = argparse.ArgumentParser(add_help=False)
+    parent.add_argument("--repo", default=None, help="owner/name for icon URLs")
+    parent.add_argument("--ref", default=None, help="git ref (default: main)")
+
+    parser = argparse.ArgumentParser(description=__doc__, parents=[parent])
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    dispatch = sub.add_parser("dispatch", help="Copilot assign success comment")
+    dispatch = sub.add_parser("dispatch", parents=[parent], help="Copilot assign success comment")
     dispatch.add_argument("agent")
     dispatch.add_argument("label")
 
-    fallback = sub.add_parser("fallback", help="Copilot assign failed comment")
+    fallback = sub.add_parser("fallback", parents=[parent], help="Copilot assign failed comment")
     fallback.add_argument("agent")
     fallback.add_argument("--instructions-file", required=True)
 
-    notice = sub.add_parser("notice", help="Generic orchestrator notice")
+    notice = sub.add_parser("notice", parents=[parent], help="Generic orchestrator notice")
     notice.add_argument("--message", required=True)
 
-    custom = sub.add_parser("comment", help="Arbitrary message with avatar")
+    custom = sub.add_parser("comment", parents=[parent], help="Arbitrary message with avatar")
     custom.add_argument("--avatar", required=True)
     custom.add_argument("--message", required=True)
 

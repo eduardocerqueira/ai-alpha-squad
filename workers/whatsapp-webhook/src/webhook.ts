@@ -96,7 +96,8 @@ export async function handleInboundMessage(
 
   const labels = await getIssueLabels(env, issueNumber);
   if (classification === "approve" && labels.includes("awaiting-approval")) {
-    await addIssueLabel(env, issueNumber, "approved");
+    await addIssueLabel(env, issueNumber, "director-approved");
     await removeIssueLabel(env, issueNumber, "awaiting-approval");
+    await removeIssueLabel(env, issueNumber, "approved");
   }
 }

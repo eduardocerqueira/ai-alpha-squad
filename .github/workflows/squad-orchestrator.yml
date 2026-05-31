@@ -14,7 +14,7 @@ on:
         description: Issue number to orchestrate
         required: true
       lifecycle_label:
-        description: Lifecycle label (new, awaiting-approval, approved)
+        description: Lifecycle label (new, awaiting-approval, director-approved)
         required: true
 
 concurrency:
@@ -75,8 +75,36 @@ jobs:
           chmod +x ./scripts/notify-director-awaiting-approval.sh
           ./scripts/notify-director-awaiting-approval.sh "$ISSUE_NUMBER" "Business Analysis ready — reply APPROVE, REJECT, or CHANGES on WhatsApp."
 
+      - name: Verify director-approved sender
+        id: director_ok
+        if: steps.label.outputs.name == 'director-approved'
+        env:
+          SQUAD_DIRECTOR_LOGIN: ${{ vars.SQUAD_DIRECTOR_LOGIN }}
+          SQUAD_WHATSAPP_APPROVAL_LOGIN: ${{ vars.SQUAD_WHATSAPP_APPROVAL_LOGIN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$SQUAD_DIRECTOR_LOGIN" ]; then
+            echo "::error::Set repository variable SQUAD_DIRECTOR_LOGIN"
+            exit 1
+          fi
+          chmod +x ./scripts/director-gate-is-authorized.sh
+          if ./scripts/director-gate-is-authorized.sh "${{ github.event.sender.login }}"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            BODY="$(python3 ./scripts/format-squad-comment.py notice \
+              --message "**Squad orchestrator:** skipped dispatch — \`director-approved\` was not set by the Director." \
+              --repo "$REPO")"
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$BODY"
+          fi
+
       - name: Dispatch Copilot agent
-        if: steps.label.outputs.name == 'new' || steps.label.outputs.name == 'approved'
+        if: >-
+          steps.label.outputs.name == 'new' ||
+          (steps.label.outputs.name == 'director-approved' && steps.director_ok.outputs.ok == 'true')
         run: |
           chmod +x ./scripts/squad-dispatch-copilot.sh
           ./scripts/squad-dispatch-copilot.sh "$REPO" "$ISSUE_NUMBER" "${{ steps.label.outputs.name }}"

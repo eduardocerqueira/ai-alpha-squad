@@ -79,8 +79,8 @@ Reply if you need rollback or have concerns.
 2. Classify using [whatsapp-director-channel.md](../../whatsapp-director-channel.md) table.
 3. Post audit comment on issue (required format in protocol doc).
 4. Update labels:
-   - Business Owner + **Approve** → add `approved`, remove `awaiting-approval` if policy says so
-   - **Reject** → comment, notify on issue, do not add `approved`
+   - Business Owner + **Approve** → add `director-approved`, remove `awaiting-approval` if policy says so
+   - **Reject** → comment, notify on issue, do not add `director-approved`
    - **Changes** → list questions on issue, keep `awaiting-approval`
 5. If ambiguous, send one WhatsApp follow-up:
 

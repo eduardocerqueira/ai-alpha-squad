@@ -34,19 +34,19 @@ After posting BA, the orchestrator will notify the Director on WhatsApp.
 EOF
 )"
     ;;
-  approved)
+  director-approved|approved)
     AGENT="architect"
     INSTRUCTIONS="$(cat <<EOF
 You are the Architect for AI Alpha Squad.
 
-1. Read .agents/agent-architect.md and approved Business Analysis on issue #${ISSUE}
+1. Read .agents/agent-architect.md and Director-approved Business Analysis on issue #${ISSUE}
 2. Write Technical Specification per .agents/templates/tech-spec-template.md
 3. Post tech spec on the issue; create sub-issues per .agents/templates/sub-issue-template.md
 4. Map FR-* requirements to BR-* from the BA
 5. Target implementation repo is named in the issue (e.g. eduardocerqueira/seeker) — sub-issues for Developer/QA/DevOps should reference it
-6. When complete, add label designed and remove approved
+6. When complete, add label designed and remove director-approved
 
-Do NOT implement application code in product repos in this session.
+Do NOT add director-approved or approved labels. Do NOT implement application code in product repos in this session.
 EOF
 )"
     ;;

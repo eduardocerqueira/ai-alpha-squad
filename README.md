@@ -4,7 +4,7 @@ Autonomous multi-agent software delivery squad. All documentation is under [.age
 
 ## End-to-end cycle
 
-Work is tracked on **GitHub Issues** (`ai-alpha-squad`); code ships from the **target repository**. Label flow: `new` → `awaiting-approval` → `approved` → `designed` → `implemented` → `validation` → `release-candidate` → `released`. Details: [issue lifecycle](.agents/issue-lifecycle.md).
+Work is tracked on **GitHub Issues** (`ai-alpha-squad`); code ships from the **target repository**. Label flow: `new` → `awaiting-approval` → `director-approved` → `designed` → `implemented` → `validation` → `release-candidate` → `released`. Director-only approval: [director gate](docs/director-gate.md). Details: [issue lifecycle](.agents/issue-lifecycle.md).
 
 ```mermaid
 sequenceDiagram

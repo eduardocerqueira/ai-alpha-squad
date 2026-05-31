@@ -59,7 +59,7 @@ Repository agents UI: [github.com/eduardocerqueira/ai-alpha-squad/agents](https:
 | Squad agent | Primary runtime | How to trigger |
 | ----------- | --------------- | -------------- |
 | Business Owner | Copilot custom `business-owner` **or** Cursor cloud | Issue `new` → assign session / `@copilot` with agent; post BA; `awaiting-approval` |
-| Architect | Copilot `architect` (read/edit docs) **or** Cursor | Issue `approved` → tech spec + sub-issues on queue repo |
+| Architect | Copilot `architect` (read/edit docs) **or** Cursor | Issue `director-approved` → tech spec + sub-issues on queue repo |
 | Developer | **Copilot cloud on target repo** | Sub-issue on product repo → assign Copilot `developer` |
 | QA | Copilot `qa` on target repo | Sub-issue after PR exists |
 | Security | Cursor / manual + tools | Review PR; security-report on issue |
@@ -97,7 +97,7 @@ Merge `.github/agents/*.agent.md` to `main` so agents appear in the dropdown.
 ## Path to stronger autonomy
 
 1. **Phase 1:** Cloud Copilot on target repos; queue repo for BA/spec; Director approvals unchanged.
-2. **Phase 2a (implemented):** [`.github/workflows/squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) on lifecycle labels — dispatches Copilot `business-owner` / `architect`, WhatsApp on `awaiting-approval`. See [docs/squad-orchestrator-automation.md](../docs/squad-orchestrator-automation.md).
+2. **Phase 2a (implemented):** [`.github/workflows/director-gate.yml`](../.github/workflows/director-gate.yml) + [`.github/workflows/squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) on lifecycle labels — Director-only `director-approved`, dispatches Copilot `business-owner` / `architect`, WhatsApp on `awaiting-approval`. See [docs/director-gate.md](../docs/director-gate.md), [docs/squad-orchestrator-automation.md](../docs/squad-orchestrator-automation.md).
 3. **Phase 2b:** Sub-issue dispatch on `designed` (target repo).
 4. **Phase 3:** Cloudflare Workflow durable orchestration (optional).
 5. **Phase 4:** Metrics from Issues/Actions.

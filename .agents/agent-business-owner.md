@@ -74,7 +74,7 @@ You are the only agent besides Release Manager allowed to WhatsApp the Director.
 2. When the Director replies, classify the intent (approve / reject / changes), post the audit comment on the issue, and apply labels per [whatsapp-director-channel.md](whatsapp-director-channel.md).
 3. Use API skills `whatsapp-cloud-api` or `integrate-whatsapp` for send/receive; never put secrets in messages.
 
-Do not treat WhatsApp approval as final until the audit comment and `approved` label (or documented rejection) are on the issue.
+Do not treat WhatsApp approval as final until the audit comment and `director-approved` label (or documented rejection) are on the issue.
 
 ## Deliverables
 
@@ -119,9 +119,9 @@ awaiting-approval
 
 Wait until label:
 
-approved
+director-approved
 
-is added.
+is added (Director only — see [docs/director-gate.md](../../docs/director-gate.md)).
 
 ## Definition of Done
 

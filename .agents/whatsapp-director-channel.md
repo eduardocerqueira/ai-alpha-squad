@@ -47,9 +47,9 @@ When the Director replies on WhatsApp, the handling agent must:
 
 | Intent | Example phrases (case-insensitive) | GitHub action |
 | ------ | ---------------------------------- | ------------- |
-| **Approve** | `approved`, `approve`, `yes`, `lgtm`, `go`, `ship it`, `release`, `ok to release` | Business: add `approved`. Release: note Director release approval; proceed per release plan |
+| **Approve** | `approved`, `approve`, `yes`, `lgtm`, `go`, `ship it`, `release`, `ok to release` | Business: add `director-approved`, remove `awaiting-approval`. Release: note Director release approval; proceed per release plan |
 | **Reject** | `reject`, `rejected`, `no`, `hold`, `stop`, `not approved` | Remove `awaiting-approval` / `release-candidate` if set; comment reason; return to Business Owner or blocked |
-| **Changes requested** | `changes`, `revise`, `questions`, `need more`, `clarify` | Comment questions on issue; do not add `approved`; stay in current workflow state |
+| **Changes requested** | `changes`, `revise`, `questions`, `need more`, `clarify` | Comment questions on issue; do not add `director-approved`; stay in current workflow state |
 | **Ambiguous** | Short or unclear text | Reply on WhatsApp asking Director to reply with `APPROVE`, `REJECT`, or `CHANGES:` plus detail; do not change labels |
 
 If WhatsApp and GitHub conflict, **GitHub label applied by the Director in the UI wins**; WhatsApp is used to prompt action, not override written issue history without a matching comment.

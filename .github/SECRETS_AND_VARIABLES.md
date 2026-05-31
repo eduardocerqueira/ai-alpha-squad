@@ -27,6 +27,8 @@ Use environment-specific secrets (`production`, `staging`) once workflows exist.
 | `GITHUB_OWNER` | `eduardocerqueira` |
 | `CLOUDFLARE_ACCOUNT_ID` | From Cloudflare dashboard |
 | `VSCE_PUBLISHER` | Marketplace publisher name |
+| `SQUAD_DIRECTOR_LOGIN` | Director GitHub username — required for Director gate + orchestrator verify |
+| `SQUAD_WHATSAPP_APPROVAL_LOGIN` | Optional; PAT owner login for WhatsApp Worker approvals (defaults to Director) |
 | `WHATSAPP_DIRECTOR_PHONE` | E.164 Director number for orchestrator notify |
 
 ## Configure via CLI

@@ -43,11 +43,11 @@ Actions:
 
 Exit Criteria:
 
-approved label added
+`director-approved` label added (Director only — see [docs/director-gate.md](../../docs/director-gate.md))
 
 ---
 
-## approved
+## director-approved
 
 Owner:
 
@@ -61,7 +61,13 @@ Actions:
 
 Exit Criteria:
 
-Architecture completed
+Architecture completed (`designed` label)
+
+---
+
+## approved (legacy)
+
+Deprecated alias. The Director gate converts Director-set `approved` to `director-approved`; unauthorized `approved` labels are removed.
 
 ---
 

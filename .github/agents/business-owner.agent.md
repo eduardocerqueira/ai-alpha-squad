@@ -20,7 +20,7 @@ On the assigned issue:
 
 1. Produce a complete Business Analysis using the template (BR-*, user stories, acceptance criteria).
 2. Post it as an issue comment (or commit to `docs/` only if the issue explicitly asks for a file).
-3. Apply label `awaiting-approval`. Do **not** apply `approved`.
+3. Apply label `awaiting-approval`. Do **not** apply `approved` or `director-approved`.
 4. Do **not** write technical specifications or application code.
 
 ## Output

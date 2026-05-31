@@ -1,0 +1,55 @@
+# Director-only approval gate for squad lifecycle labels.
+# See docs/director-gate.md
+name: Director gate
+
+permissions:
+  issues: write
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: director-gate-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.issue.state == 'open'
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      SQUAD_DIRECTOR_LOGIN: ${{ vars.SQUAD_DIRECTOR_LOGIN }}
+      SQUAD_WHATSAPP_APPROVAL_LOGIN: ${{ vars.SQUAD_WHATSAPP_APPROVAL_LOGIN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require Director login variable
+        run: |
+          if [ -z "$SQUAD_DIRECTOR_LOGIN" ]; then
+            echo "::error::Set repository variable SQUAD_DIRECTOR_LOGIN (Director GitHub username)."
+            exit 1
+          fi
+
+      - name: Gate lifecycle label
+        if: github.event_name == 'issues' && github.event.action == 'labeled'
+        run: |
+          chmod +x ./scripts/director-gate.sh
+          ./scripts/director-gate.sh label "$REPO" "$ISSUE_NUMBER" \
+            "${{ github.event.label.name }}" "${{ github.event.sender.login }}"
+
+      - name: Gate Director comment approval
+        if: github.event_name == 'issue_comment'
+        run: |
+          chmod +x ./scripts/director-gate.sh
+          ./scripts/director-gate.sh comment "$REPO" "$ISSUE_NUMBER" \
+            "${{ github.event.comment.user.login }}" "${{ github.event.comment.body }}"

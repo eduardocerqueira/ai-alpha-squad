@@ -6,7 +6,7 @@ Goal: **agents start automatically and pass work** via GitHub Issues labels — 
 
 | Event | Current behavior |
 | ----- | ---------------- |
-| Director adds `approved` | Label only; **Architect never starts** |
+| Director adds `director-approved` | Orchestrator dispatches **Architect** (after Director gate verifies actor) |
 | Business Owner finishes | Manual `notify-director-awaiting-approval.sh` |
 | Copilot session | Manual [Agents tab](https://github.com/eduardocerqueira/ai-alpha-squad/agents) |
 
@@ -21,11 +21,11 @@ sequenceDiagram
     participant C as Copilot cloud agent
     participant WA as WhatsApp Worker
 
-    I->>W: label added (new / awaiting-approval / approved / …)
+    I->>W: label added (new / awaiting-approval / director-approved / …)
     W->>W: map label → action
     alt awaiting-approval
         W->>WA: optional notify script (secrets)
-    else approved
+    else director-approved
         W->>C: assign copilot-swe-agent + custom_agent architect
     else new
         W->>C: assign custom_agent business-owner
@@ -52,7 +52,7 @@ Issue comments use line SVG avatars from [`assets/agents/`](../assets/agents/) v
 | ----------- | ----------- | -------------------- | ------------- |
 | `new` | Assign Copilot | `business-owner` | No |
 | `awaiting-approval` | WhatsApp notify Director | — | **Yes** — wait for APPROVE |
-| `approved` | Assign Copilot | `architect` | After Director approval |
+| `director-approved` | Assign Copilot | `architect` | After Director approval ([director-gate.md](director-gate.md)) |
 | `designed` | Comment + link sub-issues | `developer` on **target repo** sub-issues | No |
 | `release-candidate` | WhatsApp notify | `release-manager` pattern | **Yes** |
 
@@ -90,7 +90,7 @@ HF Jobs / Spaces are for **GPU training, batch inference, datasets** — not Git
 
 | Phase | Deliverable |
 | ----- | ----------- |
-| **2a (now)** | `squad-orchestrator.yml` + `squad-dispatch-copilot.sh` for `new`, `awaiting-approval`, `approved` |
+| **2a (now)** | `director-gate.yml` + `squad-orchestrator.yml` + `squad-dispatch-copilot.sh` for `new`, `awaiting-approval`, `director-approved` |
 | **2b** | Sub-issue dispatch on `designed` (target repo + issue number in body) |
 | **2c** | Validation matrix (`implemented` → QA/Security/DevOps sub-issues) |
 | **3** | Cloudflare Workflow durable orchestration + WhatsApp + GH (optional) |

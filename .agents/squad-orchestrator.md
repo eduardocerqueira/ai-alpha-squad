@@ -201,7 +201,7 @@ The Director may be reached on WhatsApp for fast approvals and status updates. P
 | Who may send | **Business Owner** and **Release Manager** only |
 | When | BA awaiting approval; release candidate; release/deploy status; critical rollback/incident |
 | Mirror to GitHub | Every send and every Director reply → issue comment within 15 minutes |
-| Labels | WhatsApp intent must match GitHub labels (`approved`, etc.); see reply classification in protocol |
+| Labels | WhatsApp intent must match GitHub labels (`director-approved`, etc.); see reply classification in protocol |
 
 Other agents use GitHub only and @mention Business Owner or Release Manager for Director contact.
 
