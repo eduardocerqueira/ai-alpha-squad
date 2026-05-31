@@ -53,7 +53,7 @@ esac
 
 # Skip if Copilot already assigned
 if gh issue view "$ISSUE" --repo "$REPO" --json assignees -q \
-  '.assignees[].login' 2>/dev/null | grep -qx 'copilot-swe-agent[bot]'; then
+  '.assignees[].login' 2>/dev/null | grep -qiE '^(copilot|copilot-swe-agent\[bot\])$'; then
   echo "Copilot already assigned on #$ISSUE — skip"
   exit 0
 fi
