@@ -1,0 +1,41 @@
+# Install on target product repos (e.g. seeker) to notify ai-alpha-squad when a squad-linked PR merges.
+# Copy to .github/workflows/squad-notify-queue.yml and set secrets:
+#   SQUAD_QUEUE_REPO — e.g. eduardocerqueira/ai-alpha-squad
+#   SQUAD_ORCHESTRATOR_TOKEN — PAT with repo scope on the queue repo (repository_dispatch)
+name: Squad queue notify
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify work queue (dev PR merged)
+        env:
+          GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN }}
+          QUEUE: ${{ vars.SQUAD_QUEUE_REPO || secrets.SQUAD_QUEUE_REPO }}
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+          PARENT="$(printf '%s' "$BODY" | grep -Eo '[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[0-9]+' | grep -i 'ai-alpha-squad' | head -1 | grep -Eo '[0-9]+$' || true)"
+          if [ -z "$PARENT" ]; then
+            PARENT="$(printf '%s' "$BODY" | grep -Eo 'ai-alpha-squad/issues/[0-9]+' | head -1 | cut -d/ -f3 || true)"
+          fi
+          if [ -z "$PARENT" ]; then
+            echo "No ai-alpha-squad parent issue in PR body — skip"
+            exit 0
+          fi
+          if [ -z "$QUEUE" ]; then
+            echo "Set SQUAD_QUEUE_REPO variable or secret"
+            exit 1
+          fi
+          gh api "repos/${QUEUE}/dispatches" \
+            -f event_type=squad-dev-merged \
+            -f "client_payload[parent_issue]=$PARENT" \
+            -f "client_payload[pr_url]=${{ github.event.pull_request.html_url }}"
+          echo "Notified $QUEUE parent issue #$PARENT"

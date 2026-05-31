@@ -1,0 +1,77 @@
+# Advance SDLC phases and detect completion (dev merge → implemented → validation → release).
+# See docs/squad-orchestrator-automation.md
+name: Squad phase watch
+
+permissions:
+  issues: write
+  pull-requests: read
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      parent_issue:
+        description: Parent issue number (optional — scans active jobs if empty)
+        required: false
+  repository_dispatch:
+    types: [squad-phase-tick, squad-dev-merged]
+  issues:
+    types: [closed]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: squad-phase-watch-${{ github.event.issue.number || github.event.client_payload.parent_issue || 'scan' }}
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve parent issue
+        id: parent
+        run: |
+          PARENT=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.parent_issue }}" ]; then
+            PARENT="${{ inputs.parent_issue }}"
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            PARENT="${{ github.event.client_payload.parent_issue }}"
+          elif [ "${{ github.event_name }}" = "issues" ] && [ "${{ github.event.action }}" = "closed" ]; then
+            BODY="$(gh issue view "${{ github.event.issue.number }}" --repo "$REPO" --json body -q .body)"
+            if echo "$BODY" | grep -q 'issues/[0-9]\+'; then
+              PARENT="$(echo "$BODY" | grep -Eo 'issues/[0-9]+' | head -1 | cut -d/ -f2)"
+            fi
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            ISSUE="${{ github.event.issue.number }}"
+            BODY="$(gh issue view "$ISSUE" --repo "$REPO" --json body -q .body)"
+            if echo "$BODY" | grep -q 'issues/[0-9]\+'; then
+              PARENT="$(echo "$BODY" | grep -Eo 'issues/[0-9]+' | head -1 | cut -d/ -f2)"
+            else
+              PARENT="$ISSUE"
+            fi
+          fi
+          echo "number=${PARENT}" >> "$GITHUB_OUTPUT"
+
+      - name: Run phase tick
+        run: |
+          chmod +x ./scripts/squad-phase-tick.sh \
+            ./scripts/squad-advance-implemented.sh \
+            ./scripts/squad-advance-validation.sh \
+            ./scripts/squad-find-subissues.py
+          PARENT="${{ steps.parent.outputs.number }}"
+          if [ -n "$PARENT" ]; then
+            ./scripts/squad-phase-tick.sh "$REPO" "$PARENT"
+          else
+            ./scripts/squad-phase-tick.sh "$REPO"
+          fi

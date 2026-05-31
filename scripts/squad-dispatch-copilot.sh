@@ -8,21 +8,21 @@ ISSUE="${2:?issue number required}"
 LABEL="${3:?lifecycle label required}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FORMAT_COMMENT="${ROOT}/scripts/format-squad-comment.py"
-export SQUAD_ICON_REPO="${SQUAD_ICON_REPO:-$REPO}"
-export SQUAD_ICON_REF="${SQUAD_ICON_REF:-main}"
+FIND="${ROOT}/scripts/squad-find-subissues.py"
+DISPATCH="${ROOT}/scripts/squad-dispatch-subissue.sh"
+VALIDATION="${ROOT}/scripts/squad-dispatch-validation.sh"
 
-OWNER="${REPO%%/*}"
-NAME="${REPO#*/}"
 TARGET_REPO="${TARGET_REPO:-$REPO}"
-
 AGENT=""
-INSTRUCTIONS=""
+PARENT_ISSUE="$ISSUE"
+DISPATCH_ISSUE="$ISSUE"
+INSTRUCTIONS_FILE=""
 
 case "$LABEL" in
   new)
     AGENT="business-owner"
-    INSTRUCTIONS="$(cat <<EOF
+    INSTRUCTIONS_FILE="$(mktemp)"
+    cat > "$INSTRUCTIONS_FILE" <<EOF
 You are the Business Owner for AI Alpha Squad.
 
 Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning PR).
@@ -38,11 +38,11 @@ If a draft PR exists, close it after step 3–5.
 
 After posting BA, the orchestrator will notify the Director on WhatsApp.
 EOF
-)"
     ;;
   director-approved|approved)
     AGENT="architect"
-    INSTRUCTIONS="$(cat <<EOF
+    INSTRUCTIONS_FILE="$(mktemp)"
+    cat > "$INSTRUCTIONS_FILE" <<EOF
 You are the Architect for AI Alpha Squad.
 
 Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning PR).
@@ -60,7 +60,6 @@ If a draft PR exists, close it after steps 3–7.
 
 Do NOT add director-approved or approved labels. Do NOT implement application code in product repos.
 EOF
-)"
     ;;
   designed)
     AGENT="developer"
@@ -70,36 +69,18 @@ EOF
         | grep -Eo 'issues/[0-9]+' | head -1 | cut -d/ -f2)"
     else
       PARENT_ISSUE="$ISSUE"
-      DEV_ISSUE="$(python3 -c "
-import json, subprocess, sys
-repo, parent = sys.argv[1], sys.argv[2]
-proc = subprocess.run(
-    ['gh', 'issue', 'list', '--repo', repo, '--label', 'developer', '--state', 'open',
-     '--json', 'number,body', '--limit', '20'],
-    capture_output=True, text=True, check=True,
-)
-needle = f'issues/{parent}'
-for item in json.loads(proc.stdout):
-    if needle in (item.get('body') or ''):
-        print(item['number'])
-        break
-" "$REPO" "$PARENT_ISSUE")"
+      DEV_ISSUE="$("$FIND" "$REPO" "$PARENT_ISSUE" developer)" || {
+        echo "No developer sub-issue found for parent #$PARENT_ISSUE"
+        exit 1
+      }
     fi
-    if [[ -z "${DEV_ISSUE:-}" ]]; then
-      echo "No developer sub-issue found for parent #$PARENT_ISSUE"
-      exit 1
-    fi
-    ISSUE="$DEV_ISSUE"
-    TARGET_REPO="$(gh issue view "$ISSUE" --repo "$REPO" --json body -q .body \
-      | grep -Eo 'https://github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+' \
-      | grep -vi 'ai-alpha-squad' | head -1 \
-      | sed 's|https://github.com/||')"
-    TARGET_REPO="${TARGET_REPO:-eduardocerqueira/seeker}"
-    export TARGET_REPO
-    INSTRUCTIONS="$(cat <<EOF
+    DISPATCH_ISSUE="$DEV_ISSUE"
+    TARGET_REPO="$("$FIND" "$REPO" "$PARENT_ISSUE" --target-repo)" || TARGET_REPO="eduardocerqueira/seeker"
+    INSTRUCTIONS_FILE="$(mktemp)"
+    cat > "$INSTRUCTIONS_FILE" <<EOF
 You are the Developer for AI Alpha Squad — implementation runs on the target product repo.
 
-Read the Developer sub-issue #${ISSUE} and squad context on parent issue #${PARENT_ISSUE}:
+Read the Developer sub-issue #${DEV_ISSUE} and squad context on parent issue #${PARENT_ISSUE}:
 https://github.com/${REPO}/issues/${PARENT_ISSUE}
 
 Technical Specification: parent issue comment with heading "# Technical Specification".
@@ -108,13 +89,40 @@ Custom agent profile on target repo: .github/agents/developer.agent.md
 1. Clone and work on target repo: ${TARGET_REPO} (branch from main)
 2. Implement Phase 1 per tech spec FR-003–FR-006 (Python LTS, pinned deps, preserve scheduled collection + obfuscation)
 3. Add/extend tests; keep CI green on your PR branch
-4. Open PR(s) on ${TARGET_REPO}; link parent #${PARENT_ISSUE}, sub-issue #${ISSUE}, FR/BR IDs in description
-5. Comment on sub-issue #${ISSUE} with PR URL(s) when ready
+4. Open PR(s) on ${TARGET_REPO}; link parent #${PARENT_ISSUE}, sub-issue #${DEV_ISSUE}, FR/BR IDs in description
+5. Comment on sub-issue #${DEV_ISSUE} with PR URL(s) when ready
 6. Do NOT merge to main. Do NOT open PRs on ai-alpha-squad for product code.
 
-Incremental PRs preferred over big-bang changes.
+After PR is merged by the Director, the orchestrator will advance the parent to \`implemented\` and dispatch validation agents automatically.
 EOF
-)"
+    ;;
+  implemented)
+    chmod +x "$VALIDATION"
+    "$VALIDATION" "$REPO" "$ISSUE"
+    exit 0
+    ;;
+  validation)
+    AGENT="release-manager"
+    if gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' | grep -qx 'release-candidate'; then
+      echo "Parent #$ISSUE already release-candidate — skip release-manager dispatch"
+      exit 0
+    fi
+    TARGET_REPO="$("$FIND" "$REPO" "$ISSUE" --target-repo)" || TARGET_REPO="$REPO"
+    INSTRUCTIONS_FILE="$(mktemp)"
+    cat > "$INSTRUCTIONS_FILE" <<EOF
+You are the Release Manager for AI Alpha Squad.
+
+Read: .agents/agent-release-manager.md and validation deliverables on issue #${ISSUE} and its sub-issues.
+
+1. Confirm QA report, Security report, DevOps checklist, and Tech Writer release notes are complete
+2. Post FULL release plan on parent issue #${ISSUE} — heading must include: # Release Plan
+3. Prepare release artifacts on target repo: ${TARGET_REPO} (version, changelog, release draft PR if needed)
+4. Add label release-candidate on parent #${ISSUE} when ready for Director final approval
+5. Comment: Squad deliverable complete on this issue.
+
+Do NOT merge release to production without Director approval. Orchestrator notifies Director on WhatsApp when release-candidate is added.
+EOF
+    DISPATCH_ISSUE="$ISSUE"
     ;;
   *)
     echo "No Copilot dispatch for label: $LABEL"
@@ -122,56 +130,7 @@ EOF
     ;;
 esac
 
-# Skip if Copilot already assigned
-if gh issue view "$ISSUE" --repo "$REPO" --json assignees -q \
-  '.assignees[].login' 2>/dev/null | grep -qiE '^(copilot|copilot-swe-agent\[bot\])$'; then
-  echo "Copilot already assigned on #$ISSUE — skip"
-  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-    echo "dispatched=false" >> "$GITHUB_OUTPUT"
-  fi
-  exit 0
-fi
-
-export REPO AGENT INSTRUCTIONS TARGET_REPO
-export INSTRUCTIONS_JSON="$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' <<<"$INSTRUCTIONS")"
-
-BODY_FILE="$(mktemp)"
-python3 -c "
-import json, os
-payload = {
-  'assignees': ['copilot-swe-agent[bot]'],
-  'agent_assignment': {
-    'target_repo': os.environ.get('TARGET_REPO', os.environ['REPO']),
-    'base_branch': 'main',
-    'custom_agent': os.environ['AGENT'],
-    'custom_instructions': json.loads(os.environ['INSTRUCTIONS_JSON']),
-  },
-}
-print(json.dumps(payload))
-" > "$BODY_FILE"
-
-if gh api --method POST \
-  -H "Accept: application/vnd.github+json" \
-  -H "X-GitHub-Api-Version: 2022-11-28" \
-  "/repos/${OWNER}/${NAME}/issues/${ISSUE}/assignees" \
-  --input "$BODY_FILE" 2>/dev/null; then
-  rm -f "$BODY_FILE"
-  COMMENT_BODY="$(python3 "$FORMAT_COMMENT" dispatch "$AGENT" "$LABEL" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
-  gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY"
-  echo "Dispatched $AGENT on $REPO#$ISSUE (target_repo=${TARGET_REPO})"
-  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-    echo "dispatched=true" >> "$GITHUB_OUTPUT"
-    echo "agent=$AGENT" >> "$GITHUB_OUTPUT"
-  fi
-  exit 0
-fi
-
-rm -f "$BODY_FILE"
-echo "Copilot assign API failed — posting manual instructions"
-INSTRUCTIONS_FILE="$(mktemp)"
-printf '%s' "$INSTRUCTIONS" > "$INSTRUCTIONS_FILE"
-COMMENT_BODY="$(python3 "$FORMAT_COMMENT" fallback "$AGENT" --instructions-file "$INSTRUCTIONS_FILE" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
+export DISPATCH_LABEL="$LABEL"
+chmod +x "$DISPATCH"
+"$DISPATCH" "$REPO" "$DISPATCH_ISSUE" "$AGENT" "$TARGET_REPO" "$INSTRUCTIONS_FILE"
 rm -f "$INSTRUCTIONS_FILE"
-gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY" \
-  || echo "Could not post fallback comment (check token permissions)"
-exit 0

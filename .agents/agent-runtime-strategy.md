@@ -97,10 +97,9 @@ Merge `.github/agents/*.agent.md` to `main` so agents appear in the dropdown.
 ## Path to stronger autonomy
 
 1. **Phase 1:** Cloud Copilot on target repos; queue repo for BA/spec; Director approvals unchanged.
-2. **Phase 2a (implemented):** [`.github/workflows/director-gate.yml`](../.github/workflows/director-gate.yml) + [`.github/workflows/squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) on lifecycle labels — Director-only `director-approved`, dispatches Copilot `business-owner` / `architect`, WhatsApp on `awaiting-approval`. See [docs/director-gate.md](../docs/director-gate.md), [docs/squad-orchestrator-automation.md](../docs/squad-orchestrator-automation.md).
-3. **Phase 2b:** Sub-issue dispatch on `designed` (target repo).
-4. **Phase 3:** Cloudflare Workflow durable orchestration (optional).
-5. **Phase 4:** Metrics from Issues/Actions.
+2. **Phase 2a–2d (implemented):** [director-gate.yml](../.github/workflows/director-gate.yml), [squad-orchestrator.yml](../.github/workflows/squad-orchestrator.yml), [squad-phase-watch.yml](../.github/workflows/squad-phase-watch.yml) — full label-driven SDLC through Release Manager; Director gates on approval and release only. See [docs/squad-orchestrator-automation.md](../docs/squad-orchestrator-automation.md).
+3. **Phase 3:** Cloudflare Workflow durable orchestration (optional).
+4. **Phase 4:** Metrics from Issues/Actions.
 
 Do not skip Director gates until you explicitly trust full auto-release.
 

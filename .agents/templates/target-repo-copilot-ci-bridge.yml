@@ -1,0 +1,19 @@
+# Optional overlay for target repos: run CI on push to Copilot branches without PR workflow approval.
+# Merge into existing workflows or add alongside semgrep.yml — push to copilot/* triggers checks immediately.
+name: Squad Copilot CI bridge
+
+on:
+  push:
+    branches:
+      - "copilot/**"
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-notice:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Copilot branch push detected. Ensure security scans also run on push (not only pull_request)."
+          echo "See ai-alpha-squad .agents/templates/target-repo-squad-notify.yml"

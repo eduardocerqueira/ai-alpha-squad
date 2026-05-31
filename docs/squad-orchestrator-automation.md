@@ -1,107 +1,87 @@
 # Squad orchestrator automation
 
-Goal: **agents start automatically and pass work** via GitHub Issues labels — like [AI-sandbox issue-bot](https://github.com/eduardocerqueira/AI-sandbox/blob/main/.github/workflows/issue-bot.yml) (`issues: labeled` → script), but using **AI Alpha Squad** lifecycle labels and **Copilot custom agents**.
+Goal: **end-to-end SDLC with minimal Director intervention** — agents start and hand off via GitHub Issues labels and phase watch workflows.
 
-## Problem today
-
-| Event | Current behavior |
-| ----- | ---------------- |
-| Director adds `director-approved` | Orchestrator dispatches **Architect** (after Director gate verifies actor) |
-| Business Owner finishes | Manual `notify-director-awaiting-approval.sh` |
-| Copilot session | Manual [Agents tab](https://github.com/eduardocerqueira/ai-alpha-squad/agents) |
-
-[agent-runtime-strategy.md](../.agents/agent-runtime-strategy.md) Phase 2 called this out; it was deferred until WhatsApp/Worker existed.
-
-## Recommended architecture (Phase 2)
+## Automated flow (full)
 
 ```mermaid
-sequenceDiagram
-    participant I as GitHub Issue
-    participant W as workflow squad-orchestrator.yml
-    participant C as Copilot cloud agent
-    participant WA as WhatsApp Worker
-
-    I->>W: label added (new / awaiting-approval / director-approved / …)
-    W->>W: map label → action
-    alt awaiting-approval
-        W->>WA: optional notify script (secrets)
-    else director-approved
-        W->>C: assign copilot-swe-agent + custom_agent architect
-    else new
-        W->>C: assign custom_agent business-owner
-    end
-    C->>I: comment / PR / sub-issues
-    C->>I: label designed / implemented / …
-    I->>W: next label triggers next agent
+flowchart TD
+  A[new issue + new label] --> BO[Business Owner]
+  BO --> AA[awaiting-approval + WhatsApp]
+  AA -->|Director APPROVE| DA[director-approved]
+  DA --> AR[Architect]
+  AR --> DE[designed]
+  DE --> DEV[Developer on target repo]
+  DEV -->|PR merged| IM[implemented]
+  IM --> V[QA + Security + DevOps + Tech Writer]
+  V -->|all deliverables| VA[validation]
+  VA --> RM[Release Manager]
+  RM --> RC[release-candidate + WhatsApp]
+  RC -->|Director| REL[released]
 ```
 
-### Core workflow
+## Workflows
 
-[`.github/workflows/squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) listens to:
+| Workflow | Trigger | Action |
+| -------- | ------- | ------ |
+| [squad-orchestrator.yml](../.github/workflows/squad-orchestrator.yml) | `issues: labeled`, `opened` | Dispatch Copilot agent for lifecycle label |
+| [squad-phase-watch.yml](../.github/workflows/squad-phase-watch.yml) | schedule 15m, `repository_dispatch`, sub-issue closed, comments | Advance `designed`→`implemented`, `implemented`→`validation` |
+| [director-gate.yml](../.github/workflows/director-gate.yml) | `director-approved`, Director comments | Enforce approval gates |
 
-- `issues: labeled` — hand off to the next agent
-- `issues: opened` — if the issue has `new`, start Business Owner
+## Label → action map
 
-Dispatcher: [`scripts/squad-dispatch-copilot.sh`](../scripts/squad-dispatch-copilot.sh)
+| Label added | Auto action | Copilot agent |
+| ----------- | ----------- | ------------- |
+| `new` | Dispatch | `business-owner` |
+| `awaiting-approval` | WhatsApp Director | — |
+| `director-approved` | Dispatch (Director gate) | `architect` |
+| `designed` | Dispatch Developer sub-issue | `developer` on target repo |
+| `implemented` | Dispatch validation sub-issues | `qa`, `security`, `devops`, `tech-writer` |
+| `validation` | Dispatch | `release-manager` |
+| `release-candidate` | WhatsApp Director | — |
 
-Issue comments use line SVG avatars from [`assets/agents/`](../assets/agents/) via [`src/ai_alpha_squad/comments.py`](../src/ai_alpha_squad/comments.py) (or `scripts/format-squad-comment.py`).
+## Target repo hook (instant dev-merge detection)
 
-### Label → action map
+Copy [target-repo-squad-notify.yml](../.agents/templates/target-repo-squad-notify.yml) to product repo as `.github/workflows/squad-notify-queue.yml`, or run:
 
-| Label added | Auto action | Copilot custom agent | Director gate |
-| ----------- | ----------- | -------------------- | ------------- |
-| `new` | Assign Copilot | `business-owner` | No |
-| `awaiting-approval` | WhatsApp notify Director | — | **Yes** — wait for APPROVE |
-| `director-approved` | Assign Copilot | `architect` | After Director approval ([director-gate.md](director-gate.md)) |
-| `designed` | Comment + link sub-issues | `developer` on **target repo** sub-issues | No |
-| `release-candidate` | WhatsApp notify | `release-manager` pattern | **Yes** |
+```bash
+./scripts/install-target-repo-orchestrator-hook.sh eduardocerqueira/seeker
+```
 
-Workflow labels like `implemented` / `validation` can be added in Phase 2b (parallel QA/Security sub-issues).
+Set on the **target repo**: `SQUAD_QUEUE_REPO=eduardocerqueira/ai-alpha-squad`, `SQUAD_ORCHESTRATOR_TOKEN` (PAT with `repo` + workflow dispatch on queue repo).
 
-### Why Copilot API (not only OpenAI scripts)
+When a squad-linked PR merges, the queue repo receives `repository_dispatch` → immediate phase tick (no 15m wait).
 
-[AI-sandbox](https://github.com/eduardocerqueira/AI-sandbox) uses **Python + OpenAI + `gh`** in Actions. That works but ignores `.github/agents/*.agent.md` profiles.
+## Director intervention only
 
-For ai-alpha-squad, prefer:
+| Gate | Why |
+| ---- | --- |
+| Business Analysis | `awaiting-approval` → APPROVE |
+| Merge Developer PR | Production code |
+| Approve Copilot CI (GitHub UI) | GitHub security policy on bot PRs |
+| Release | `release-candidate` → final APPROVE |
 
-1. **Assign issue to `copilot-swe-agent[bot]`** with `agent_assignment.custom_agent` — see [Copilot cloud agent API](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/use-cloud-agent-via-the-api).
-2. Fallback: workflow comments “Assign Copilot agent X” if API/token fails.
+## Scripts
 
-### Why not Hugging Face for orchestration
-
-HF Jobs / Spaces are for **GPU training, batch inference, datasets** — not GitHub issue state machines. Use HF when a **tech spec** requires it (see job skills on issue). Orchestration stays on **GitHub Actions + Copilot**.
-
-## Secrets (repository)
-
-| Secret | Purpose |
+| Script | Purpose |
 | ------ | ------- |
-| `SQUAD_ORCHESTRATOR_TOKEN` | PAT or `github_app` with `issues: write`, Copilot agent assign (fine-grained: Issues + Copilot) |
-| `OPENAI_API_KEY` | Optional fallback runner (Phase 2b) |
-| `WHATSAPP_*` | For `awaiting-approval` / `release-candidate` notify step |
-| `GITHUB_TOKEN` | Default; may lack Copilot assign — prefer dedicated token |
+| `squad-dispatch-copilot.sh` | Label → Copilot assign |
+| `squad-dispatch-validation.sh` | Fan-out validation agents |
+| `squad-advance-implemented.sh` | Dev PR merged → `implemented` |
+| `squad-advance-validation.sh` | All validators done → `validation` |
+| `squad-phase-tick.sh` | Run advance checks for active jobs |
+| `squad-find-subissues.py` | Find sub-issues + deliverable checks |
 
-## Guards (avoid loops)
+## Secrets (queue repo)
 
-- Skip if `github.actor` is `github-actions[bot]` and label is orchestrator-internal.
-- Skip assign if `copilot-swe-agent[bot]` already assigned.
-- Concurrency: `squad-orchestrator-${{ github.event.issue.number }}`.
-
-## Phase rollout
-
-| Phase | Deliverable |
-| ----- | ----------- |
-| **2a (now)** | `director-gate.yml` + `squad-orchestrator.yml` + `squad-dispatch-copilot.sh` for `new`, `awaiting-approval`, `director-approved` |
-| **2a-guard** | `squad-copilot-pr-guard.yml` closes Copilot planning PRs — [copilot-issue-first-delivery.md](../.agents/copilot-issue-first-delivery.md) |
-| **2b** | Sub-issue dispatch on `designed` (target repo + issue number in body) |
-| **2c** | Validation matrix (`implemented` → QA/Security/DevOps sub-issues) |
-| **3** | Cloudflare Workflow durable orchestration + WhatsApp + GH (optional) |
-
-## Manual override
-
-Director can always assign Copilot from the UI. Automation is additive.
+| Secret / var | Purpose |
+| ------------ | ------- |
+| `SQUAD_ORCHESTRATOR_TOKEN` | PAT: issues, Copilot assign, workflow dispatch |
+| `SQUAD_DIRECTOR_LOGIN` | Director gate |
+| `WHATSAPP_*` | Director notifications |
 
 ## Related
 
 - [squad-orchestrator.md](../.agents/squad-orchestrator.md)
 - [issue-lifecycle.md](../.agents/issue-lifecycle.md)
-- [.github/SECRETS_AND_VARIABLES.md](../.github/SECRETS_AND_VARIABLES.md)
+- [agent-runtime-strategy.md](../.agents/agent-runtime-strategy.md)
