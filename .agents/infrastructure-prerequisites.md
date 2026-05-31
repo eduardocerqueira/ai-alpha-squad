@@ -16,7 +16,8 @@ Director-owned setup **before** the first business-request issue moves past inta
 | 6 | Cloudflare account + API token (if any job uses Workers/R2/D1) | Director / DevOps | `wrangler whoami` |
 | 7 | Hugging Face token (if agents use Hub/Jobs) | Director | `hf auth whoami` |
 | 8 | Copilot coding agent enabled (cloud) **or** local Cursor | Director | [agent-runtime-strategy.md](agent-runtime-strategy.md) |
-| 9 | Job-specific secrets identified below | Architect → DevOps | Documented on issue |
+| 9 | `main` branch protected (PR required; squad-safe) | Director | [docs/branch-protection.md](../docs/branch-protection.md) — `./scripts/setup-branch-protection.sh` |
+| 10 | Job-specific secrets identified below | Architect → DevOps | Documented on issue |
 
 CI/CD pipelines: **deferred** until first job implementation (DevOps sub-issue).
 
