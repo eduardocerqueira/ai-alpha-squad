@@ -23,11 +23,9 @@ export default {
 
     if (request.method === "POST") {
       const rawBody = await request.text();
-      if (env.WHATSAPP_APP_SECRET) {
-        const ok = await verifySignature(request, env.WHATSAPP_APP_SECRET, rawBody);
-        if (!ok) {
-          return new Response("Invalid signature", { status: 401 });
-        }
+      const ok = await verifySignature(request, env.WHATSAPP_APP_SECRET, rawBody);
+      if (!ok) {
+        return new Response("Invalid signature", { status: 401 });
       }
 
       let payload: unknown;

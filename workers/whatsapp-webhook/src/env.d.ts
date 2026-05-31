@@ -7,5 +7,5 @@ interface Env {
   GITHUB_OWNER: string;
   SQUAD_WORK_QUEUE_REPO: string;
   WHATSAPP_DEFAULT_ISSUE_NUMBER: string;
-  WHATSAPP_APP_SECRET?: string;
+  WHATSAPP_APP_SECRET: string;
 }

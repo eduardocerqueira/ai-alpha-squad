@@ -47,14 +47,20 @@ jobs:
 
       - name: Gate lifecycle label
         if: github.event_name == 'issues' && github.event.action == 'labeled'
+        env:
+          LABEL_NAME: ${{ github.event.label.name }}
+          SENDER_LOGIN: ${{ github.event.sender.login }}
         run: |
           chmod +x ./scripts/director-gate.sh
           ./scripts/director-gate.sh label "$REPO" "$ISSUE_NUMBER" \
-            "${{ github.event.label.name }}" "${{ github.event.sender.login }}"
+            "$LABEL_NAME" "$SENDER_LOGIN"
 
       - name: Gate Director comment approval
         if: github.event_name == 'issue_comment'
+        env:
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           chmod +x ./scripts/director-gate.sh
           ./scripts/director-gate.sh comment "$REPO" "$ISSUE_NUMBER" \
-            "${{ github.event.comment.user.login }}" "${{ github.event.comment.body }}"
+            "$COMMENT_AUTHOR" "$COMMENT_BODY"
