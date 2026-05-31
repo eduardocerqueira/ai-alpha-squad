@@ -66,7 +66,7 @@ rules = json.loads(sys.argv[1])
 rules.append({
     "type": "required_status_checks",
     "parameters": {
-        "strict_required_status_checks_policy": true,
+        "strict_required_status_checks_policy": True,
         "required_status_checks": [{"context": "ci-test"}],
     },
 })
