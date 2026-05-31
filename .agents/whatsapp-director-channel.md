@@ -10,6 +10,8 @@ Only these agents may **send** WhatsApp messages to the Director:
 | ----- | ----- | ---------------- |
 | Business Owner | `business-owner` | Business Analysis ready (`awaiting-approval`); clarification needed; scope questions |
 | Release Manager | `release-manager` | Release candidate ready; deployment start/complete; rollback or SEV-1/2 incident summary |
+| **Orchestrator (Actions)** | lifecycle labels | Every step — see [docs/whatsapp-lifecycle-notify.md](../docs/whatsapp-lifecycle-notify.md) |
+| **WhatsApp Worker** | inbound ack | Confirms APPROVE / REJECT / CHANGES received |
 
 No other agent may message the Director on WhatsApp. Other agents escalate through GitHub and mention Business Owner or Release Manager.
 

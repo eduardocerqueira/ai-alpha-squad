@@ -7,6 +7,14 @@ import re
 import urllib.error
 import urllib.request
 
+from ai_alpha_squad.whatsapp.lifecycle import format_business_analysis_ready as _format_ba_ready
+
+__all__ = [
+    "format_business_analysis_ready",
+    "normalize_phone_e164_digits",
+    "send_text_message",
+]
+
 
 def normalize_phone_e164_digits(phone: str) -> str:
     """Meta `to` field: digits only, no leading +."""
@@ -20,18 +28,11 @@ def format_business_analysis_ready(
     summary: str,
     repo: str = "eduardocerqueira/ai-alpha-squad",
 ) -> str:
-    owner, name = repo.split("/", 1) if "/" in repo else ("eduardocerqueira", repo)
-    url = f"https://github.com/{owner}/{name}/issues/{issue_number}"
-    return (
-        "[AI Alpha Squad] Business Analysis ready\n\n"
-        f"Issue: #{issue_number} — {title}\n"
-        f"{url}\n\n"
-        f"Summary: {summary}\n\n"
-        "Please reply:\n"
-        "• APPROVE — proceed to architecture\n"
-        "• REJECT: <reason>\n"
-        "• CHANGES: <what to clarify>\n\n"
-        "Full report is on the issue."
+    return _format_ba_ready(
+        issue_number,
+        title,
+        summary=summary,
+        repo=repo,
     )
 
 

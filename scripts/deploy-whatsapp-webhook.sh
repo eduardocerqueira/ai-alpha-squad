@@ -57,6 +57,12 @@ npm install
 echo "$WHATSAPP_WEBHOOK_VERIFY_TOKEN" | npx wrangler secret put WHATSAPP_WEBHOOK_VERIFY_TOKEN
 echo "$WHATSAPP_DIRECTOR_PHONE" | npx wrangler secret put WHATSAPP_DIRECTOR_PHONE
 echo "$GITHUB_TOKEN" | npx wrangler secret put GITHUB_TOKEN
+if [[ -n "${WHATSAPP_ACCESS_TOKEN:-}" ]]; then
+  echo "$WHATSAPP_ACCESS_TOKEN" | npx wrangler secret put WHATSAPP_ACCESS_TOKEN
+fi
+if [[ -n "${WHATSAPP_PHONE_NUMBER_ID:-}" ]]; then
+  echo "$WHATSAPP_PHONE_NUMBER_ID" | npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID
+fi
 if [[ -n "${WHATSAPP_APP_SECRET:-}" ]]; then
   echo "$WHATSAPP_APP_SECRET" | npx wrangler secret put WHATSAPP_APP_SECRET
 fi

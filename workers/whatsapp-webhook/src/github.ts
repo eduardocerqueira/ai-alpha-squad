@@ -14,6 +14,20 @@ export async function postIssueComment(env: Env, issueNumber: number, body: stri
   }
 }
 
+export async function getIssueTitle(env: Env, issueNumber: number): Promise<string> {
+  const owner = env.GITHUB_OWNER;
+  const repo = env.SQUAD_WORK_QUEUE_REPO;
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`,
+    { headers: githubHeaders(env) },
+  );
+  if (!res.ok) {
+    return `Issue #${issueNumber}`;
+  }
+  const data = (await res.json()) as { title?: string };
+  return data.title ?? `Issue #${issueNumber}`;
+}
+
 export async function getIssueLabels(env: Env, issueNumber: number): Promise<string[]> {
   const owner = env.GITHUB_OWNER;
   const repo = env.SQUAD_WORK_QUEUE_REPO;

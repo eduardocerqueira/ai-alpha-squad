@@ -29,6 +29,8 @@ Load API skills as needed:
 
 ## Outbound templates
 
+Lifecycle messages (all steps): [docs/whatsapp-lifecycle-notify.md](../../../docs/whatsapp-lifecycle-notify.md). Script: `./scripts/notify-director-lifecycle.sh <step> <issue#>`.
+
 ### Business Owner — analysis ready
 
 ```

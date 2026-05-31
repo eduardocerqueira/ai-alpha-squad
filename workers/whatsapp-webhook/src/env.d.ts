@@ -1,6 +1,8 @@
 interface Env {
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: string;
   WHATSAPP_DIRECTOR_PHONE: string;
+  WHATSAPP_ACCESS_TOKEN?: string;
+  WHATSAPP_PHONE_NUMBER_ID?: string;
   GITHUB_TOKEN: string;
   GITHUB_OWNER: string;
   SQUAD_WORK_QUEUE_REPO: string;

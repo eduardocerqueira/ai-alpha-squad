@@ -6,9 +6,12 @@ import {
 import {
   addIssueLabel,
   getIssueLabels,
+  getIssueTitle,
   postIssueComment,
   removeIssueLabel,
 } from "./github";
+import { formatLifecycleMessage } from "./lifecycle";
+import { sendTextMessage } from "./send";
 
 export function verifyMetaWebhook(
   mode: string | null,
@@ -99,5 +102,20 @@ export async function handleInboundMessage(
     await addIssueLabel(env, issueNumber, "director-approved");
     await removeIssueLabel(env, issueNumber, "awaiting-approval");
     await removeIssueLabel(env, issueNumber, "approved");
+  }
+
+  const repo = `${env.GITHUB_OWNER}/${env.SQUAD_WORK_QUEUE_REPO}`;
+  const title = await getIssueTitle(env, issueNumber);
+  const ackStep =
+    classification === "approve"
+      ? "inbound-approve"
+      : classification === "reject"
+        ? "inbound-reject"
+        : classification === "changes"
+          ? "inbound-changes"
+          : null;
+  if (ackStep) {
+    const body = formatLifecycleMessage(ackStep, issueNumber, title, repo);
+    if (body) await sendTextMessage(env, body);
   }
 }

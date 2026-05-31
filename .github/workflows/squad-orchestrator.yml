@@ -33,6 +33,11 @@ jobs:
       REPO: ${{ github.repository }}
       ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
       LABEL: ${{ github.event.label.name || inputs.lifecycle_label }}
+      WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+      WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+      WHATSAPP_DIRECTOR_PHONE: ${{ vars.WHATSAPP_DIRECTOR_PHONE }}
+      GITHUB_OWNER: ${{ github.repository_owner }}
+      SQUAD_WORK_QUEUE_REPO: ${{ github.event.repository.name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,24 +61,22 @@ jobs:
             echo "name=${LABEL}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Notify Director (awaiting-approval)
-        if: steps.label.outputs.name == 'awaiting-approval'
-        env:
-          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
-          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
-          WHATSAPP_DIRECTOR_PHONE: ${{ vars.WHATSAPP_DIRECTOR_PHONE }}
-          GITHUB_OWNER: ${{ github.repository_owner }}
-          SQUAD_WORK_QUEUE_REPO: ${{ github.event.repository.name }}
+      - name: Notify Director (lifecycle step)
+        if: >-
+          contains(fromJSON('["new","awaiting-approval","director-approved","designed","implemented","validation","release-candidate","released","blocked"]'), steps.label.outputs.name)
         run: |
-          if [ -z "$WHATSAPP_ACCESS_TOKEN" ] || [ -z "$WHATSAPP_DIRECTOR_PHONE" ]; then
-            BODY="$(python3 ./scripts/format-squad-comment.py notice \
-              --message "**Squad orchestrator:** \`awaiting-approval\` — configure WhatsApp secrets/vars or run \`./scripts/notify-director-awaiting-approval.sh\` locally." \
-              --repo "$REPO")"
-            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$BODY"
-            exit 0
+          STEP="${{ steps.label.outputs.name }}"
+          EXTRA=""
+          if [ "$STEP" = "awaiting-approval" ]; then
+            EXTRA="Summary: Business Analysis ready for your review."
           fi
-          chmod +x ./scripts/notify-director-awaiting-approval.sh
-          ./scripts/notify-director-awaiting-approval.sh "$ISSUE_NUMBER" "Business Analysis ready — reply APPROVE, REJECT, or CHANGES on WhatsApp."
+          chmod +x ./scripts/notify-director-lifecycle.sh
+          if ! ./scripts/notify-director-lifecycle.sh "$STEP" "$ISSUE_NUMBER" "$REPO" "$EXTRA"; then
+            BODY="$(python3 ./scripts/format-squad-comment.py notice \
+              --message "**Squad orchestrator:** WhatsApp notify failed for \`$STEP\` — check WHATSAPP_* secrets/vars." \
+              --repo "$REPO")"
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$BODY" || true
+          fi
 
       - name: Verify director-approved sender
         id: director_ok
@@ -102,9 +105,16 @@ jobs:
           fi
 
       - name: Dispatch Copilot agent
+        id: dispatch
         if: >-
           steps.label.outputs.name == 'new' ||
           (steps.label.outputs.name == 'director-approved' && steps.director_ok.outputs.ok == 'true')
         run: |
           chmod +x ./scripts/squad-dispatch-copilot.sh
           ./scripts/squad-dispatch-copilot.sh "$REPO" "$ISSUE_NUMBER" "${{ steps.label.outputs.name }}"
+
+      - name: Notify Director (agent dispatched)
+        if: steps.dispatch.outputs.dispatched == 'true'
+        run: |
+          chmod +x ./scripts/notify-director-lifecycle.sh
+          ./scripts/notify-director-lifecycle.sh "dispatched-${{ steps.dispatch.outputs.agent }}" "$ISSUE_NUMBER" "$REPO" || true

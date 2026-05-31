@@ -58,6 +58,10 @@ post_unauthorized() {
   local body
   body="$(python3 "$FORMAT_COMMENT" notice --message "$msg" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
   gh issue comment "$ISSUE" --repo "$REPO" --body "$body"
+  if [[ -x "${ROOT}/scripts/notify-director-lifecycle.sh" ]] && [[ -n "${WHATSAPP_ACCESS_TOKEN:-}" ]]; then
+    "${ROOT}/scripts/notify-director-lifecycle.sh" unauthorized-approval "$ISSUE" "$REPO" \
+      "Attempted label: ${label} by ${sender}." || true
+  fi
 }
 
 classify_approve_comment() {

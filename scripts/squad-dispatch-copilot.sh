@@ -60,6 +60,9 @@ esac
 if gh issue view "$ISSUE" --repo "$REPO" --json assignees -q \
   '.assignees[].login' 2>/dev/null | grep -qiE '^(copilot|copilot-swe-agent\[bot\])$'; then
   echo "Copilot already assigned on #$ISSUE — skip"
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    echo "dispatched=false" >> "$GITHUB_OUTPUT"
+  fi
   exit 0
 fi
 
@@ -90,6 +93,10 @@ if gh api --method POST \
   COMMENT_BODY="$(python3 "$FORMAT_COMMENT" dispatch "$AGENT" "$LABEL" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
   gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY"
   echo "Dispatched $AGENT on $REPO#$ISSUE"
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    echo "dispatched=true" >> "$GITHUB_OUTPUT"
+    echo "agent=$AGENT" >> "$GITHUB_OUTPUT"
+  fi
   exit 0
 fi
 

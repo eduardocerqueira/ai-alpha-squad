@@ -11,7 +11,7 @@ def test_format_business_analysis_ready():
         "Review and modernize seeker",
         summary="Incremental modernization recommended.",
     )
-    assert "Issue: #1" in body
+    assert "#1" in body
     assert "github.com/eduardocerqueira/ai-alpha-squad/issues/1" in body
     assert "APPROVE" in body
     assert "Incremental modernization" in body
