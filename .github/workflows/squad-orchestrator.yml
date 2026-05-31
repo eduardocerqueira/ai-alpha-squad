@@ -108,6 +108,7 @@ jobs:
         id: dispatch
         if: >-
           steps.label.outputs.name == 'new' ||
+          steps.label.outputs.name == 'designed' ||
           (steps.label.outputs.name == 'director-approved' && steps.director_ok.outputs.ok == 'true')
         run: |
           chmod +x ./scripts/squad-dispatch-copilot.sh

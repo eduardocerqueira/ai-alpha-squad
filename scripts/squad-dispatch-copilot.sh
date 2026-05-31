@@ -14,6 +14,7 @@ export SQUAD_ICON_REF="${SQUAD_ICON_REF:-main}"
 
 OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
+TARGET_REPO="${TARGET_REPO:-$REPO}"
 
 AGENT=""
 INSTRUCTIONS=""
@@ -61,6 +62,60 @@ Do NOT add director-approved or approved labels. Do NOT implement application co
 EOF
 )"
     ;;
+  designed)
+    AGENT="developer"
+    if gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' 2>/dev/null | grep -qx 'developer'; then
+      DEV_ISSUE="$ISSUE"
+      PARENT_ISSUE="$(gh issue view "$ISSUE" --repo "$REPO" --json body -q .body \
+        | grep -Eo 'issues/[0-9]+' | head -1 | cut -d/ -f2)"
+    else
+      PARENT_ISSUE="$ISSUE"
+      DEV_ISSUE="$(python3 -c "
+import json, subprocess, sys
+repo, parent = sys.argv[1], sys.argv[2]
+proc = subprocess.run(
+    ['gh', 'issue', 'list', '--repo', repo, '--label', 'developer', '--state', 'open',
+     '--json', 'number,body', '--limit', '20'],
+    capture_output=True, text=True, check=True,
+)
+needle = f'issues/{parent}'
+for item in json.loads(proc.stdout):
+    if needle in (item.get('body') or ''):
+        print(item['number'])
+        break
+" "$REPO" "$PARENT_ISSUE")"
+    fi
+    if [[ -z "${DEV_ISSUE:-}" ]]; then
+      echo "No developer sub-issue found for parent #$PARENT_ISSUE"
+      exit 1
+    fi
+    ISSUE="$DEV_ISSUE"
+    TARGET_REPO="$(gh issue view "$ISSUE" --repo "$REPO" --json body -q .body \
+      | grep -Eo 'https://github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+' \
+      | grep -vi 'ai-alpha-squad' | head -1 \
+      | sed 's|https://github.com/||')"
+    TARGET_REPO="${TARGET_REPO:-eduardocerqueira/seeker}"
+    export TARGET_REPO
+    INSTRUCTIONS="$(cat <<EOF
+You are the Developer for AI Alpha Squad — implementation runs on the target product repo.
+
+Read the Developer sub-issue #${ISSUE} and squad context on parent issue #${PARENT_ISSUE}:
+https://github.com/${REPO}/issues/${PARENT_ISSUE}
+
+Technical Specification: parent issue comment with heading "# Technical Specification".
+Custom agent profile on target repo: .github/agents/developer.agent.md
+
+1. Clone and work on target repo: ${TARGET_REPO} (branch from main)
+2. Implement Phase 1 per tech spec FR-003–FR-006 (Python LTS, pinned deps, preserve scheduled collection + obfuscation)
+3. Add/extend tests; keep CI green on your PR branch
+4. Open PR(s) on ${TARGET_REPO}; link parent #${PARENT_ISSUE}, sub-issue #${ISSUE}, FR/BR IDs in description
+5. Comment on sub-issue #${ISSUE} with PR URL(s) when ready
+6. Do NOT merge to main. Do NOT open PRs on ai-alpha-squad for product code.
+
+Incremental PRs preferred over big-bang changes.
+EOF
+)"
+    ;;
   *)
     echo "No Copilot dispatch for label: $LABEL"
     exit 0
@@ -77,7 +132,7 @@ if gh issue view "$ISSUE" --repo "$REPO" --json assignees -q \
   exit 0
 fi
 
-export REPO AGENT INSTRUCTIONS
+export REPO AGENT INSTRUCTIONS TARGET_REPO
 export INSTRUCTIONS_JSON="$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' <<<"$INSTRUCTIONS")"
 
 BODY_FILE="$(mktemp)"
@@ -86,7 +141,7 @@ import json, os
 payload = {
   'assignees': ['copilot-swe-agent[bot]'],
   'agent_assignment': {
-    'target_repo': os.environ['REPO'],
+    'target_repo': os.environ.get('TARGET_REPO', os.environ['REPO']),
     'base_branch': 'main',
     'custom_agent': os.environ['AGENT'],
     'custom_instructions': json.loads(os.environ['INSTRUCTIONS_JSON']),
@@ -103,7 +158,7 @@ if gh api --method POST \
   rm -f "$BODY_FILE"
   COMMENT_BODY="$(python3 "$FORMAT_COMMENT" dispatch "$AGENT" "$LABEL" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
   gh issue comment "$ISSUE" --repo "$REPO" --body "$COMMENT_BODY"
-  echo "Dispatched $AGENT on $REPO#$ISSUE"
+  echo "Dispatched $AGENT on $REPO#$ISSUE (target_repo=${TARGET_REPO})"
   if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "dispatched=true" >> "$GITHUB_OUTPUT"
     echo "agent=$AGENT" >> "$GITHUB_OUTPUT"
