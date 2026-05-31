@@ -63,16 +63,20 @@ class IssueState:
 
 
 def gh_api(query: str, **variables: object) -> dict:
-    args = ["gh", "api", "graphql", "-f", f"query={query}"]
-    for key, value in variables.items():
-        args.extend(["-f", f"{key}={value}"])
-    proc = subprocess.run(args, capture_output=True, text=True, check=False)
+    payload = {"query": query.strip(), "variables": variables}
+    proc = subprocess.run(
+        ["gh", "api", "graphql", "--input", "-"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
-    payload = json.loads(proc.stdout)
-    if payload.get("errors"):
-        raise RuntimeError(json.dumps(payload["errors"], indent=2))
-    return payload["data"]
+    body = json.loads(proc.stdout)
+    if body.get("errors"):
+        raise RuntimeError(json.dumps(body["errors"], indent=2))
+    return body["data"]
 
 
 def gh_json(args: list[str]) -> dict | list:
@@ -139,7 +143,7 @@ def project_query(owner: str, project_number: int) -> dict:
       }
     }
     """
-    return gh_api(query, login=owner, number=str(project_number))["user"]["projectV2"]
+    return gh_api(query, login=owner, number=project_number)["user"]["projectV2"]
 
 
 def find_single_select(project: dict, field_name: str) -> dict | None:

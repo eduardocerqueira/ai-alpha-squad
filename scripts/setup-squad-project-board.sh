@@ -14,10 +14,9 @@ if ! gh auth status >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! gh auth status -h github.com 2>&1 | grep -q 'read:project\|project'; then
-  echo "GitHub CLI needs project scope. Run:" >&2
-  echo "  gh auth refresh -s read:project,project" >&2
-  exit 1
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  echo "Note: GITHUB_TOKEN is set — it may lack read:project/project scopes." >&2
+  echo "For local setup, prefer: unset GITHUB_TOKEN && gh auth refresh -s read:project,project" >&2
 fi
 
 run_py() {
