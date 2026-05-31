@@ -91,19 +91,6 @@ def issue_text(repo: str, issue_number: int) -> str:
 
 
 def subissue_complete(repo: str, issue_number: int, role: str) -> bool:
-    data = gh_json(
-        [
-            "issue",
-            "view",
-            str(issue_number),
-            "--repo",
-            repo,
-            "--json",
-            "state,body,comments",
-        ]
-    )
-    if (data.get("state") or "").upper() == "CLOSED":
-        return True
     text = issue_text(repo, issue_number)
     markers = DELIVERABLE_MARKERS.get(role, ())
     return any(marker in text for marker in markers)
