@@ -22,7 +22,7 @@
 
 **Summary:** The ai-alpha-squad automation layer is well-structured with strong foundations: Director-only approval gates, HMAC-SHA256 webhook signature verification with timing-safe comparison, least-privilege workflow permissions, and `.env`-based secret management. Two actionable vulnerabilities were identified and **fixed in this PR**:
 
-- **FIND-001 (High — Fixed):** GitHub Actions script injection via `${{ github.event.comment.body }}` in `director-gate.yml`.
+- **FIND-001 (High — Fixed):** GitHub Actions script injection via user-controlled `${{ github.event.* }}` values interpolated directly in `run:` blocks — fixed in `director-gate.yml` and `squad-orchestrator.yml` by routing all event context through environment variables.
 - **FIND-002 (Medium — Fixed):** `WHATSAPP_APP_SECRET` was optional, allowing unsigned webhook POST requests through without verification.
 
 Two informational findings remain documented but pose no release-blocking risk. The seeker target repo security review is **blocked pending the developer PR** (FIND-005). A follow-up security review of the seeker PR is required before final release approval.
@@ -79,7 +79,7 @@ Two informational findings remain documented but pose no release-blocking risk. 
 | - | -------- | ------ | ----- |
 | A01 | Broken Access Control | Pass | Director gate (`director-gate.sh`, `director-gate-is-authorized.sh`) restricts label application and comment-approval to authorized logins only |
 | A02 | Cryptographic Failures | Pass | Webhook uses HMAC-SHA256 with `crypto.subtle`; timing-safe comparison via XOR loop; TLS enforced on all external calls |
-| A03 | Injection | Pass (after fix) | FIND-001 fixed — `github.event.comment.body` now passed through env var, not interpolated directly into shell `run:` expressions |
+| A03 | Injection | Pass (after fix) | FIND-001 fixed — user-controlled event context (`comment.body`, `sender.login`, `label.name`) now passed through env vars in `director-gate.yml` and `squad-orchestrator.yml`; not interpolated directly into shell `run:` expressions |
 | A04 | Insecure Design | Pass | Director approval is a single-factor control appropriate for internal automation; role boundaries enforced |
 | A05 | Security Misconfiguration | Pass | Secrets in GitHub Actions Secrets; `wrangler.jsonc` vars are non-sensitive; `.gitignore` excludes `.env` and `squad-config.yaml` |
 | A06 | Vulnerable and Outdated Components | Low risk | See FIND-003; first-party GitHub Actions at major version tags; no high-CVE packages in minimal dependency set |
@@ -92,15 +92,15 @@ Two informational findings remain documented but pose no release-blocking risk. 
 
 ## Findings
 
-### FIND-001: GitHub Actions script injection via `github.event.comment.body`
+### FIND-001: GitHub Actions script injection via user-controlled `${{ github.event.* }}` values
 
 | Field | Value |
 | ----- | ----- |
 | Severity | **High** |
-| Location | `.github/workflows/director-gate.yml` — "Gate Director comment approval" step (line 60) |
-| Description | `${{ github.event.comment.body }}` was directly interpolated into a `run:` shell expression. Any GitHub user who can post a comment on a squad issue could inject arbitrary shell commands into the Actions runner by crafting a comment body containing shell metacharacters (e.g., `"; malicious_command #`). This is a well-known GitHub Actions supply-chain attack vector documented in GitHub's security hardening guide. |
-| Remediation | Pass user-controlled GitHub context values through environment variables (not inline `${{ }}` expressions in `run:`). The same pattern was applied to `github.event.label.name` and `github.event.sender.login` for defence-in-depth. |
-| Status | **Fixed** — `.github/workflows/director-gate.yml` updated in this PR |
+| Location | `.github/workflows/director-gate.yml` — "Gate Director comment approval" step; `.github/workflows/squad-orchestrator.yml` — "Verify director-approved sender" step |
+| Description | User-controlled GitHub event context values were directly interpolated into `run:` shell expressions using `${{ github.event.comment.body }}` and `${{ github.event.sender.login }}`. The Actions expression engine substitutes these values into the shell script before execution, so a malicious comment body containing shell metacharacters (e.g., `"; rm -rf /; "`) could execute arbitrary commands in the runner. The `comment.body` case is the critical vector — any GitHub user who can comment on a squad issue could trigger injection. `sender.login` is constrained to `[a-zA-Z0-9-]` by GitHub, but was also moved to an env var for consistency. |
+| Remediation | Pass user-controlled GitHub context values through step-level `env:` mappings. Environment variable values are treated as data (not code) by the shell — they are not re-expanded by the Actions expression parser. Applied to `comment.body`, `comment.user.login`, `label.name`, and `sender.login`. |
+| Status | **Fixed** — `.github/workflows/director-gate.yml` and `.github/workflows/squad-orchestrator.yml` updated in this PR |
 
 ---
 
