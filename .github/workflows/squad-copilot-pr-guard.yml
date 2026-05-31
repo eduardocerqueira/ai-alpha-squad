@@ -21,7 +21,7 @@ on:
 jobs:
   guard:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'eduardocerqueira/ai-alpha-squad'
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
@@ -36,5 +36,9 @@ jobs:
 
       - name: Guard Copilot planning PR
         run: |
-          chmod +x ./scripts/squad-copilot-pr-guard.sh ./scripts/squad-nudge-stuck.sh
+          chmod +x ./scripts/squad-copilot-pr-guard.sh \
+            ./scripts/squad-nudge-stuck.sh \
+            ./scripts/squad-sync-planning-labels.sh \
+            ./scripts/squad-dispatch-copilot.sh \
+            ./scripts/squad-dispatch-subissue.sh
           ./scripts/squad-copilot-pr-guard.sh "$REPO" "$PR_NUMBER"
