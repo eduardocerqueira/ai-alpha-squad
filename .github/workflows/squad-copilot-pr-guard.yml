@@ -36,5 +36,5 @@ jobs:
 
       - name: Guard Copilot planning PR
         run: |
-          chmod +x ./scripts/squad-copilot-pr-guard.sh
+          chmod +x ./scripts/squad-copilot-pr-guard.sh ./scripts/squad-nudge-stuck.sh
           ./scripts/squad-copilot-pr-guard.sh "$REPO" "$PR_NUMBER"

@@ -130,6 +130,15 @@ EOF
     ;;
 esac
 
+if [[ -n "${SQUAD_NUDGE_REASON:-}" && -n "$INSTRUCTIONS_FILE" ]]; then
+  {
+    echo "**Orchestrator nudge:** ${SQUAD_NUDGE_REASON}"
+    echo
+    cat "$INSTRUCTIONS_FILE"
+  } > "${INSTRUCTIONS_FILE}.nudge"
+  mv "${INSTRUCTIONS_FILE}.nudge" "$INSTRUCTIONS_FILE"
+fi
+
 export DISPATCH_LABEL="$LABEL"
 chmod +x "$DISPATCH"
 "$DISPATCH" "$REPO" "$DISPATCH_ISSUE" "$AGENT" "$TARGET_REPO" "$INSTRUCTIONS_FILE"

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Dispatch QA, Security, DevOps, and Tech Writer on validation sub-issues.
-# Usage: squad-dispatch-validation.sh <queue_repo> <parent_issue_number>
+# Usage: squad-dispatch-validation.sh <queue_repo> <parent_issue_number> [role]
 set -euo pipefail
 
 REPO="${1:?queue repo required}"
 PARENT="${2:?parent issue number required}"
+ROLE_FILTER="${3:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIND="${ROOT}/scripts/squad-find-subissues.py"
@@ -17,7 +18,7 @@ SUBISSUES="$("$FIND" "$REPO" "$PARENT")" || {
   exit 1
 }
 
-if gh issue view "$PARENT" --repo "$REPO" --json comments -q '.comments[].body' 2>/dev/null \
+if [[ -z "$ROLE_FILTER" ]] && gh issue view "$PARENT" --repo "$REPO" --json comments -q '.comments[].body' 2>/dev/null \
   | grep -q 'Validation phase started'; then
   echo "Validation agents already dispatched for parent #$PARENT — skip"
   if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
@@ -109,6 +110,12 @@ EOF
   esac
 
   export DISPATCH_LABEL="implemented"
+  if [[ "${SQUAD_FORCE_NUDGE:-}" == "1" ]]; then
+    gh api --method DELETE \
+      -H "Accept: application/vnd.github+json" \
+      "/repos/${REPO%%/*}/${REPO#*/}/issues/${sub_issue}/assignees" \
+      -f 'assignees[]=copilot-swe-agent[bot]' 2>/dev/null || true
+  fi
   if "$DISPATCH" "$REPO" "$sub_issue" "$role" "$TARGET_REPO" "$instructions_file"; then
     DISPATCHED=$((DISPATCHED + 1))
   else
@@ -119,6 +126,9 @@ EOF
 
 while IFS='=' read -r role sub_issue; do
   [[ -n "$role" && -n "$sub_issue" ]] || continue
+  if [[ -n "$ROLE_FILTER" && "$role" != "$ROLE_FILTER" ]]; then
+    continue
+  fi
   dispatch_role "$role" "$sub_issue"
 done < <(python3 -c "
 import json, sys
@@ -128,9 +138,11 @@ for role, num in sorted(data.items()):
 " "$SUBISSUES")
 
 SUMMARY="$(python3 "$FORMAT_COMMENT" notice \
-  --message "**Squad orchestrator:** Validation phase started on parent #${PARENT}. Dispatched agents for: \`$(echo "$SUBISSUES" | python3 -c 'import json,sys; print(", ".join(sorted(json.loads(sys.stdin.read()).keys())))')\`. Track sub-issues for deliverables." \
+  --message "**Squad orchestrator:** Validation dispatch on parent #${PARENT} (role: \`${ROLE_FILTER:-all}\`). Track sub-issues for deliverables." \
   --repo "$REPO")"
-gh issue comment "$PARENT" --repo "$REPO" --body "$SUMMARY"
+if [[ -z "$ROLE_FILTER" ]]; then
+  gh issue comment "$PARENT" --repo "$REPO" --body "$SUMMARY"
+fi
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   echo "dispatched=true" >> "$GITHUB_OUTPUT"
