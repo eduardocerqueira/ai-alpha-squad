@@ -15,7 +15,7 @@ Setup guide: [.agents/infrastructure-prerequisites.md](../.agents/infrastructure
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp send/receive automation |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | WhatsApp webhook Worker |
 | `WHATSAPP_PHONE_NUMBER_ID` | Outbound WhatsApp from orchestrator |
-| `SQUAD_ORCHESTRATOR_TOKEN` | PAT with issues, PRs, workflow dispatch on queue + target repos (preferred over default `GITHUB_TOKEN`) |
+| `SQUAD_ORCHESTRATOR_TOKEN` | PAT with issues, PRs, **contents:write** on queue + target repos (required for Squad Actions push/PR to `vscode-squad-director`, etc.) |
 | `APP_STORE_CONNECT_API_KEY` | Base64 or JSON key for ASC API (prefer OIDC/env file in secure runner) |
 
 Use environment-specific secrets (`production`, `staging`) once workflows exist.
