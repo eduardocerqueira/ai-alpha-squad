@@ -40,7 +40,8 @@ jobs:
       SQUAD_HF_DEFAULT_MODEL: ${{ vars.SQUAD_HF_DEFAULT_MODEL }}
       SQUAD_ACTIONS_MAX_TURNS: "50"
       SQUAD_ACTIONS_STRATEGY: "scaffold"
-      SQUAD_ACTIONS_SCAFFOLD_GREENFIELD: "1"
+      SQUAD_ACTIONS_SCAFFOLD_GREENFIELD: ${{ vars.SQUAD_V2 == '1' && '0' || '1' }}
+      SQUAD_V2: ${{ vars.SQUAD_V2 }}
       SQUAD_ACTIONS_INLINE: "1"
       SQUAD_PROJECT_BOARD_URL: https://github.com/users/eduardocerqueira/projects/6/views/9
       DISPATCH_LABEL: ${{ inputs.agent }}

@@ -86,6 +86,9 @@ def run_in_progress(comments: tuple[dict, ...]) -> str | None:
             # Stale marker left after a successful deliverable (common when label sync races).
             if has_deliverable(comments, agent):
                 continue
+            # Failed run finished — allow re-dispatch (in_progress comment may remain).
+            if run_failures(comments, agent) > 0:
+                continue
             return agent
     return None
 

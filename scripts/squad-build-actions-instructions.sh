@@ -13,7 +13,9 @@ FIND="${ROOT}/scripts/squad-find-subissues.py"
 OUT="$(mktemp)"
 
 PARENT_ISSUE="$ISSUE"
-if [[ "$AGENT" == "developer" ]]; then
+if [[ "$AGENT" == "developer" && "${SQUAD_V2:-}" == "1" ]]; then
+  PARENT_ISSUE="$ISSUE"
+elif [[ "$AGENT" == "developer" ]]; then
   if ! gh issue view "$ISSUE" --repo "$QUEUE_REPO" --json labels -q '.labels[].name' 2>/dev/null | grep -qx 'developer'; then
     PARENT_ISSUE="$ISSUE"
     ISSUE="$("$FIND" "$QUEUE_REPO" "$PARENT_ISSUE" developer)" || {
@@ -27,7 +29,26 @@ if [[ "$AGENT" == "developer" ]]; then
   fi
 fi
 
-cat > "$OUT" <<EOF
+if [[ "${SQUAD_V2:-}" == "1" ]]; then
+  cat > "$OUT" <<EOF
+You are the ${AGENT} agent for AI Alpha Squad v2 (single parent issue — no sub-issues).
+
+Parent issue: https://github.com/${QUEUE_REPO}/issues/${PARENT_ISSUE}
+Target repo: ${TARGET_REPO}
+
+Read the parent issue body and \`# Business Analysis\` comment. Implement exactly what the Director requested on the target repo (not the queue repo).
+Use one folder or file per language when applicable. Keep changes minimal.
+
+1. list_dir on the target repo, then write_file / run_command as needed
+2. Open a PR on ${TARGET_REPO}; the orchestrator posts \`# Developer Deliverable\` on the parent issue
+3. Use the finish tool when the PR is ready
+4. Do NOT modify ${QUEUE_REPO} except via the separate deliverable comment step
+5. Do NOT merge to main on the target repo
+
+Agent profile: .agents/agent-${AGENT}.md
+EOF
+else
+  cat > "$OUT" <<EOF
 You are the ${AGENT} agent for AI Alpha Squad — implementation runs on the target product repo.
 
 Queue repo issue: https://github.com/${QUEUE_REPO}/issues/${ISSUE}
@@ -45,5 +66,6 @@ Target repo: ${TARGET_REPO} — may only have README.md; scaffold the VS Code ex
 
 Agent profile: .agents/agent-${AGENT}.md on the queue repo.
 EOF
+fi
 
 echo "$OUT"
