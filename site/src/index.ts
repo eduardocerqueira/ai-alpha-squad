@@ -26,6 +26,12 @@ const MAX_NAME = 120;
 const MAX_EMAIL = 254;
 const MAX_MESSAGE = 4000;
 
+// CI (director-dashboard.yml) refreshes jobs.json on this branch; the deployed
+// dashboard reads it live so it tracks GitHub without a redeploy.
+const DIRECTOR_JOBS_BRANCH_URL =
+  "https://raw.githubusercontent.com/eduardocerqueira/ai-alpha-squad/director-jobs-json/site/public/director/jobs.json";
+const DIRECTOR_JOBS_TTL_SEC = 60;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -46,29 +52,59 @@ export default {
     }
 
     if (url.pathname === "/api/director/jobs" && request.method === "GET") {
-      const assetUrl = new URL("/director/jobs.json", url.origin);
-      const staticRes = await env.ASSETS.fetch(assetUrl.toString());
-      if (staticRes.ok) {
-        return new Response(staticRes.body, {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-          },
-        });
-      }
-      return json(
-        {
-          error:
-            "Dashboard not published yet. Run the Director dashboard workflow or ./scripts/squad-director-dashboard.py --serve locally.",
-        },
-        503,
-      );
+      return handleDirectorJobs(env, url);
     }
 
     return env.ASSETS.fetch(request);
   },
 };
+
+/**
+ * Serve the Director dashboard snapshot. Prefers the live CI-refreshed copy on
+ * the `director-jobs-json` branch (edge-cached ~60s) so the dashboard tracks
+ * GitHub without a redeploy; falls back to the asset bundled at deploy time.
+ */
+async function handleDirectorJobs(env: Env, url: URL): Promise<Response> {
+  try {
+    const live = await fetch(DIRECTOR_JOBS_BRANCH_URL, {
+      cf: { cacheTtl: DIRECTOR_JOBS_TTL_SEC, cacheEverything: true },
+    });
+    if (live.ok) {
+      const body = await live.text();
+      if (body.trimStart().startsWith("{")) {
+        return new Response(body, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": `public, max-age=${DIRECTOR_JOBS_TTL_SEC}`,
+            "X-Data-Source": "live",
+          },
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Live jobs.json fetch failed, using bundled asset:", err);
+  }
+
+  const staticRes = await env.ASSETS.fetch(new URL("/director/jobs.json", url.origin).toString());
+  if (staticRes.ok) {
+    return new Response(staticRes.body, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "X-Data-Source": "bundled",
+      },
+    });
+  }
+  return json(
+    {
+      error:
+        "Dashboard not published yet. Run the Director dashboard workflow or ./scripts/squad-director-dashboard.py --serve locally.",
+    },
+    503,
+  );
+}
 
 async function handleContact(request: Request, env: Env): Promise<Response> {
   let body: ContactPayload;

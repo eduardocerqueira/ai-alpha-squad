@@ -91,9 +91,11 @@ def test_fetch_dashboard_json_uses_cache_on_gh_error(tmp_path: Path, monkeypatch
             {
                 "generated_at": "2026-01-01T00:00:00Z",
                 "repo": "o/r",
-                "counts": {"your_move": 1, "attention": 0},
-                "your_move": [{"number": 1, "title": "t", "url": "u", "headline": "h", "action": "APPROVE"}],
-                "attention": [],
+                "counts": {"needs_you": 1, "in_progress": 0, "stuck": 0, "completed": 0},
+                "needs_you": [{"number": 1, "title": "t", "url": "u", "headline": "h"}],
+                "in_progress": [],
+                "stuck": [],
+                "completed": [],
             }
         ),
         encoding="utf-8",
@@ -109,5 +111,5 @@ def test_fetch_dashboard_json_uses_cache_on_gh_error(tmp_path: Path, monkeypatch
     data = fetch_dashboard_json("o/r", cache_path=cache)
     assert data["stale"] is True
     assert "rate limit" in data["fetch_error"].lower()
-    assert data["counts"]["your_move"] == 1
+    assert data["counts"]["needs_you"] == 1
 

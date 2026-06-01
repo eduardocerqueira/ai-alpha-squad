@@ -15,14 +15,65 @@
 ./scripts/squad-close-job.sh eduardocerqueira/ai-alpha-squad <parent#> "reason"
 ```
 
-## Optional web snapshot
+## Web dashboard
+
+A two-column React dashboard (served at `/director/` by the site Worker):
+
+- **80% — timeline.** A timeline19-style vertical timeline of the selected job's
+  lifecycle (`new → awaiting-approval → … → released`). Each step shows its owning
+  agent and status (done / current / blocked / pending). When a job is **awaiting a
+  Director decision**, that step renders as a highlighted "request for Director" node
+  with the message and an **Open issue & respond** action link.
+- **20% — squad.** Every agent assigned to the job with an SVG status indicator
+  (idle / working / blocked / done) and a link to its sub-issue.
+- **Job tabs** group jobs by status: **Open** (needs-you / stuck) · **In progress** ·
+  **Done** (released/closed). Each tab shows a count; the Open tab flags when an
+  approval is waiting. A job switcher under the tabs picks which job's timeline shows.
+  Deep-link a tab with `?tab=done` (also `in_progress`, `open`).
+
+### Where the data comes from (and how it refreshes)
+
+The dashboard reads `/api/director/jobs`. The deployed Worker serves the
+**live** copy CI publishes to the `director-jobs-json` branch (edge-cached ~60s),
+falling back to the `jobs.json` bundled at deploy time. The page also
+**auto-refreshes every 60s**, and **Refresh** reloads the latest status:
+
+- **Deployed:** Refresh re-pulls the CI-maintained branch copy. The
+  `Director dashboard` workflow regenerates it on issue events (labeled / closed /
+  reopened) and every 15 min.
+- **Local `--serve --live`:** Refresh rebuilds **live from GitHub** via `gh`
+  (`?live=1&refresh=1`).
+
+### Local preview
 
 ```bash
-git pull origin main
+# Static snapshot (no GitHub calls):
 ./scripts/squad-director-dashboard.py --serve
+
+# Live: the Refresh button rebuilds from GitHub on demand:
+./scripts/squad-director-dashboard.py --serve --live
 ```
 
-With **`SQUAD_V2=1`**, the Director dashboard workflow is skipped — use the CLI above. Legacy mode refreshes `jobs.json` via Actions (artifact + branch `director-jobs-json`; not `main` because of branch protection).
+### Develop / build the dashboard
+
+Source lives in [`site/dashboard/`](../site/dashboard) (Vite + React + TypeScript +
+Tailwind, shadcn-style components). It builds to `site/public/director/` so the
+existing Cloudflare Worker serves it as static assets — no extra routing.
+
+```bash
+cd site/dashboard
+npm install
+npm run dev        # hot-reload dev server (fetches /director/jobs.json)
+npm run build      # → site/public/director/ (preserves jobs.json)
+```
+
+`wrangler deploy` from `site/` builds the dashboard automatically (`predeploy` →
+`build:dashboard`).
+
+The `Director dashboard` workflow regenerates `jobs.json` and force-pushes it to
+the `director-jobs-json` branch, which the Worker reads live. It runs on issue
+events and every 15 min (`main` itself is branch-protected, so the data lives on
+its own branch rather than being committed to `main`).
 
 ## Autonomous target
 

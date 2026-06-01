@@ -1,4 +1,5 @@
-# Optional: refresh site/public/director/jobs.json (legacy). Disabled when SQUAD_V2=1 — use squad-director-now.sh.
+# Refresh the Director dashboard data: regenerate jobs.json and publish it to the
+# director-jobs-json branch, which the deployed Worker reads live (/api/director/jobs).
 name: Director dashboard
 
 permissions:
@@ -23,9 +24,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: >-
-      github.repository == 'eduardocerqueira/ai-alpha-squad' &&
-      vars.SQUAD_V2 != '1'
+    if: github.repository == 'eduardocerqueira/ai-alpha-squad'
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
