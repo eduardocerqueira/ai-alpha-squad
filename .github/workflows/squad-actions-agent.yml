@@ -7,6 +7,8 @@ permissions:
   pull-requests: write
   issues: write
 
+# Project field sync uses GraphQL (PAT with project scope via SQUAD_ORCHESTRATOR_TOKEN).
+
 on:
   workflow_dispatch:
     inputs:
@@ -40,6 +42,7 @@ jobs:
       SQUAD_ACTIONS_STRATEGY: "scaffold"
       SQUAD_ACTIONS_SCAFFOLD_GREENFIELD: "1"
       SQUAD_ACTIONS_INLINE: "1"
+      SQUAD_PROJECT_BOARD_URL: https://github.com/users/eduardocerqueira/projects/6/views/9
       DISPATCH_LABEL: ${{ inputs.agent }}
     steps:
       - uses: actions/checkout@v4
