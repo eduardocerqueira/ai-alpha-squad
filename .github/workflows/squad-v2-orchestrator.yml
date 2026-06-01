@@ -25,7 +25,7 @@ concurrency:
 jobs:
   orchestrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 90
     if: vars.SQUAD_V2 == '1'
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
@@ -33,6 +33,8 @@ jobs:
       ISSUE: ${{ github.event.issue.number || inputs.issue_number }}
       LABEL: ${{ github.event.label.name || inputs.lifecycle_label }}
       SQUAD_V2: "1"
+      SQUAD_ACTIONS_INLINE: "1"
+      SQUAD_ACTIONS_SCAFFOLD_GREENFIELD: "0"
       SQUAD_AI_PROVIDER: huggingface
       SQUAD_CODE_RUNTIME: actions
       HF_TOKEN: ${{ secrets.HF_TOKEN }}

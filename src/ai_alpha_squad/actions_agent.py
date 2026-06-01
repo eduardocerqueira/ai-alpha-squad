@@ -214,10 +214,16 @@ def run_agent_loop(
 ) -> tuple[str, bool]:
     """Returns (summary, finished_via_finish_tool)."""
     model = resolve_model(agent, "huggingface")
+    v2 = os.environ.get("SQUAD_V2", "").strip() in ("1", "true", "yes")
+    task_hint = (
+        "Follow the Task section and parent issue context exactly (v2 — no default VS Code scaffold)."
+        if v2
+        else "The repo may be greenfield (only README.md). Scaffold a minimal VS Code extension per the parent issue Technical Specification: package.json, tsconfig.json, src/extension.ts, .vscodeignore, README updates."
+    )
     system = f"""You are the AI Alpha Squad `{agent}` agent running in GitHub Actions on a cloned repository.
 Work only inside the repository root. Implement the task using tools.
 
-The repo may be greenfield (only README.md). Scaffold a minimal VS Code extension per the parent issue Technical Specification: package.json, tsconfig.json, src/extension.ts, .vscodeignore, README updates.
+{task_hint}
 
 Respond with ONE JSON object per message — no markdown fences, no extra text:
 {{"tool": "<name>", "args": {{...}}}}
