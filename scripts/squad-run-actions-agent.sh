@@ -90,12 +90,33 @@ if [[ -n "${GITHUB_ACTIONS:-}" && "${SQUAD_ACTIONS_INLINE:-}" != "1" ]]; then
   echo "workflow dispatch failed — running inline (SQUAD_ACTIONS_INLINE fallback)" >&2
 fi
 
+# Escalate a non-retryable setup/permission problem to the Director and stop
+# WITHOUT consuming a retry attempt (exit 0 so the wrapper posts no failed marker).
+escalate_setup_failure() {
+  local reason="$1"
+  echo "error: setup failure — ${reason}" >&2
+  if [[ "${SQUAD_V2:-}" == "1" ]]; then
+    gh issue edit "$ISSUE" --repo "$QUEUE_REPO" --add-label blocked 2>/dev/null || true
+    local marker
+    marker="$(python3 -c "from ai_alpha_squad.squad_v2 import setup_failed_comment; print(setup_failed_comment('${AGENT}', '''${reason}'''))" 2>/dev/null \
+      || echo "squad-v2-run:setup-failed:${AGENT} — ${reason}")"
+    gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "$marker" 2>/dev/null || true
+  fi
+  exit 0
+}
+
 WORKDIR="${RUNNER_TEMP:-/tmp}/squad-target-${ISSUE}-$$"
 rm -rf "$WORKDIR"
 configure_git_auth
+
+# Pre-flight (cheap, before the expensive agent loop): fail fast on setup problems
+# that retries cannot fix, rather than burning the retry budget on full agent runs.
+PUSH_PERM="$(gh api "repos/${TARGET_REPO}" --jq '.permissions.push' 2>/dev/null || echo "unknown")"
+if [[ "$PUSH_PERM" == "false" ]]; then
+  escalate_setup_failure "the squad token lacks push (contents:write) access to ${TARGET_REPO}"
+fi
 if ! git ls-remote --heads "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" "$BASE_BRANCH" | grep -q .; then
-  echo "error: target repo ${TARGET_REPO} has no ${BASE_BRANCH} branch — create it before dispatching squad work" >&2
-  exit 1
+  escalate_setup_failure "target repo ${TARGET_REPO} has no ${BASE_BRANCH} branch — create it before dispatching squad work"
 fi
 git clone --depth 1 -b "$BASE_BRANCH" "https://github.com/${TARGET_REPO}.git" "$WORKDIR"
 
@@ -104,6 +125,20 @@ checkout_work_branch "$WORKDIR"
 export SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT=1
 python3 -m ai_alpha_squad.actions_agent run \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$TARGET_REPO" "$WORKDIR" "$INSTRUCTIONS_FILE"
+
+# Safety gate: reject destructive rewrites (agent deleting most of a file / dropping
+# public functions) before they become a PR. Retryable failure so the cap applies.
+SAFETY_VIOLATIONS="$(cd "$WORKDIR" && python3 -m ai_alpha_squad.actions_agent check-changes "$WORKDIR" 2>/dev/null)" || {
+  echo "error: developer change failed the destructive-edit safety check on ${TARGET_REPO}" >&2
+  printf '%s\n' "$SAFETY_VIOLATIONS" >&2
+  gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "**Squad developer — change rejected by safety check.** The proposed edit on \`${TARGET_REPO}\` looks destructive (likely a file rewrite that drops existing code), so no PR was opened:
+
+\`\`\`
+${SAFETY_VIOLATIONS}
+\`\`\`
+Re-run after the agent makes a *targeted* change." 2>/dev/null || true
+  exit 1
+}
 
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
   git add -A

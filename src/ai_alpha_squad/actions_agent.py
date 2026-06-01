@@ -123,6 +123,62 @@ def execute_tool(workdir: Path, name: str, args: dict) -> str:
     return f"error: unknown tool {name!r}"
 
 
+_DEF_RE = re.compile(r"^[+-](?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)")
+
+
+def diff_file_stats(diff_text: str) -> dict[str, dict]:
+    """Per-file line/def deltas from a unified git diff (``git diff HEAD``).
+
+    Returns ``{path: {added, removed, added_defs, removed_defs}}``. ``*_defs`` are
+    top-level Python ``def``/``class`` names (column 0 after the +/- marker).
+    """
+    stats: dict[str, dict] = {}
+    cur: str | None = None
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            match = re.search(r" b/(.+)$", line)
+            cur = match.group(1) if match else None
+            if cur:
+                stats[cur] = {"added": 0, "removed": 0, "added_defs": set(), "removed_defs": set()}
+            continue
+        if cur is None or line[:3] in ("+++", "---") or line.startswith("@@"):
+            continue
+        if line.startswith("+"):
+            stats[cur]["added"] += 1
+            dm = _DEF_RE.match(line)
+            if dm:
+                stats[cur]["added_defs"].add(dm.group(1))
+        elif line.startswith("-"):
+            stats[cur]["removed"] += 1
+            dm = _DEF_RE.match(line)
+            if dm:
+                stats[cur]["removed_defs"].add(dm.group(1))
+    return stats
+
+
+def assess_change_safety(diff_text: str) -> list[str]:
+    """Flag suspiciously destructive edits (the kind where the model rewrites a
+    file and drops existing code). Returns human-readable violation strings.
+
+    New (untracked) files don't appear in ``git diff HEAD``, so greenfield work
+    that only adds files is never flagged.
+    """
+    violations: list[str] = []
+    for path, s in diff_file_stats(diff_text).items():
+        lost_defs = s["removed_defs"] - s["added_defs"]
+        if lost_defs:
+            violations.append(
+                f"{path}: removes top-level definitions without re-adding them: "
+                + ", ".join(sorted(lost_defs))
+            )
+        if s["removed"] >= 30 and s["removed"] >= 3 * max(s["added"], 1):
+            violations.append(
+                f"{path}: deletes {s['removed']} lines but adds only {s['added']} — "
+                "looks like a file rewrite/truncation, not a targeted change"
+            )
+    return violations
+
+
 def _extract_json_object(text: str, start: int) -> str | None:
     depth = 0
     for i in range(start, len(text)):
@@ -484,6 +540,20 @@ def main(argv: list[str] | None = None) -> int:
             pr_url = argv[5] if len(argv) > 5 else os.environ.get("SQUAD_ACTIONS_PR_URL", "")
             summary = summary_path.read_text(encoding="utf-8")
             post_result(queue_repo, int(issue_s), agent, summary, pr_url=pr_url)
+        elif argv[0] == "check-changes":
+            # Safety gate: reject destructive rewrites before they become a PR.
+            workdir = Path(argv[1])
+            # Force standard a/ b/ prefixes regardless of the runner's git config
+            # (mnemonicPrefix/noprefix would otherwise break diff parsing).
+            diff = subprocess.run(
+                ["git", "-c", "diff.mnemonicPrefix=false", "-c", "diff.noprefix=false",
+                 "diff", "HEAD"],
+                cwd=workdir, capture_output=True, text=True,
+            ).stdout
+            violations = assess_change_safety(diff)
+            for v in violations:
+                print(v)
+            return 3 if violations else 0
         elif len(argv) >= 6:
             queue_repo, issue_s, agent, target_repo, workdir_s, instructions_path_s = argv[:6]
             instructions = Path(instructions_path_s).read_text(encoding="utf-8")

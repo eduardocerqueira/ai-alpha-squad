@@ -30,6 +30,10 @@ DELIVERABLE_MARKERS: dict[str, str] = {
 RUN_IN_PROGRESS_MARKER = "squad-v2-run:in_progress:"
 RUN_FAILED_MARKER = "squad-v2-run:failed:"
 RUN_RESET_MARKER = "squad-v2-run:reset:"
+# Non-retryable setup/permission failure. Deliberately NOT a substring of
+# RUN_FAILED_MARKER so it does not count toward the retry cap — these need a
+# human (grant access, create the branch), not another agent attempt.
+RUN_SETUP_FAILED_MARKER = "squad-v2-run:setup-failed:"
 MAX_RUN_ATTEMPTS = 3
 # A run with an in_progress marker older than this with no terminal marker is
 # treated as dead (orchestrator timeout is 90m, so this must stay above it).
@@ -280,6 +284,7 @@ def is_squad_internal_comment(body: str) -> bool:
         RUN_IN_PROGRESS_MARKER in text
         or RUN_FAILED_MARKER in text
         or RUN_RESET_MARKER in text
+        or RUN_SETUP_FAILED_MARKER in text
     ):
         return True
     if "squad hf agent" in text or "squad actions agent" in text:
@@ -298,6 +303,15 @@ def in_progress_comment(agent: str) -> str:
 def failed_comment(agent: str, error: str) -> str:
     text = (error or "unknown error").strip()[:500]
     return f"{RUN_FAILED_MARKER}{agent} — {text}"
+
+
+def setup_failed_comment(agent: str, reason: str) -> str:
+    """Non-retryable escalation: a setup/permission problem a human must fix."""
+    text = (reason or "setup error").strip()[:500]
+    return (
+        f"{RUN_SETUP_FAILED_MARKER}{agent} — {text}. "
+        "This will not be retried automatically; fix the cause and re-run the orchestrator."
+    )
 
 
 def reset_comment(agent: str) -> str:
