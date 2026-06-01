@@ -159,6 +159,20 @@ def next_action(view: IssueView) -> NextAction:
     return NextAction("idle", reason=f"Unhandled phase {lc}")
 
 
+def is_squad_internal_comment(body: str) -> bool:
+    """Comments that must not re-trigger phase watch (avoids feedback loops on #94)."""
+    text = (body or "").lower()
+    if RUN_IN_PROGRESS_MARKER in text or RUN_FAILED_MARKER in text:
+        return True
+    if "squad hf agent" in text or "squad actions agent" in text:
+        return True
+    if "squad orchestrator" in text and "<table>" in text:
+        return True
+    from ai_alpha_squad.nudge import is_orchestrator_noise
+
+    return is_orchestrator_noise(body)
+
+
 def in_progress_comment(agent: str) -> str:
     return f"{RUN_IN_PROGRESS_MARKER}{agent} — do not start another agent on this issue."
 

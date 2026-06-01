@@ -65,8 +65,22 @@ body = subprocess.check_output(
 print(extract_target_repo(body) or repo)
 " "$REPO" "$ISSUE")"
 
-MARKER="$(python3 -c "from ai_alpha_squad.squad_v2 import in_progress_comment; print(in_progress_comment('$AGENT'))")"
-gh issue comment "$ISSUE" --repo "$REPO" --body "$MARKER"
+if ! python3 -c "
+import json, subprocess, sys
+sys.path.insert(0, 'src')
+from ai_alpha_squad.squad_v2 import run_in_progress
+repo, issue, agent = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+data = json.loads(subprocess.check_output(
+    ['gh', 'issue', 'view', str(issue), '--repo', repo, '--json', 'comments'],
+    text=True,
+))
+comments = tuple(data.get('comments') or [])
+active = run_in_progress(comments)
+raise SystemExit(0 if active == agent else 1)
+" "$REPO" "$ISSUE" "$AGENT"; then
+  MARKER="$(python3 -c "from ai_alpha_squad.squad_v2 import in_progress_comment; print(in_progress_comment('$AGENT'))")"
+  gh issue comment "$ISSUE" --repo "$REPO" --body "$MARKER"
+fi
 
 INSTRUCTIONS="$(mktemp)"
 case "$AGENT" in

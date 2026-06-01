@@ -3,6 +3,7 @@
 from ai_alpha_squad.squad_v2 import (
     IssueView,
     has_deliverable,
+    is_squad_internal_comment,
     next_action,
     run_in_progress,
 )
@@ -66,6 +67,12 @@ def test_stale_in_progress_ignored_after_deliverable():
 
 def test_ba_detected():
     assert has_deliverable(({"body": "# Business Analysis\n\nx" * 50},), "business-owner")
+
+
+def test_internal_comment_detection():
+    assert is_squad_internal_comment("squad-v2-run:in_progress:developer")
+    assert is_squad_internal_comment("**Squad HF agent result** — foo")
+    assert not is_squad_internal_comment("approve")
 
 
 def test_developer_deliverable_requires_heading_not_inline_mention():

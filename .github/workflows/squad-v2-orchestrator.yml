@@ -20,7 +20,7 @@ on:
 
 concurrency:
   group: squad-v2-${{ github.event.issue.number || inputs.issue_number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   orchestrate:
