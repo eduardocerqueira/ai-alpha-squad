@@ -63,7 +63,7 @@ def test_default_hf_model_env(monkeypatch):
 EXPECTED_AGENT_HF_MODELS = {
     "business-owner": "deepseek-ai/DeepSeek-V4-Flash",
     "architect": "Qwen/Qwen3.6-27B",
-    "developer": "Qwen/Qwen2.5-Coder-32B-Instruct",
+    "developer": "deepseek-ai/DeepSeek-V4-Flash",
     "qa": "deepseek-ai/DeepSeek-V4-Flash",
     "security": "deepseek-ai/DeepSeek-V4-Flash",
     "devops": "Qwen/Qwen2.5-Coder-32B-Instruct",
