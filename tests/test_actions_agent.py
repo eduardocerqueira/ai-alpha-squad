@@ -177,3 +177,35 @@ def test_diff_file_stats_counts():
     s = stats["seeker/util.py"]
     assert s["removed"] > s["added"]
     assert {"get_config", "build_regex"} <= s["removed_defs"]
+
+
+# --- edit_file (targeted find/replace for existing files) ---
+
+def test_edit_file_replaces_unique_snippet(tmp_path):
+    (tmp_path / "u.py").write_text('open(f, "r")\nother = 1\n')
+    res = execute_tool(tmp_path, "edit_file", {
+        "path": "u.py", "old_string": 'open(f, "r")', "new_string": 'open(f, "r", errors="ignore")'})
+    assert res.startswith("ok:")
+    assert (tmp_path / "u.py").read_text() == 'open(f, "r", errors="ignore")\nother = 1\n'
+
+
+def test_edit_file_errors_when_not_found(tmp_path):
+    (tmp_path / "u.py").write_text("a = 1\n")
+    res = execute_tool(tmp_path, "edit_file", {"path": "u.py", "old_string": "nope", "new_string": "x"})
+    assert res.startswith("error:") and "not found" in res
+
+
+def test_edit_file_errors_on_ambiguous_match(tmp_path):
+    (tmp_path / "u.py").write_text("x\nx\n")
+    res = execute_tool(tmp_path, "edit_file", {"path": "u.py", "old_string": "x", "new_string": "y"})
+    assert res.startswith("error:") and "matches 2" in res
+
+
+def test_edit_file_errors_on_missing_file(tmp_path):
+    res = execute_tool(tmp_path, "edit_file", {"path": "nope.py", "old_string": "a", "new_string": "b"})
+    assert res.startswith("error:") and "not a file" in res
+
+
+def test_edit_file_rejects_path_escape(tmp_path):
+    res = execute_tool(tmp_path, "edit_file", {"path": "../../etc/passwd", "old_string": "a", "new_string": "b"})
+    assert res.startswith("error:")
