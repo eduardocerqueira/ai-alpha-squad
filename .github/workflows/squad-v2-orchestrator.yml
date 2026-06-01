@@ -1,0 +1,65 @@
+# Minimal squad v2: Business Owner + Developer on one issue. Enable with repo variable SQUAD_V2=1.
+name: Squad v2 orchestrator
+
+permissions:
+  issues: write
+  pull-requests: write
+  actions: write
+
+on:
+  issues:
+    types: [labeled, opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Parent issue number
+        required: true
+      lifecycle_label:
+        description: Lifecycle label (new or director-approved)
+        required: true
+
+concurrency:
+  group: squad-v2-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: vars.SQUAD_V2 == '1'
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      ISSUE: ${{ github.event.issue.number || inputs.issue_number }}
+      LABEL: ${{ github.event.label.name || inputs.lifecycle_label }}
+      SQUAD_V2: "1"
+      SQUAD_AI_PROVIDER: huggingface
+      SQUAD_CODE_RUNTIME: actions
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install HF runner deps
+        run: python -m pip install -e ".[dev]" 2>/dev/null || python -m pip install httpx pyyaml
+
+      - name: Resolve trigger label
+        id: lc
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.lifecycle_label }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.action }}" = "opened" ]; then
+            echo "name=new" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${LABEL}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dispatch v2 agent
+        if: contains(fromJSON('["new","director-approved"]'), steps.lc.outputs.name)
+        run: |
+          chmod +x ./scripts/squad-v2-dispatch.sh ./scripts/squad-dispatch-subissue.sh \
+            ./scripts/squad-run-hf-agent.sh ./scripts/squad-run-actions-agent.sh
+          ./scripts/squad-v2-dispatch.sh "$REPO" "$ISSUE"

@@ -28,8 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: >-
-      (github.event_name == 'workflow_dispatch') ||
-      (github.event.issue.state == 'open')
+      vars.SQUAD_V2 != '1' &&
+      ((github.event_name == 'workflow_dispatch') ||
+      (github.event.issue.state == 'open'))
     outputs:
       lifecycle_label: ${{ steps.label.outputs.name }}
       issue_number: ${{ steps.issue.outputs.number }}
