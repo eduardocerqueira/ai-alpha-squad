@@ -1,0 +1,51 @@
+# Squad v2 phase watch — sequential dispatch and label sync. Requires SQUAD_V2=1.
+name: Squad v2 phase watch
+
+permissions:
+  issues: write
+  pull-requests: write
+  actions: write
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number (optional)
+        required: false
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: squad-v2-watch-${{ github.event.issue.number || 'scan' }}
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: vars.SQUAD_V2 == '1'
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      SQUAD_V2: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run v2 tick
+        run: |
+          chmod +x ./scripts/squad-v2-tick.sh ./scripts/squad-v2-dispatch.sh \
+            ./scripts/squad-sync-planning-labels.sh
+          ISSUE="${{ github.event.issue.number || inputs.issue_number }}"
+          if [ -n "$ISSUE" ]; then
+            ./scripts/squad-v2-tick.sh "$REPO" "$ISSUE"
+          else
+            ./scripts/squad-v2-tick.sh "$REPO"
+          fi
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
