@@ -479,38 +479,8 @@ h1 .sub {
 .form-status.err { color: #ef4444; }
 
 .turnstile-wrap {
-  margin: 0 auto 1rem;
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  background: var(--surface);
-}
-
-/* Two-layer clip: hides Turnstile iframe's built-in 1px border (cross-origin) */
-.turnstile-clip {
-  overflow: hidden;
-  width: fit-content;
-  max-width: 100%;
-  line-height: 0;
-  background: var(--surface);
-  /* Extra bottom inset — bottom edge is the usual leak on dark pages */
-  clip-path: inset(1px 1px 3px 1px);
-}
-
-.turnstile-clip #turnstile-widget,
-.turnstile-clip .cf-turnstile {
-  line-height: 0;
-  margin: -1px -1px -3px;
-}
-
-.turnstile-clip iframe {
-  display: block;
-  border: none !important;
-  outline: none !important;
-  box-shadow: none !important;
-  color-scheme: light;
-  vertical-align: top;
-  margin-bottom: -2px;
+  margin-bottom: 1rem;
+  min-height: 65px;
 }
 
 .visually-hidden {
