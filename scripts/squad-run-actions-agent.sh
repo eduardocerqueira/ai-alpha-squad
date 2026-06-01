@@ -32,6 +32,7 @@ configure_git_auth() {
 }
 
 BRANCH="$(python3 -c "from ai_alpha_squad.squad_v2 import squad_work_branch; print(squad_work_branch('$AGENT', $ISSUE))" 2>/dev/null || echo "squad/${AGENT}-issue-${ISSUE}")"
+BASE_BRANCH="${SQUAD_TARGET_BASE_BRANCH:-main}"
 
 checkout_work_branch() {
   local workdir="$1"
@@ -42,6 +43,7 @@ checkout_work_branch() {
     git checkout "$BRANCH"
     git pull --rebase origin "$BRANCH" || git pull origin "$BRANCH" || true
   else
+    git checkout "$BASE_BRANCH"
     git checkout -b "$BRANCH"
   fi
 }
@@ -59,6 +61,7 @@ ensure_pull_request() {
     return 0
   fi
   gh pr create --repo "$TARGET_REPO" \
+    --base "$BASE_BRANCH" \
     --title "[Squad ${AGENT}] Issue #${ISSUE}" \
     --body "Squad queue: ${QUEUE_REPO}#${ISSUE}
 
@@ -89,7 +92,11 @@ fi
 WORKDIR="${RUNNER_TEMP:-/tmp}/squad-target-${ISSUE}-$$"
 rm -rf "$WORKDIR"
 configure_git_auth
-git clone --depth 1 "https://github.com/${TARGET_REPO}.git" "$WORKDIR"
+if ! git ls-remote --heads "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" "$BASE_BRANCH" | grep -q .; then
+  echo "error: target repo ${TARGET_REPO} has no ${BASE_BRANCH} branch — create it before dispatching squad work" >&2
+  exit 1
+fi
+git clone --depth 1 -b "$BASE_BRANCH" "https://github.com/${TARGET_REPO}.git" "$WORKDIR"
 
 checkout_work_branch "$WORKDIR"
 
