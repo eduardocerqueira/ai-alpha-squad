@@ -1,14 +1,17 @@
 import type { AgentStatus } from "@/types";
 
-export type NormStatus = "done" | "working" | "blocked" | "idle";
+// Honest role-states derived from issue artifacts (not live run state):
+//  done · review (PR open, awaiting merge) · progress (its turn / in flight) ·
+//  idle (waiting for an earlier phase) · blocked.
+export type NormStatus = "done" | "review" | "progress" | "idle" | "blocked";
 
-export function normalizeAgentStatus(status: AgentStatus | string): NormStatus {
+export function normalizeAgentStatus(status: AgentStatus | string, detail = ""): NormStatus {
   switch (status) {
     case "done":
       return "done";
     case "active":
     case "working":
-      return "working";
+      return /pr open|merge when ready|review/i.test(detail) ? "review" : "progress";
     case "stuck":
     case "blocked":
       return "blocked";
@@ -19,68 +22,43 @@ export function normalizeAgentStatus(status: AgentStatus | string): NormStatus {
 
 const COLORS: Record<NormStatus, string> = {
   done: "var(--green)",
-  working: "var(--green)",
-  blocked: "var(--danger)",
+  review: "var(--amber)",
+  progress: "var(--amber)",
   idle: "var(--muted)",
+  blocked: "var(--danger)",
 };
 
-/** Hand-drawn SVG status indicator for an agent (idle / working / blocked / done). */
+/** Static SVG status indicator for an agent — no spinner (the dashboard can't
+ *  see live Action runs, so it never implies one). */
 export function AgentStatusIcon({ status }: { status: NormStatus }) {
   const color = COLORS[status];
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      role="img"
-      aria-label={status}
-    >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" role="img" aria-label={status}>
       {status === "idle" && (
         <circle cx="12" cy="12" r="6" stroke={color} strokeWidth="2" opacity="0.7" />
       )}
 
-      {status === "working" && (
+      {status === "progress" && (
         <g>
-          <circle
-            cx="12"
-            cy="12"
-            r="9"
-            stroke={color}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray="14 40"
-            opacity="0.9"
-          >
-            <animateTransform
-              attributeName="transform"
-              type="rotate"
-              from="0 12 12"
-              to="360 12 12"
-              dur="1.4s"
-              repeatCount="indefinite"
-            />
-          </circle>
-          <circle cx="12" cy="12" r="3.5" fill={color}>
-            <animate
-              attributeName="opacity"
-              values="1;0.4;1"
-              dur="1.4s"
-              repeatCount="indefinite"
-            />
-          </circle>
+          <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="2" opacity="0.35" />
+          <circle cx="12" cy="12" r="3.5" fill={color} />
+        </g>
+      )}
+
+      {status === "review" && (
+        <g stroke={color} strokeWidth="2" fill="none" strokeLinecap="round">
+          {/* git-pull-request glyph */}
+          <circle cx="7" cy="6" r="2.2" />
+          <circle cx="7" cy="18" r="2.2" />
+          <line x1="7" y1="8.2" x2="7" y2="15.8" />
+          <circle cx="17" cy="18" r="2.2" />
+          <path d="M17 15.8 V11 a3 3 0 0 0-3-3 H10.5" />
         </g>
       )}
 
       {status === "blocked" && (
         <g>
-          <path
-            d="M12 3 L22 20 H2 Z"
-            fill="none"
-            stroke={color}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+          <path d="M12 3 L22 20 H2 Z" fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
           <line x1="12" y1="9" x2="12" y2="14" stroke={color} strokeWidth="2" strokeLinecap="round" />
           <circle cx="12" cy="17" r="1.1" fill={color} />
         </g>

@@ -48,6 +48,7 @@ export interface JobCard {
   lifecycle: string | null;
   active_agent: string;
   bucket: Bucket;
+  blocked: boolean;
   updated_at: string;
   target_repo: string | null;
   target_pr_url: string | null;
