@@ -87,7 +87,8 @@ export default {
     if (url.pathname === "/api/director/jobs" && request.method === "GET") {
       const email = await sessionEmail(env, request);
       if (!email) return json({ error: "unauthorized" }, 401);
-      return handleDirectorJobs(env, url);
+      const force = url.searchParams.get("refresh") === "1" || url.searchParams.get("live") === "1";
+      return handleDirectorJobs(env, force);
     }
 
     return env.ASSETS.fetch(request);
@@ -95,14 +96,19 @@ export default {
 };
 
 /**
- * Serve the Director dashboard snapshot. Prefers the live CI-refreshed copy on
- * the `director-jobs-json` branch (edge-cached ~60s) so the dashboard tracks
- * GitHub without a redeploy; falls back to the asset bundled at deploy time.
+ * Serve the Director dashboard snapshot from the CI-refreshed
+ * `director-jobs-json` branch (edge-cached ~60s) so it tracks GitHub without a
+ * redeploy; falls back to the asset bundled at deploy time. When `force` (the
+ * Refresh button sends `?refresh=1`), bypass both the edge cache and the raw
+ * CDN cache with a cache-busting URL so the very latest is fetched.
  */
-async function handleDirectorJobs(env: Env, url: URL): Promise<Response> {
+async function handleDirectorJobs(env: Env, force: boolean): Promise<Response> {
   try {
-    const live = await fetch(DIRECTOR_JOBS_BRANCH_URL, {
-      cf: { cacheTtl: DIRECTOR_JOBS_TTL_SEC, cacheEverything: true },
+    const target = force ? `${DIRECTOR_JOBS_BRANCH_URL}?t=${Date.now()}` : DIRECTOR_JOBS_BRANCH_URL;
+    const live = await fetch(target, {
+      cf: force
+        ? { cacheTtl: 0, cacheEverything: false }
+        : { cacheTtl: DIRECTOR_JOBS_TTL_SEC, cacheEverything: true },
     });
     if (live.ok) {
       const body = await live.text();
@@ -111,7 +117,7 @@ async function handleDirectorJobs(env: Env, url: URL): Promise<Response> {
           status: 200,
           headers: {
             "Content-Type": "application/json",
-            "Cache-Control": `public, max-age=${DIRECTOR_JOBS_TTL_SEC}`,
+            "Cache-Control": force ? "no-store" : `public, max-age=${DIRECTOR_JOBS_TTL_SEC}`,
             "X-Data-Source": "live",
           },
         });
@@ -121,7 +127,7 @@ async function handleDirectorJobs(env: Env, url: URL): Promise<Response> {
     console.error("Live jobs.json fetch failed, using bundled asset:", err);
   }
 
-  const staticRes = await env.ASSETS.fetch(new URL("/director/jobs.json", url.origin).toString());
+  const staticRes = await env.ASSETS.fetch("https://assets.local/director/jobs.json");
   if (staticRes.ok) {
     return new Response(staticRes.body, {
       status: 200,

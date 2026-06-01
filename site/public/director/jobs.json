@@ -1,32 +1,31 @@
 {
-  "generated_at": "2026-06-01T22:01:32Z",
+  "generated_at": "2026-06-01T22:19:03Z",
   "repo": "eduardocerqueira/ai-alpha-squad",
   "counts": {
-    "needs_you": 0,
-    "in_progress": 1,
+    "needs_you": 1,
+    "in_progress": 0,
     "stuck": 0,
-    "completed": 6
+    "completed": 7
   },
-  "needs_you": [],
-  "in_progress": [
+  "needs_you": [
     {
-      "number": 111,
-      "title": "[Request]: Fix seeker pipeline \u2014 UnicodeDecodeError in purge() (experimental)",
-      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/111",
-      "lifecycle": "implemented",
-      "active_agent": "developer",
-      "bucket": "in_progress",
-      "blocked": true,
-      "updated_at": "2026-06-01T21:59:34Z",
-      "target_repo": "eduardocerqueira/seeker",
-      "target_pr_url": "https://github.com/eduardocerqueira/seeker/pull/15",
+      "number": 120,
+      "title": "[Request]: Add 30 more hello world languages + fix README count (experimental-hello-world)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+      "lifecycle": "awaiting-approval",
+      "active_agent": "Director",
+      "bucket": "needs_you",
+      "blocked": false,
+      "updated_at": "2026-06-01T22:14:24Z",
+      "target_repo": "eduardocerqueira/experimental-hello-world",
+      "target_pr_url": null,
       "target_pr_merged": false,
-      "summary": "Phase `implemented`",
-      "headline": "Squad is working \u2014 nothing needed from you.",
-      "director_action": "",
+      "summary": "Director approval required",
+      "headline": "Approve the Business Analysis.",
+      "director_action": "Open the issue and reply APPROVE (or REQUEST CHANGES).",
       "labels": [
-        "blocked",
-        "director-approved"
+        "business-owner",
+        "awaiting-approval"
       ],
       "stuck_reasons": [],
       "suggested_action": "",
@@ -34,23 +33,23 @@
         {
           "role": "business-owner",
           "status": "done",
-          "issue_number": 111,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/111",
+          "issue_number": 120,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
           "detail": "BA on parent issue"
         },
         {
           "role": "architect",
-          "status": "done",
-          "issue_number": 111,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/111",
-          "detail": "Complete"
+          "status": "waiting",
+          "issue_number": 120,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+          "detail": "Not started"
         },
         {
           "role": "developer",
-          "status": "active",
+          "status": "waiting",
           "issue_number": null,
           "issue_url": null,
-          "detail": "PR open \u2014 merge when ready: https://github.com/eduardocerqueira/seeker/pull/15"
+          "detail": "Starts at designed phase"
         },
         {
           "role": "qa",
@@ -100,30 +99,34 @@
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
-          "status": "done",
-          "detail": ""
+          "status": "director",
+          "detail": "Open the issue and reply APPROVE (or REQUEST CHANGES).",
+          "action": {
+            "label": "Open issue & respond",
+            "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+            "message": "Open the issue and reply APPROVE (or REQUEST CHANGES)."
+          }
         },
         {
           "key": "director-approved",
           "title": "Approved \u2014 architecture & planning",
           "owner": "architect",
-          "status": "done",
+          "status": "pending",
           "detail": ""
         },
         {
           "key": "designed",
           "title": "Technical spec ready \u2014 development",
           "owner": "developer",
-          "status": "done",
+          "status": "pending",
           "detail": ""
         },
         {
           "key": "implemented",
           "title": "Code complete \u2014 pull request",
           "owner": "developer",
-          "status": "current",
-          "detail": "PR open",
-          "pr_url": "https://github.com/eduardocerqueira/seeker/pull/15"
+          "status": "pending",
+          "detail": ""
         },
         {
           "key": "validation",
@@ -149,8 +152,147 @@
       ]
     }
   ],
+  "in_progress": [],
   "stuck": [],
   "completed": [
+    {
+      "number": 111,
+      "title": "[Request]: Fix seeker pipeline \u2014 UnicodeDecodeError in purge() (experimental)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/111",
+      "lifecycle": "released",
+      "active_agent": "Done",
+      "bucket": "completed",
+      "blocked": false,
+      "updated_at": "2026-06-01T22:04:44Z",
+      "target_repo": "eduardocerqueira/seeker",
+      "target_pr_url": "https://github.com/eduardocerqueira/seeker/pull/15",
+      "target_pr_merged": true,
+      "summary": "Job finished",
+      "headline": "This job is done.",
+      "director_action": "",
+      "labels": [
+        "released"
+      ],
+      "stuck_reasons": [],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 111,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/111",
+          "detail": "BA on parent issue"
+        },
+        {
+          "role": "architect",
+          "status": "done",
+          "issue_number": 111,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/111",
+          "detail": "Complete"
+        },
+        {
+          "role": "developer",
+          "status": "done",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "PR merged \u2014 https://github.com/eduardocerqueira/seeker/pull/15"
+        },
+        {
+          "role": "qa",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "security",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "devops",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "tech-writer",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "release-manager",
+          "status": "done",
+          "issue_number": 111,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/111",
+          "detail": "Phase `released`"
+        }
+      ],
+      "events": [
+        {
+          "key": "new",
+          "title": "Request triaged",
+          "owner": "business-owner",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "awaiting-approval",
+          "title": "Business analysis ready",
+          "owner": "Director",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "director-approved",
+          "title": "Approved \u2014 architecture & planning",
+          "owner": "architect",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "designed",
+          "title": "Technical spec ready \u2014 development",
+          "owner": "developer",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "implemented",
+          "title": "Code complete \u2014 pull request",
+          "owner": "developer",
+          "status": "done",
+          "detail": "PR merged",
+          "pr_url": "https://github.com/eduardocerqueira/seeker/pull/15"
+        },
+        {
+          "key": "validation",
+          "title": "Validation (QA, Security, DevOps, Docs)",
+          "owner": "release-manager",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "release-candidate",
+          "title": "Release candidate",
+          "owner": "Director",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "released",
+          "title": "Released",
+          "owner": "Done",
+          "status": "done",
+          "detail": ""
+        }
+      ]
+    },
     {
       "number": 110,
       "title": "[Request]: 10 more hello world languages (experimental-hello-world) \u2014 v2 E2E #2",
