@@ -18,7 +18,6 @@ close_copilot_pr() {
   local issue="$2"
   local reason="$3"
   local next="$4"
-  local nudge_phase="${5:-}"
 
   local pr_url
   pr_url="$(gh pr view "$PR" --repo "$REPO" --json url -q .url)"
@@ -30,10 +29,12 @@ ${next}
 
 PR: ${pr_url}"
 
-  if [[ -n "$issue" ]]; then
+  if [[ -n "$issue" ]] && issue_is_open "$issue"; then
     local comment_body
     comment_body="$(python3 "$FORMAT_COMMENT" notice --message "$msg" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
     gh issue comment "$issue" --repo "$REPO" --body "$comment_body"
+  elif [[ -n "$issue" ]]; then
+    echo "Skip issue comment — #$issue is not OPEN"
   fi
 
   gh pr comment "$PR" --repo "$REPO" --body "$msg"
@@ -45,29 +46,58 @@ PR: ${pr_url}"
     "${ROOT}/scripts/squad-approve-copilot-workflows.sh"
   "${ROOT}/scripts/squad-approve-copilot-workflows.sh" "$REPO" "$PR" || true
 
-  if [[ -n "$issue" && -n "$nudge_phase" ]]; then
-    "${ROOT}/scripts/squad-nudge-stuck.sh" "$REPO" "$issue" --phase "$nudge_phase" --force --reason "$reason" || true
-  fi
 }
 
 resolve_linked_issue() {
-  local issue=""
-  issue="$(gh api graphql -f query="
-query(\$owner: String!, \$name: String!, \$pr: Int!) {
-  repository(owner: \$owner, name: \$name) {
-    pullRequest(number: \$pr) {
-      closingIssuesReferences(first: 5) { nodes { number } }
-    }
-  }
-}" -f owner="${REPO%%/*}" -f name="${REPO#*/}" -F pr="$PR" \
-    --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[0].number // empty' 2>/dev/null || true)"
+  local pr_text
+  pr_text="$(gh pr view "$PR" --repo "$REPO" --json body,title -q '[.title,.body]|join("\n")' 2>/dev/null || true)"
+  python3 "${ROOT}/scripts/squad-resolve-guard-issue.py" "$REPO" "$PR" "$pr_text" 2>/dev/null || true
+}
 
-  if [[ -z "$issue" ]]; then
-    local body
-    body="$(gh pr view "$PR" --repo "$REPO" --json body,title -q '[.title,.body]|join("\n")')"
-    issue="$(printf '%s' "$body" | grep -Eo '(issue|Issue|Fixes|fixes|Closes|closes)[^#]*#[[:space:]]*[0-9]+|#[0-9]+' | grep -Eo '[0-9]+' | head -1 || true)"
+issue_is_open() {
+  local issue="$1"
+  [[ -n "$issue" ]] || return 1
+  [[ "$(gh issue view "$issue" --repo "$REPO" --json state -q .state 2>/dev/null || true)" == "OPEN" ]]
+}
+
+copilot_assigned_on_issue() {
+  local issue="$1"
+  gh issue view "$issue" --repo "$REPO" --json assignees -q '.assignees[].login' 2>/dev/null \
+    | grep -qiE '^(copilot|copilot-swe-agent|app/copilot-swe-agent)$'
+}
+
+# Re-dispatch only when Copilot is not already running (avoids guard ↔ PR death spiral).
+maybe_guard_redispatch() {
+  local issue="$1"
+  local phase="$2"
+  local reason="$3"
+
+  [[ -n "$issue" && -n "$phase" ]] || return 0
+  if ! issue_is_open "$issue"; then
+    echo "Skip guard redispatch — issue #$issue is not OPEN"
+    return 0
   fi
-  printf '%s' "$issue"
+  if copilot_assigned_on_issue "$issue"; then
+    echo "Skip guard redispatch — Copilot already assigned on #$issue"
+    return 0
+  fi
+
+  chmod +x "${ROOT}/scripts/squad-dispatch-copilot.sh" "${ROOT}/scripts/squad-dispatch-subissue.sh"
+  export SQUAD_ALLOW_COPILOT_REASSIGN=1
+  case "$phase" in
+    architect)
+      SQUAD_NUDGE_REASON="$reason" "${ROOT}/scripts/squad-dispatch-copilot.sh" "$REPO" "$issue" "director-approved"
+      ;;
+    business-owner)
+      SQUAD_NUDGE_REASON="$reason" "${ROOT}/scripts/squad-dispatch-copilot.sh" "$REPO" "$issue" "new"
+      ;;
+    developer)
+      SQUAD_NUDGE_REASON="$reason" "${ROOT}/scripts/squad-dispatch-copilot.sh" "$REPO" "$issue" "designed"
+      ;;
+    *)
+      echo "No guard redispatch for phase=${phase}"
+      ;;
+  esac
 }
 
 AUTHOR="$(gh pr view "$PR" --repo "$REPO" --json author -q .author.login 2>/dev/null || true)"
@@ -100,20 +130,9 @@ PY
 if [[ "$(python3 -c 'import json,sys; print("yes" if json.loads(sys.argv[1])["close"] else "no")' "$PRODUCT_DECISION")" == "yes" ]]; then
   PRODUCT_REASON="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["reason"])' "$PRODUCT_DECISION")"
   ISSUE="$(resolve_linked_issue)"
-  NUDGE=""
-  if [[ -n "$ISSUE" ]]; then
-    LABELS="$(gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' | tr '\n' ' ')"
-    if grep -q 'designed' <<<"$LABELS"; then
-      NUDGE="developer"
-    elif grep -q 'director-approved' <<<"$LABELS"; then
-      NUDGE="architect"
-    elif grep -qE '(^|[[:space:]])new([[:space:]]|$)' <<<"$LABELS"; then
-      NUDGE="business-owner"
-    fi
-  fi
   close_copilot_pr "queue-product-code" "$ISSUE" "$PRODUCT_REASON" \
-    "Close this PR. Post planning artifacts on the parent issue; implement code only on the target product repo (Developer sub-issue)." \
-    "$NUDGE"
+    "Close this PR. Post planning artifacts on the parent issue; implement code only on the target product repo (Developer sub-issue)."
+  # Product PRs must not re-dispatch Copilot (causes WIP extension loop on the queue repo).
   exit 0
 fi
 
@@ -194,7 +213,11 @@ else
   NEXT="Close this PR. Work continues on the issue and sub-issues only."
 fi
 
-close_copilot_pr "$phase" "$ISSUE" "$REASON" "$NEXT" "$phase"
+close_copilot_pr "$phase" "$ISSUE" "$REASON" "$NEXT"
 if [[ "$has_marker" == true ]]; then
   "${ROOT}/scripts/squad-sync-planning-labels.sh" "$REPO" "$ISSUE" || true
+elif [[ "$PR_HAS_MARKER" == true ]]; then
+  echo "Deliverable only on PR — skip redispatch; Copilot must post ${marker} on issue #${ISSUE}."
+else
+  maybe_guard_redispatch "$ISSUE" "$phase" "$REASON"
 fi

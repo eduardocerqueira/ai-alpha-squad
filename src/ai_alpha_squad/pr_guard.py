@@ -2,6 +2,16 @@
 from __future__ import annotations
 
 import re
+from typing import Iterable
+
+COPILOT_ASSIGNEE_LOGINS = frozenset(
+    {
+        "copilot",
+        "copilot-swe-agent",
+        "app/copilot-swe-agent",
+        "copilot-swe-agent[bot]",
+    }
+)
 
 # Paths that are normal on ai-alpha-squad (orchestration, docs, site, Python package).
 QUEUE_REPO_ALLOWED_PREFIXES: tuple[str, ...] = (
@@ -121,3 +131,45 @@ def should_close_queue_product_pr(
         )
 
     return False, ""
+
+
+def is_copilot_assignee(login: str) -> bool:
+    return login.strip().lower() in {name.lower() for name in COPILOT_ASSIGNEE_LOGINS}
+
+
+def issue_numbers_from_pr_text(text: str) -> list[int]:
+    """Extract issue numbers from PR title/body (all #N references, in order)."""
+    seen: list[int] = []
+    for match in re.finditer(
+        r"(?:issue|Issue|Fixes|fixes|Closes|closes)[^#]*#\s*(\d+)|#(\d+)",
+        text,
+    ):
+        num = int(match.group(1) or match.group(2))
+        if num not in seen:
+            seen.append(num)
+    return seen
+
+
+def pick_guard_issue_number(
+    closing_numbers: Iterable[int],
+    body_numbers: Iterable[int],
+    *,
+    state_by_number: dict[int, str],
+) -> int | None:
+    """
+    Choose the issue to attach guard actions to.
+
+    Prefer OPEN issues; when several are open, use the highest number (usually the
+    current parent job). Never target a closed issue when an open candidate exists.
+    """
+    candidates: list[int] = []
+    for num in list(closing_numbers) + list(body_numbers):
+        if num not in candidates:
+            candidates.append(num)
+    if not candidates:
+        return None
+
+    open_issues = [n for n in candidates if state_by_number.get(n) == "OPEN"]
+    if open_issues:
+        return max(open_issues)
+    return None

@@ -13,6 +13,13 @@ FORMAT="${ROOT}/scripts/format-squad-comment.py"
 
 LABELS="$(gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' | tr '\n' ' ')"
 
+cleanup_stale_business_owner_label() {
+  if grep -q 'director-approved' <<<"$LABELS" && grep -q 'business-owner' <<<"$LABELS"; then
+    gh issue edit "$ISSUE" --repo "$REPO" --remove-label "business-owner" || true
+    echo "Removed stale business-owner label on #$ISSUE (director-approved active)"
+  fi
+}
+
 sync_ba() {
   if ! grep -qE '(^|[[:space:]])new([[:space:]]|$)' <<<"$LABELS"; then
     return 0
@@ -89,5 +96,6 @@ PY
   echo "Synced architect labels on #$ISSUE"
 }
 
+cleanup_stale_business_owner_label
 sync_ba
 sync_architect

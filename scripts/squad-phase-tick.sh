@@ -12,6 +12,7 @@ ADVANCE_VAL="${ROOT}/scripts/squad-advance-validation.sh"
 NUDGE="${ROOT}/scripts/squad-nudge-stuck.sh"
 SYNC="${ROOT}/scripts/squad-sync-planning-labels.sh"
 VALIDATION="${ROOT}/scripts/squad-dispatch-validation.sh"
+RECOVER_ARCH="${ROOT}/scripts/squad-recover-architect.sh"
 
 dispatch_missing_validation() {
   local parent="$1"
@@ -39,7 +40,8 @@ tick_parent() {
 
 if [[ -n "$PARENT_FILTER" ]]; then
   tick_parent "$PARENT_FILTER"
-  chmod +x "$NUDGE" "$SYNC"
+  chmod +x "$NUDGE" "$SYNC" "$RECOVER_ARCH"
+  "$RECOVER_ARCH" "$REPO" "$PARENT_FILTER" || true
   "$NUDGE" "$REPO" "$PARENT_FILTER" || true
   exit 0
 fi
@@ -52,7 +54,8 @@ for parent in $(gh issue list --repo "$REPO" --label implemented --state open --
   [[ -n "$parent" ]] && tick_parent "$parent"
 done
 
-chmod +x "$NUDGE" "$SYNC"
+chmod +x "$NUDGE" "$SYNC" "$RECOVER_ARCH"
+"$RECOVER_ARCH" "$REPO" || true
 "$NUDGE" "$REPO" || true
 
 echo "Phase tick complete for $REPO"
