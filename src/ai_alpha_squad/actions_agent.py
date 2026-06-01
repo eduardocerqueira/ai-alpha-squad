@@ -105,6 +105,27 @@ def execute_tool(workdir: Path, name: str, args: dict) -> str:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(str(args.get("content", "")), encoding="utf-8")
             return f"ok: wrote {path.relative_to(workdir)} ({path.stat().st_size} bytes)"
+        if name == "edit_file":
+            # Targeted find/replace for EXISTING files — avoids the destructive
+            # full-file rewrite that weaker models do with write_file.
+            path = _safe_path(workdir, str(args.get("path", "")))
+            if not path.is_file():
+                return f"error: not a file: {path} (use write_file to create new files)"
+            old = str(args.get("old_string", ""))
+            new = str(args.get("new_string", ""))
+            if not old:
+                return "error: edit_file requires a non-empty old_string"
+            text = path.read_text(encoding="utf-8", errors="replace")
+            count = text.count(old)
+            if count == 0:
+                return "error: old_string not found — read_file first and copy the exact text"
+            if count > 1:
+                return (
+                    f"error: old_string matches {count} places; add surrounding "
+                    "context so it is unique"
+                )
+            path.write_text(text.replace(old, new, 1), encoding="utf-8")
+            return f"ok: edited {path.relative_to(workdir)} (1 replacement)"
         if name == "list_dir":
             path = _safe_path(workdir, str(args.get("path", ".")))
             if not path.is_dir():
@@ -318,13 +339,17 @@ Respond with ONE JSON object per message — no markdown fences, no extra text:
 
 Tools:
 - read_file: {{"path": "relative/path"}}
-- write_file: {{"path": "relative/path", "content": "..."}}
+- write_file: {{"path": "relative/path", "content": "..."}}  (NEW files only)
+- edit_file: {{"path": "relative/path", "old_string": "exact text to replace", "new_string": "replacement"}}
 - list_dir: {{"path": "."}}
 - run_command: {{"command": "npm install"}}  (allowlisted: npm, pnpm, yarn, npx, node, python, make, cargo, go, git status/diff/add/commit)
 - finish: {{"summary": "what you did"}}
 
-Use list_dir once at the start, then prefer write_file for each artifact.
-If the task lists multiple languages, create every language, then call finish immediately.
+To CHANGE an existing file, use edit_file with a unique snippet copied verbatim from a
+prior read_file — do NOT rewrite the whole file with write_file (you will drop code and
+the change will be rejected). Use write_file only to create NEW files.
+For new files, prefer write_file for each artifact; if the task lists multiple languages,
+create every language, then call finish immediately.
 The "Progress so far" list below shows the tools you have ALREADY run this session —
 do not repeat completed work, and once every required artifact exists call finish.
 Do not repeat list_dir on the same path. Output only the JSON object."""
