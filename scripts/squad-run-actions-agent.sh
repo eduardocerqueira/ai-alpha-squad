@@ -142,8 +142,8 @@ Re-run after the agent makes a *targeted* change." 2>/dev/null || true
 
 # Completeness backstop: if the task enumerates N files to create, a partial
 # result (e.g. the agent hit max turns) must not become a finished deliverable.
-# Counted BEFORE commit while new files are still untracked.
-INCOMPLETE_MSG="$(python3 -m ai_alpha_squad.actions_agent check-complete "$WORKDIR" "$INSTRUCTIONS_FILE" 2>/dev/null)" && COMPLETE=1 || COMPLETE=0
+# Checks the named files exist (committed or not) against the issue body.
+INCOMPLETE_MSG="$(python3 -m ai_alpha_squad.actions_agent check-complete "$WORKDIR" "$QUEUE_REPO" "$ISSUE" 2>/dev/null)" && COMPLETE=1 || COMPLETE=0
 
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
   git add -A

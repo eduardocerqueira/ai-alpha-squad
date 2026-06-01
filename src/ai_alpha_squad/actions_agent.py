@@ -398,8 +398,9 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
     # Completeness guard: if the task enumerates specific files to create, don't
     # accept finish until they all exist on disk — models otherwise call finish
     # early (e.g. 8 of 30) and ship a partial deliverable. Checking existence (not
-    # this run's writes) keeps an idempotent continue correct.
-    required_files = expected_artifact_files(instructions)
+    # this run's writes) keeps an idempotent continue correct. The enumerated list
+    # lives in the issue body (issue_context), not the short dispatch instructions.
+    required_files = expected_artifact_files(f"{instructions}\n\n{issue_context}")
 
     def build_conversation(extra: str = "") -> str:
         parts = [user]
@@ -632,11 +633,12 @@ def main(argv: list[str] | None = None) -> int:
             return 3 if violations else 0
         elif argv[0] == "check-complete":
             # Backstop: a partial result (e.g. agent hit max turns) must not pass as
-            # a finished deliverable. Compares new files created against the count
-            # the task enumerates.
+            # a finished deliverable. The enumerated file list lives in the issue
+            # body, so fetch the same context the agent saw.
             workdir = Path(argv[1])
-            instructions = Path(argv[2]).read_text(encoding="utf-8")
-            required = expected_artifact_files(instructions)
+            queue_repo, issue_s = argv[2], argv[3]
+            task_text = fetch_issue_context_with_parent(queue_repo, int(issue_s))
+            required = expected_artifact_files(task_text)
             if not required:
                 return 0
             # Check the specific enumerated files exist on disk (committed or not),
