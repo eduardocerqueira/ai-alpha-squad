@@ -309,3 +309,26 @@ def test_loop_counts_preexisting_files_for_completion(tmp_path, monkeypatch):
     # a.py was never rewritten (it pre-existed); only b/c created.
     assert (tmp_path / "a.py").read_text() == "exists from a prior run\n"
     assert (tmp_path / "b.py").exists() and (tmp_path / "c.py").exists()
+
+
+def test_loop_guard_reads_list_from_issue_context(tmp_path, monkeypatch):
+    """The enumerated file list lives in the issue body (issue_context), not the
+    short dispatch instructions — the guard must still engage."""
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 20)
+    short_instructions = "Implement on the target repo and post # Developer Deliverable."
+    issue_body = "1. A — `a.py`\n2. B — `b.py`\n3. C — `c.py`"
+
+    def fake_chat(model, *, system, user, token):
+        for name in ("a.py", "b.py", "c.py"):
+            if not (tmp_path / name).exists():
+                return '{"tool":"write_file","args":{"path":"%s","content":"x"}}' % name
+        return '{"tool":"finish","args":{"summary":"all done"}}'
+
+    monkeypatch.setattr(actions_agent, "chat_completion", fake_chat)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions=short_instructions,
+        issue_context=issue_body, token="t",
+    )
+    assert finished is True
+    assert all((tmp_path / f).exists() for f in ("a.py", "b.py", "c.py"))

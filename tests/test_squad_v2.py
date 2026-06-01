@@ -210,3 +210,66 @@ def test_developer_deliverable_requires_heading_not_inline_mention():
         ({"body": "# Developer Deliverable\n\nPR: https://github.com/o/r/pull/1\n" + "x" * 400},),
         "developer",
     )
+
+
+# --- QA gate (Developer⇄QA rework loop) ---
+
+_DEV = {"body": "# Developer Deliverable\n\nPR: https://github.com/o/r/pull/1\n" + "x" * 200}
+
+
+def _dev_approved(comments):
+    return IssueView(1, "OPEN", frozenset({"director-approved"}), tuple(comments), "https://github.com/o/r")
+
+
+def test_qa_dispatched_after_developer_deliverable():
+    act = next_action(_dev_approved([_DEV]))
+    assert act.kind == "dispatch" and act.agent == "qa"
+
+
+def test_qa_pass_advances_to_release_candidate():
+    comments = [_DEV, {"body": "# QA Report\n\nAll good.\n\nsquad-v2-qa:pass"}]
+    act = next_action(_dev_approved(comments))
+    assert act.kind == "idle" and "QA passed" in act.reason
+
+
+def test_qa_fail_redispatches_developer():
+    comments = [_DEV, {"body": "# QA Report\n\nGaps.\n\nsquad-v2-qa:fail\n- missing X"}]
+    act = next_action(_dev_approved(comments))
+    assert act.kind == "dispatch" and act.agent == "developer"
+    assert "QA requested changes" in act.reason
+
+
+def test_qa_reviews_redelivered_work():
+    # dev → qa:fail → dev again; QA must review the new deliverable.
+    comments = [
+        _DEV,
+        {"body": "# QA Report\n\nsquad-v2-qa:fail\n- gap"},
+        {"body": "# Developer Deliverable\n\nfixed it\n" + "y" * 200},
+    ]
+    act = next_action(_dev_approved(comments))
+    assert act.kind == "dispatch" and act.agent == "qa"
+
+
+def test_qa_fail_cap_escalates():
+    comments = [_DEV]
+    for _ in range(3):
+        comments.append({"body": "# QA Report\n\nsquad-v2-qa:fail\n- gap"})
+        comments.append({"body": "# Developer Deliverable\n\nattempt\n" + "z" * 200})
+    # 3 fails recorded; latest is a fresh dev deliverable awaiting QA, but the cap
+    # is checked when QA next fails — simulate a 3rd fail as the latest verdict:
+    comments.append({"body": "# QA Report\n\nsquad-v2-qa:fail\n- still wrong"})
+    act = next_action(_dev_approved(comments))
+    assert act.kind == "failed" and "QA rejected" in act.reason
+
+
+def test_qa_passed_helper():
+    from ai_alpha_squad.squad_v2 import qa_passed
+    assert qa_passed((_DEV, {"body": "# QA Report\n\nsquad-v2-qa:pass"}))
+    assert not qa_passed((_DEV,))
+    # pass before the latest dev deliverable doesn't count
+    assert not qa_passed((_DEV, {"body": "squad-v2-qa:pass"}, {"body": "# Developer Deliverable\n\nnew\n" + "x"*200}))
+
+
+def test_qa_markers_are_internal():
+    assert is_squad_internal_comment("squad-v2-qa:pass")
+    assert is_squad_internal_comment("# QA Report\n\nsquad-v2-qa:fail\n- gap")

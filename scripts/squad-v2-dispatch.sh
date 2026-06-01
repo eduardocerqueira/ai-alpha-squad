@@ -110,7 +110,38 @@ Issue: https://github.com/${REPO}/issues/${ISSUE}
 1. Implement on ${TARGET} (branch + PR)
 2. Post on THIS issue (#${ISSUE}) — heading must include: # Developer Deliverable
    Include the PR URL and summary of changes.
-3. Do not create sub-issues. Do not post validation reports — v2 has only BO + Developer.
+3. If the issue has a "# QA Report" comment ending in \`squad-v2-qa:fail\`, this is a
+   REWORK: fix every gap it lists (continue on the existing branch), then post an
+   updated # Developer Deliverable.
+4. Do not create sub-issues.
+EOF
+    ;;
+  qa)
+    PR_DIFF=""
+    QA_PR="$(gh pr list --repo "$TARGET" --head "squad/developer-issue-${ISSUE}" --state open --json number -q '.[0].number' 2>/dev/null || true)"
+    if [[ -n "$QA_PR" ]]; then
+      PR_DIFF="$(gh pr diff "$QA_PR" --repo "$TARGET" 2>/dev/null | head -c 12000)"
+    fi
+    cat > "$INSTRUCTIONS" <<EOF
+You are the QA engineer for AI Alpha Squad (v2). Read .agents/agent-qa.md.
+
+Issue: https://github.com/${REPO}/issues/${ISSUE}
+Target repo: ${TARGET}
+
+Evaluate whether the Developer's deliverable satisfies EVERY success criterion in
+the issue above (the criteria are in the issue body). Review the delivered changes:
+
+\`\`\`diff
+${PR_DIFF:-(no open PR diff found — treat as not delivered)}
+\`\`\`
+
+Post ONE comment on THIS issue (#${ISSUE}) with heading: # QA Report
+- List each success criterion and whether it is met (✅/❌) with a one-line reason.
+- End with EXACTLY one verdict line, nothing after it:
+  - \`squad-v2-qa:pass\` — if and only if every criterion is fully met.
+  - \`squad-v2-qa:fail\` — otherwise, immediately followed by a bullet list of the
+    specific, actionable gaps the Developer must fix.
+Do not open PRs or sub-issues; review only.
 EOF
     ;;
   *)
