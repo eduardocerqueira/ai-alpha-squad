@@ -15,26 +15,57 @@
     },
   };
 
+  function statusClass(status) {
+    return `agent-status agent-status--${status}`;
+  }
+
+  function renderAgents(agents) {
+    if (!agents || !agents.length) return "";
+    const rows = agents
+      .map(
+        (a) => `
+      <tr>
+        <td>${escapeHtml(a.role)}</td>
+        <td><span class="${statusClass(a.status)}">${escapeHtml(a.status)}</span></td>
+        <td>${a.issue_url ? `<a href="${escapeAttr(a.issue_url)}" target="_blank" rel="noopener">#${a.issue_number || "—"}</a>` : "—"}</td>
+        <td>${escapeHtml(a.detail)}</td>
+      </tr>`,
+      )
+      .join("");
+    return `
+      <table class="agent-table" aria-label="Agent status">
+        <thead><tr><th>Agent</th><th>Status</th><th>Issue</th><th>Detail</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
   function renderCard(job) {
     const li = document.createElement("li");
-    li.className = "job-card";
+    li.className = "job-card" + (job.bucket === "stuck" ? " job-card--stuck" : "");
     const pr = job.target_pr_url
-      ? `<a href="${escapeAttr(job.target_pr_url)}" target="_blank" rel="noopener">Target PR</a>`
+      ? `<a href="${escapeAttr(job.target_pr_url)}" target="_blank" rel="noopener">Target PR${job.target_pr_merged ? " (merged)" : ""}</a>`
       : "";
-    const target = job.target_repo
-      ? `<span>${escapeHtml(job.target_repo)}</span>`
+    const stuck =
+      job.stuck_reasons && job.stuck_reasons.length
+        ? `<ul class="stuck-list">${job.stuck_reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`
+        : "";
+    const action = job.suggested_action
+      ? `<p class="job-action"><code>${escapeHtml(job.suggested_action)}</code></p>`
       : "";
     li.innerHTML = `
       <a class="job-title" href="${escapeAttr(job.url)}" target="_blank" rel="noopener">
         #${job.number} ${escapeHtml(job.title)}
       </a>
       <div class="job-meta">
-        <span class="lifecycle">${escapeHtml(job.lifecycle || "—")}</span>
+        Phase: <strong>${escapeHtml(job.lifecycle || "—")}</strong>
         · ${escapeHtml(job.active_agent)}
-        ${target ? ` · ${target}` : ""}
+        ${job.target_repo ? ` · ${escapeHtml(job.target_repo)}` : ""}
       </div>
       <p class="job-summary">${escapeHtml(job.summary)}</p>
+      ${stuck}
+      ${action}
       <div class="job-links">${pr}</div>
+      ${renderAgents(job.agents)}
     `;
     return li;
   }

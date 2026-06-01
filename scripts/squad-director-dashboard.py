@@ -77,7 +77,19 @@ def main() -> int:
     parser.add_argument("--write", type=Path, nargs="?", const=DEFAULT_JSON, metavar="PATH")
     parser.add_argument("--serve", type=int, nargs="?", const=8788, metavar="PORT")
     parser.add_argument("--print", action="store_true", help="Print JSON to stdout")
+    parser.add_argument(
+        "--tick",
+        type=int,
+        metavar="PARENT_ISSUE",
+        help="Run squad-phase-tick for parent job (unblock pipeline)",
+    )
     args = parser.parse_args()
+
+    if args.tick is not None:
+        import subprocess
+
+        tick = ROOT / "scripts" / "squad-phase-tick.sh"
+        subprocess.run([str(tick), args.repo, str(args.tick)], cwd=ROOT, check=False)
 
     if args.write is not None:
         write_json(args.write, args.repo)

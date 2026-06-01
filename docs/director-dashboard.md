@@ -34,6 +34,24 @@ Data file: `/director/jobs.json`, updated by [director-dashboard.yml](../.github
 ./scripts/squad-director-dashboard.py --write
 ```
 
+## Unblock a stuck job
+
+When the dashboard shows **Stuck** (e.g. PR merged but validation idle):
+
+```bash
+./scripts/squad-director-dashboard.py --tick 64
+# or
+./scripts/squad-phase-tick.sh eduardocerqueira/ai-alpha-squad 64
+```
+
+If validation was dispatched but no report appeared:
+
+```bash
+SQUAD_FORCE_NUDGE=1 ./scripts/squad-dispatch-validation.sh eduardocerqueira/ai-alpha-squad 64 qa
+```
+
+Each job card includes an **agent roster** (business-owner → release-manager) with status: `done`, `active`, `waiting`, or `stuck`.
+
 ## What we stopped doing
 
 - Long **Squad Director status** comments on issues (disabled by default; set `SQUAD_DIRECTOR_STATUS_COMMENTS=1` only if you want them back).

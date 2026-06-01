@@ -216,6 +216,62 @@ body.director-page main {
   font-style: italic;
 }
 
+.job-card--stuck {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.35);
+}
+
+.stuck-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: #fca5a5;
+}
+
+.job-action {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.job-action code {
+  font-size: 0.7rem;
+  word-break: break-all;
+}
+
+.agent-table {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.agent-table th,
+.agent-table td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.agent-table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.agent-status {
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.agent-status--done { color: var(--green); }
+.agent-status--active { color: #60a5fa; }
+.agent-status--waiting { color: var(--muted); }
+.agent-status--stuck { color: #f87171; }
+.agent-status--idle { color: var(--dim); }
+
 .director-footer {
   position: relative;
   z-index: 2;

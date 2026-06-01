@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 from ai_alpha_squad.hf_dispatch import parse_parent_issue_number
+from ai_alpha_squad.job_pipeline import analyze_job
 from ai_alpha_squad.nudge import PHASE_MARKERS, issue_has_deliverable
 from ai_alpha_squad.project_sync import (
     AGENT_PENDING_ON_ISSUE,
     PlanningDeliverables,
-    current_lifecycle,
     derive_state,
 )
 
@@ -26,10 +25,6 @@ SUBISSUE_TITLE_PREFIXES = (
     "[DevOps]",
     "[Tech Writer]",
     "Architect:",
-)
-
-PR_URL_RE = re.compile(
-    r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\d+)",
 )
 
 
@@ -44,8 +39,12 @@ class JobCard:
     updated_at: str
     target_repo: str | None
     target_pr_url: str | None
+    target_pr_merged: bool
     summary: str
     labels: tuple[str, ...]
+    stuck_reasons: tuple[str, ...]
+    suggested_action: str
+    agents: tuple[dict[str, Any], ...]
 
 
 @dataclass(frozen=True)
@@ -94,43 +93,6 @@ def _is_parent_job(title: str, body: str) -> bool:
     return not any(title.startswith(prefix) for prefix in SUBISSUE_TITLE_PREFIXES)
 
 
-def _extract_target_repo(body: str) -> str | None:
-    for match in re.finditer(r"`([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)`", body or ""):
-        repo = match.group(1)
-        if "ai-alpha-squad" not in repo.lower():
-            return repo
-    for match in re.finditer(r"github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", body or ""):
-        repo = match.group(1)
-        if "ai-alpha-squad" not in repo.lower() and "vscode-squad" in repo.lower():
-            return repo
-    return None
-
-
-def _find_target_pr(repo: str, issue: int) -> str | None:
-    try:
-        detail = _gh_json(
-            [
-                "issue",
-                "view",
-                str(issue),
-                "--repo",
-                repo,
-                "--json",
-                "comments",
-            ]
-        )
-        comments = detail.get("comments") or []
-    except subprocess.CalledProcessError:
-        return None
-    for comment in reversed(comments):
-        body = str(comment.get("body") or "")
-        for match in PR_URL_RE.finditer(body):
-            pr_repo = match.group(1)
-            if "ai-alpha-squad" not in pr_repo.lower():
-                return match.group(0)
-    return None
-
-
 def _planning_from_comments(comments: list[dict]) -> PlanningDeliverables:
     return PlanningDeliverables(
         has_business_analysis=issue_has_deliverable(comments, PHASE_MARKERS["business-owner"]),
@@ -145,7 +107,10 @@ def _classify_bucket(
     active_agent: str,
     needs_director: str,
     planning: PlanningDeliverables,
+    stuck_reasons: tuple[str, ...],
 ) -> str:
+    if stuck_reasons:
+        return "stuck"
     if state.upper() == "CLOSED" or lifecycle == "released":
         return "completed"
     if lifecycle == "blocked" or active_agent in (AGENT_PENDING_ON_ISSUE, "Blocked"):
@@ -159,24 +124,22 @@ def _classify_bucket(
     return "in_progress"
 
 
-def _summary_for_bucket(bucket: str, lifecycle: str | None, active_agent: str, pr_url: str | None) -> str:
+def _summary_for_card(
+    bucket: str,
+    lifecycle: str | None,
+    stuck_reasons: tuple[str, ...],
+    pr_merged: bool,
+    suggested_action: str,
+) -> str:
+    if stuck_reasons:
+        return stuck_reasons[0]
     if bucket == "needs_you":
-        if lifecycle == "awaiting-approval":
-            return "Approve or reject Business Analysis on GitHub"
-        if lifecycle == "release-candidate":
-            return "Approve or reject release"
-        return "Director action required"
-    if bucket == "stuck":
-        if active_agent == AGENT_PENDING_ON_ISSUE:
-            return "Squad deliverable missing on issue — agent blocked"
-        if lifecycle == "blocked":
-            return "Explicitly blocked"
-        return "Check issue for blocker"
+        return "Director approval required"
+    if pr_merged and lifecycle == "implemented":
+        return "PR merged — validation agents should be running"
     if bucket == "completed":
         return "Job finished"
-    if pr_url:
-        return f"Squad working — review target PR"
-    return f"Phase `{lifecycle or '—'}` · {active_agent}"
+    return f"Phase `{lifecycle or '—'}`"
 
 
 def _load_job_card(repo: str, row: dict) -> JobCard | None:
@@ -208,32 +171,68 @@ def _load_job_card(repo: str, row: dict) -> JobCard | None:
     except subprocess.CalledProcessError:
         pass
 
+    health = analyze_job(repo, number, labels=label_set, comments=comments, body=body)
+    lifecycle = health.effective_lifecycle
     planning = _planning_from_comments(comments)
-    derived = derive_state(set(labels), planning=planning)
-    lifecycle = derived.lifecycle or current_lifecycle(label_set)
+    derived = derive_state(label_set, planning=planning)
+    if lifecycle:
+        derived_lifecycle = lifecycle
+    else:
+        derived_lifecycle = derived.lifecycle
+
     bucket = _classify_bucket(
         state=state,
-        lifecycle=lifecycle,
+        lifecycle=derived_lifecycle,
         active_agent=derived.active_agent,
         needs_director=derived.needs_director,
         planning=planning,
+        stuck_reasons=health.stuck_reasons,
     )
-    target_repo = _extract_target_repo(body)
-    pr_url = _find_target_pr(repo, number)
+
+    agent_rows = tuple(
+        {
+            "role": a.role,
+            "status": a.status,
+            "issue_number": a.issue_number,
+            "issue_url": a.issue_url,
+            "detail": a.detail,
+        }
+        for a in health.agents
+    )
 
     return JobCard(
         number=number,
         title=title,
         url=f"https://github.com/{repo}/issues/{number}",
-        lifecycle=lifecycle,
+        lifecycle=derived_lifecycle,
         active_agent=derived.active_agent,
         bucket=bucket,
         updated_at=updated_at,
-        target_repo=target_repo,
-        target_pr_url=pr_url,
-        summary=_summary_for_bucket(bucket, lifecycle, derived.active_agent, pr_url),
+        target_repo=_extract_target_repo(body),
+        target_pr_url=health.target_pr_url,
+        target_pr_merged=health.target_pr_merged,
+        summary=_summary_for_card(
+            bucket,
+            derived_lifecycle,
+            health.stuck_reasons,
+            health.target_pr_merged,
+            health.suggested_action,
+        ),
         labels=labels,
+        stuck_reasons=health.stuck_reasons,
+        suggested_action=health.suggested_action,
+        agents=agent_rows,
     )
+
+
+def _extract_target_repo(body: str) -> str | None:
+    import re
+
+    for match in re.finditer(r"`([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)`", body or ""):
+        repo = match.group(1)
+        if "ai-alpha-squad" not in repo.lower():
+            return repo
+    return None
 
 
 def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 15) -> DirectorDashboard:
