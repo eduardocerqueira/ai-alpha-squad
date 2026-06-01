@@ -105,7 +105,6 @@ export SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT=1
 python3 -m ai_alpha_squad.actions_agent run \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$TARGET_REPO" "$WORKDIR" "$INSTRUCTIONS_FILE"
 
-PR_URL=""
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
   git add -A
   git -c 'user.name=github-actions[bot]' \
@@ -116,8 +115,12 @@ if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --po
     echo "Ensure SQUAD_ORCHESTRATOR_TOKEN has repo scope + contents:write on ${TARGET_REPO}." >&2
     exit 128
   fi
-  PR_URL="$(ensure_pull_request)"
 fi
+
+# Resolve the PR for this branch (existing or newly created) regardless of whether
+# THIS run added commits: an idempotent re-run on a branch that already has work
+# still has an open PR, and that PR is the deliverable.
+PR_URL="$(ensure_pull_request)"
 
 export SQUAD_V2="${SQUAD_V2:-}"
 python3 -m ai_alpha_squad.actions_agent finalize \
@@ -136,11 +139,13 @@ if [[ -n "$PR_URL" ]]; then
 fi
 
 if [[ -z "$PR_URL" ]]; then
-  echo "No PR was created on ${TARGET_REPO} — see issue #${ISSUE} agent result comment and workflow logs." >&2
-  # Agent may have run (e.g. max turns); avoid duplicate dispatch-failed if finalize posted.
-  if [[ -s "$SUMMARY_FILE" ]]; then
-    exit 0
-  fi
+  # No PR exists and none could be created (the agent produced no committable
+  # work, e.g. it churned on reads or hit max turns). The deliverable heading is
+  # only posted with a PR, so has_deliverable stays false. Exit non-zero so the
+  # caller records a failure marker and the retry cap engages — otherwise the
+  # orchestrator would re-dispatch this no-op run on every tick, forever.
+  echo "error: no PR on ${TARGET_REPO} for ${BRANCH} — agent produced no changes; treating as failure" >&2
+  echo "See issue #${ISSUE} agent result comment and workflow logs for the agent's summary." >&2
   exit 1
 fi
 

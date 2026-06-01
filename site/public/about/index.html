@@ -60,10 +60,18 @@
         AI Alpha Squad started as a question: what if a small team of specialized agents could run a full delivery cycle — from a vague business ask to a tagged release — with a human Director keeping final authority?
       </p>
       <p>
-        This is not a demo chatbot. It is a governed pipeline. Every decision is auditable on GitHub Issues. Every agent has a narrow mandate. Business Owner analyzes and seeks approval. Architect designs. Developer ships code to a target repository. QA, Security, DevOps, and Tech Writer validate in parallel. Release Manager gates production.
+        This is an open experiment, not a finished product. It is a governed pipeline where every decision is auditable on GitHub Issues and every agent has a narrow mandate. Business Owner analyzes and seeks approval. Architect designs. Developer ships code to a target repository. QA, Security, DevOps, and Tech Writer validate in parallel. Release Manager gates the release.
+      </p>
+      <h2 id="infra">Infrastructure &amp; models</h2>
+      <p>
+        The squad runs on <strong style="color:var(--text);font-weight:500">GitHub Actions</strong> as the runner and <strong style="color:var(--text);font-weight:500">Hugging Face Inference Providers</strong> for the models behind every agent. Planning roles — Business Owner, Architect, QA, Security, Tech Writer, Release Manager — call the
+        <a href="https://router.huggingface.co/v1/chat/completions">Hugging Face router</a> and post their deliverables straight to the issue. Developer and DevOps run an Actions agent that clones the target repo and drives a Hugging Face tool loop to open a PR. Models are configurable per agent via <code>SQUAD_HF_DEFAULT_MODEL</code> and per-role overrides, with cost-first provider routing by default.
       </p>
       <p>
-        The lab is intentionally experimental. We iterate on orchestration, agent prompts, and cloud runtimes while keeping the same contract: <strong style="color:var(--text);font-weight:500">Issues are truth. Releases need Director sign-off. WhatsApp is for speed, not for secrets.</strong>
+        A GitHub Copilot coding-agent path still exists as a legacy, optional runtime, but Hugging Face on Actions is the default and the direction we build toward.
+      </p>
+      <p>
+        The lab is intentionally experimental. We iterate on orchestration, agent prompts, open models, and runtimes while keeping the same contract: <strong style="color:var(--text);font-weight:500">Issues are truth. Releases need Director sign-off. WhatsApp is for speed, not for secrets.</strong>
       </p>
 
       <h2 id="flow">Delivery flow</h2>
