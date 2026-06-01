@@ -22,7 +22,7 @@ git pull origin main
 ./scripts/squad-director-dashboard.py --serve
 ```
 
-Reads `jobs.json` from CI (no live GitHub on refresh). Shows **Your move** + **Attention**.
+With **`SQUAD_V2=1`**, the Director dashboard workflow is skipped — use the CLI above. Legacy mode refreshes `jobs.json` via Actions (artifact + branch `director-jobs-json`; not `main` because of branch protection).
 
 ## Autonomous target
 
