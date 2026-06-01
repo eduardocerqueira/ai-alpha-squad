@@ -48,6 +48,14 @@ Mapping rules (see `scripts/squad_project_sync.py`):
 
 Sub-issues (QA, Security, etc.) show their agent label when in `implemented`.
 
+## View 9 / “everything in Backlog”
+
+GitHub’s default **Status** field (Backlog / In progress / Done) is separate from squad **Lifecycle** and **Active agent**. If cards sit in Backlog while work is running:
+
+1. Open [Project #6](https://github.com/users/eduardocerqueira/projects/6) → your pipeline view → **View menu** → **Column field** → choose **Lifecycle** or **Active agent** (not Status).
+2. Run `./scripts/squad_project_sync.py sync-family 64` (parent job number) after sub-issues are created or a target PR opens — sub-issues inherit the parent phase on the board.
+3. Check the latest **Squad Director status** comment on the parent issue for a step-by-step checklist and PR links.
+
 ## Recommended views (tabs)
 
 Create these in the project UI after running setup.

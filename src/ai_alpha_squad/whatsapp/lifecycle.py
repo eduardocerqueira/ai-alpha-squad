@@ -69,6 +69,16 @@ LIFECYCLE_STEPS: dict[str, LifecycleStep] = {
         status="Copilot is writing the tech spec and sub-issues.",
         next_step="Track progress on GitHub issue comments.",
     ),
+    "dispatched-developer": LifecycleStep(
+        headline="Agent: Developer",
+        status="Squad Actions is implementing on the target repo.",
+        next_step="Review the status table on the parent GitHub issue.",
+    ),
+    "developer-pr-ready": LifecycleStep(
+        headline="Implementation PR ready",
+        status="Developer opened a PR on the target repo.",
+        next_step="Review and merge the PR; track checklist on parent issue.",
+    ),
     "inbound-approve": LifecycleStep(
         headline="APPROVE received",
         status="Your WhatsApp reply was recorded on GitHub.",

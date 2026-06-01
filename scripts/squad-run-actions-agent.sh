@@ -11,6 +11,7 @@ INSTRUCTIONS_FILE="${5:?instructions file required}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+export SQUAD_REPO_ROOT="$ROOT"
 export DISPATCH_LABEL="${DISPATCH_LABEL:-$AGENT}"
 
 SUMMARY_FILE="${RUNNER_TEMP:-/tmp}/squad-actions-summary-${ISSUE}.txt"
@@ -89,6 +90,12 @@ fi
 
 python3 -m ai_alpha_squad.actions_agent finalize \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$SUMMARY_FILE" "${PR_URL:-}"
+
+if [[ -n "$PR_URL" ]]; then
+  chmod +x "${ROOT}/scripts/squad-post-director-status.sh"
+  ./scripts/squad-post-director-status.sh "$QUEUE_REPO" "$ISSUE" \
+    --agent "$AGENT" --pr-url "$PR_URL" --target-repo "$TARGET_REPO" || true
+fi
 
 if [[ -z "$PR_URL" ]]; then
   echo "No PR was created on ${TARGET_REPO} — check issue #${ISSUE} result comment and workflow logs." >&2

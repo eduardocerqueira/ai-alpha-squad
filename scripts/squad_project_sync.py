@@ -17,6 +17,7 @@ from ai_alpha_squad.project_sync import (  # noqa: E402
     AGENT_PENDING_ON_ISSUE,
     Derived,
     PlanningDeliverables,
+    current_lifecycle,
     derive_state,
 )
 
@@ -348,6 +349,30 @@ def set_single_select(
     )
 
 
+def _parent_labels_for_issue(repo: str, issue_number: int) -> set[str] | None:
+    from ai_alpha_squad.hf_dispatch import parse_parent_issue_number
+
+    data = gh_json(
+        [
+            "issue",
+            "view",
+            str(issue_number),
+            "--repo",
+            repo,
+            "--json",
+            "body,labels",
+        ]
+    )
+    labels = {item["name"] for item in data.get("labels") or []}
+    if current_lifecycle(labels):
+        return None
+    parent = parse_parent_issue_number(data.get("body") or "")
+    if not parent or parent == issue_number:
+        return None
+    parent_issue = load_issue(repo, parent)
+    return set(parent_issue.labels)
+
+
 def sync_issue(
     owner: str,
     project_number: int,
@@ -360,10 +385,12 @@ def sync_issue(
     planning = load_planning_deliverables(repo, issue_number)
     copilot_sessions = count_copilot_sessions(repo, issue_number, issue.assignees)
     session_count = max(copilot_sessions, 1)
+    parent_labels = _parent_labels_for_issue(repo, issue_number)
     derived = derive_state(
         set(issue.labels),
         copilot_sessions=session_count,
         planning=planning,
+        parent_labels=parent_labels,
     )
     project = ensure_fields(owner, project_number)
     project_id = project["id"]
@@ -408,6 +435,13 @@ def sync_issue(
         f"agent={derived.active_agent} needs_director={derived.needs_director}"
     )
     return derived
+
+
+def sync_issue_family(owner: str, project_number: int, repo: str, parent_issue: int) -> None:
+    """Sync parent job and all linked architect sub-issues."""
+    from ai_alpha_squad.director_visibility import sync_project_family
+
+    sync_project_family(repo, parent_issue)
 
 
 def sync_all_open(owner: str, project_number: int, repo: str) -> None:
@@ -482,6 +516,9 @@ def main(argv: list[str] | None = None) -> int:
     sync_one = sub.add_parser("sync-issue", help="Sync one issue to the project")
     sync_one.add_argument("issue", type=int)
 
+    sync_family = sub.add_parser("sync-family", help="Sync parent job and all sub-issues")
+    sync_family.add_argument("parent", type=int)
+
     args = parser.parse_args(argv)
     try:
         if args.command == "ensure-fields":
@@ -490,6 +527,8 @@ def main(argv: list[str] | None = None) -> int:
             sync_all_open(args.owner, args.project, args.repo)
         elif args.command == "sync-issue":
             sync_issue(args.owner, args.project, args.repo, args.issue)
+        elif args.command == "sync-family":
+            sync_issue_family(args.owner, args.project, args.repo, args.parent)
         elif args.command == "print-views":
             print_view_setup(args.owner, args.project, args.repo)
         else:

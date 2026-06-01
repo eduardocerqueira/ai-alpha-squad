@@ -86,6 +86,7 @@ def base_active_agent(
     lifecycle: str | None,
     *,
     planning: PlanningDeliverables | None = None,
+    sub_issue: bool = False,
 ) -> str:
     agents_on_issue = sorted(labels & AGENT_LABELS)
     deliverables = planning or PlanningDeliverables()
@@ -106,7 +107,12 @@ def base_active_agent(
         if len(agents_on_issue) == 1:
             return agents_on_issue[0]
     if lifecycle in PHASE_TO_AGENT:
-        return PHASE_TO_AGENT[lifecycle]
+        if sub_issue and len(agents_on_issue) == 1:
+            return agents_on_issue[0]
+        if lifecycle == "implemented":
+            pass  # handled above
+        else:
+            return PHASE_TO_AGENT[lifecycle]
     return agents_on_issue[0] if agents_on_issue else "Unassigned"
 
 
@@ -115,9 +121,18 @@ def derive_state(
     *,
     copilot_sessions: int = 1,
     planning: PlanningDeliverables | None = None,
+    parent_labels: set[str] | None = None,
 ) -> Derived:
     lifecycle = current_lifecycle(labels)
-    base = base_active_agent(labels, lifecycle, planning=planning)
+    inherited_lifecycle = lifecycle is None and bool(parent_labels)
+    if inherited_lifecycle:
+        lifecycle = current_lifecycle(parent_labels or set())
+    base = base_active_agent(
+        labels,
+        lifecycle,
+        planning=planning,
+        sub_issue=inherited_lifecycle,
+    )
     if base == PARALLEL_VALIDATION_AGENT:
         active_agent = base
     else:

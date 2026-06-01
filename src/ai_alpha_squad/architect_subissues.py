@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 
 from ai_alpha_squad.agent_models import repo_root
 from ai_alpha_squad.autonomous_planning import create_architect_subissues
@@ -81,4 +82,12 @@ def ensure_architect_subissues(queue_repo: str, parent: int) -> dict[str, int]:
 
     target_repo = parse_target_repo(data.get("body") or "") or "eduardocerqueira/vscode-squad-director"
     title = (data.get("title") or f"Job #{parent}").strip()
-    return create_architect_subissues(queue_repo, parent, target_repo, title)
+    created = create_architect_subissues(queue_repo, parent, target_repo, title)
+    try:
+        from ai_alpha_squad.director_visibility import post_director_status, sync_project_family
+
+        post_director_status(queue_repo, parent)
+        sync_project_family(queue_repo, parent)
+    except Exception as exc:
+        print(f"Director visibility sync skipped: {exc}", file=sys.stderr)
+    return created

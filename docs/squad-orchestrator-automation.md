@@ -29,6 +29,7 @@ flowchart TD
 | [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Schedule every 10m, Copilot PR opened, `workflow_dispatch` | Close planning PRs + **queue-repo product/extension PRs** (scheduled path needs no per-PR workflow approval); nudge agent or sync labels |
 | [director-gate.yml](../.github/workflows/director-gate.yml) | `director-approved`, Director comments | Enforce approval gates |
 | [squad-project-sync.yml](../.github/workflows/squad-project-sync.yml) | Issue opened / labeled | Sync [Director project board](director-project-board.md) fields |
+| Squad Actions agent (after target PR) | `squad-post-director-status.sh` | **Squad Director status** comment on parent + `sync-family` for board |
 
 ## Orchestrator nudge (recovery)
 
