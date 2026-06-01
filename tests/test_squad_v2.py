@@ -50,3 +50,15 @@ def test_sequential_blocks_second_dispatch():
 
 def test_ba_detected():
     assert has_deliverable(({"body": "# Business Analysis\n\nx" * 50},), "business-owner")
+
+
+def test_developer_deliverable_requires_heading_not_inline_mention():
+    ba_plan = (
+        "# Business Analysis\n\n"
+        "5. Post the PR link as a comment (heading `# Developer Deliverable`).\n"
+    )
+    assert not has_deliverable(({"body": ba_plan},), "developer")
+    assert has_deliverable(
+        ({"body": "# Developer Deliverable\n\nPR: https://github.com/o/r/pull/1\n" + "x" * 400},),
+        "developer",
+    )
