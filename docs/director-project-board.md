@@ -95,11 +95,24 @@ Narrow view for approvals only.
 - **Filter:** `is:issue is:open repo:eduardocerqueira/ai-alpha-squad label:awaiting-approval,release-candidate`
 - **Column field:** Lifecycle
 
+## Copilot session count (Active agent)
+
+When multiple Copilot coding sessions work the same parent issue (e.g. two open planning PRs), sync sets **Active agent** to values like `architect (Copilot x2)`.
+
+**One-time setup:** In [Project #6](https://github.com/users/eduardocerqueira/projects/6) → **Fields** → **Active agent** → add options (GitHub UI only — API cannot append options to an existing field):
+
+- `architect (Copilot x2)`, `architect (Copilot x3)`
+- `business-owner (Copilot x2)`, `developer (Copilot x2)`
+- `validation (parallel)` (Phase 4 fan-out on parent issue)
+
+Until those exist, sync falls back to `architect` / `developer` and prints a note in Actions logs.
+
 ## Troubleshooting
 
 | Problem | Fix |
 | ------- | --- |
 | **Active agent** missing from Column field / Group menu | View menu → **Fields** → show **Active agent** first |
+| Board shows `architect` but GitHub shows 2 Copilot agents | Add `architect (Copilot x2)` option on project field, then re-run sync |
 | Board still shows Status columns | View menu → **Column field** → **Active agent** (not Status) |
 | Cards stuck in wrong column after sync | Drag card once in UI (known GitHub Projects API quirk) or re-save Column field |
 | Most items in **No value** | Run `./scripts/setup-squad-project-board.sh sync-all` (only open queue issues get squad fields) |
