@@ -1,0 +1,84 @@
+{
+  "generated_at": "2026-06-01T15:52:36Z",
+  "repo": "eduardocerqueira/ai-alpha-squad",
+  "counts": {
+    "needs_you": 0,
+    "in_progress": 1,
+    "stuck": 0,
+    "completed": 3
+  },
+  "needs_you": [],
+  "in_progress": [
+    {
+      "number": 64,
+      "title": "[Job 1] VS Code extension: Squad Director (GitHub queue + approval gates)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
+      "lifecycle": "implemented",
+      "active_agent": "Unassigned",
+      "bucket": "in_progress",
+      "updated_at": "2026-06-01T15:43:59Z",
+      "target_repo": "eduardocerqueira/vscode-squad-director",
+      "target_pr_url": "https://github.com/eduardocerqueira/vscode-squad-director/pull/1",
+      "summary": "Squad working \u2014 review target PR",
+      "labels": [
+        "designed",
+        "implemented",
+        "medium"
+      ]
+    }
+  ],
+  "stuck": [],
+  "completed": [
+    {
+      "number": 17,
+      "title": "[Job 1] VS Code extension: Squad Director (GitHub queue + approval gates)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/17",
+      "lifecycle": "director-approved",
+      "active_agent": "blocked \u2014 post on issue",
+      "bucket": "completed",
+      "updated_at": "2026-06-01T02:00:55Z",
+      "target_repo": "eduardocerqueira/vscode-squad-director",
+      "target_pr_url": null,
+      "summary": "Job finished",
+      "labels": [
+        "medium",
+        "director-approved"
+      ]
+    },
+    {
+      "number": 15,
+      "title": "[Job 1] VS Code extension: Squad Status Bar (Marketplace + Open VSX)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/15",
+      "lifecycle": "new",
+      "active_agent": "blocked \u2014 post on issue",
+      "bucket": "completed",
+      "updated_at": "2026-06-01T01:23:48Z",
+      "target_repo": "eduardocerqueira/vscode-squad-status-bar",
+      "target_pr_url": null,
+      "summary": "Job finished",
+      "labels": [
+        "business-owner",
+        "new",
+        "medium"
+      ]
+    },
+    {
+      "number": 1,
+      "title": "[Request]: Review and modernize seeker (eduardocerqueira/seeker)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/1",
+      "lifecycle": "implemented",
+      "active_agent": "architect",
+      "bucket": "completed",
+      "updated_at": "2026-05-31T21:36:14Z",
+      "target_repo": ".github/workflows",
+      "target_pr_url": "https://github.com/eduardocerqueira/seeker/pull/13",
+      "summary": "Job finished",
+      "labels": [
+        "business-owner",
+        "architect",
+        "implemented",
+        "medium"
+      ]
+    }
+  ]
+}

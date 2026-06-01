@@ -1,0 +1,44 @@
+# Publish Director dashboard JSON (single job visibility — not issue comments).
+name: Director dashboard
+
+permissions:
+  contents: write
+  issues: read
+
+on:
+  issues:
+    types: [labeled, opened, closed, reopened]
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'eduardocerqueira/ai-alpha-squad'
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build dashboard JSON
+        run: |
+          chmod +x ./scripts/squad-director-dashboard.py
+          python3 ./scripts/squad-director-dashboard.py --write site/public/director/jobs.json
+
+      - name: Commit dashboard data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add site/public/director/jobs.json
+          if git diff --staged --quiet; then
+            echo "No dashboard changes"
+            exit 0
+          fi
+          git commit -m "chore(director): refresh dashboard jobs.json"
+          git push

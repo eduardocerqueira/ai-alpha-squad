@@ -91,10 +91,15 @@ fi
 python3 -m ai_alpha_squad.actions_agent finalize \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$SUMMARY_FILE" "${PR_URL:-}"
 
-if [[ -n "$PR_URL" ]]; then
+# Director visibility: dashboard (site/director), not issue comment spam.
+if [[ -n "$PR_URL" ]] && [[ "${SQUAD_DIRECTOR_STATUS_COMMENTS:-0}" == "1" ]]; then
   chmod +x "${ROOT}/scripts/squad-post-director-status.sh"
   ./scripts/squad-post-director-status.sh "$QUEUE_REPO" "$ISSUE" \
     --agent "$AGENT" --pr-url "$PR_URL" --target-repo "$TARGET_REPO" || true
+fi
+if [[ -n "$PR_URL" ]]; then
+  chmod +x "${ROOT}/scripts/squad-director-dashboard.py"
+  python3 "${ROOT}/scripts/squad-director-dashboard.py" --write "${ROOT}/site/public/director/jobs.json" || true
 fi
 
 if [[ -z "$PR_URL" ]]; then

@@ -45,6 +45,27 @@ export default {
       return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY });
     }
 
+    if (url.pathname === "/api/director/jobs" && request.method === "GET") {
+      const assetUrl = new URL("/director/jobs.json", url.origin);
+      const staticRes = await env.ASSETS.fetch(assetUrl.toString());
+      if (staticRes.ok) {
+        return new Response(staticRes.body, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+      return json(
+        {
+          error:
+            "Dashboard not published yet. Run the Director dashboard workflow or ./scripts/squad-director-dashboard.py --serve locally.",
+        },
+        503,
+      );
+    }
+
     return env.ASSETS.fetch(request);
   },
 };
