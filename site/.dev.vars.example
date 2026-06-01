@@ -1,0 +1,11 @@
+# Copy to .dev.vars for `wrangler dev` (gitignored). In production, set the
+# secret with:  cd site && wrangler secret put AUTH_SECRET
+#
+# AUTH_SECRET signs the Director dashboard magic-link tokens and session
+# cookies. Use a long random value, e.g.:  openssl rand -hex 32
+AUTH_SECRET="replace-with-a-long-random-string"
+
+# Optional local overrides:
+# DIRECTOR_ALLOWED_EMAILS="you@example.com"
+# CLOUDFLARE_ACCOUNT_ID="..."
+# CLOUDFLARE_EMAIL_SEND_TOKEN="..."

@@ -6,7 +6,7 @@ import json
 import os
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -17,6 +17,7 @@ from ai_alpha_squad.job_pipeline import SquadIssueIndex, analyze_job
 from ai_alpha_squad.nudge import PHASE_MARKERS, issue_has_deliverable
 from ai_alpha_squad.project_sync import (
     AGENT_PENDING_ON_ISSUE,
+    LIFECYCLE_LABELS,
     PlanningDeliverables,
     derive_state,
 )
@@ -70,6 +71,7 @@ class JobCard:
     stuck_reasons: tuple[str, ...]
     suggested_action: str
     agents: tuple[dict[str, Any], ...]
+    events: tuple[dict[str, Any], ...]
 
 
 @dataclass(frozen=True)
@@ -82,26 +84,22 @@ class DirectorDashboard:
     completed: tuple[JobCard, ...]
 
     def to_json(self) -> dict[str, Any]:
-        def simple(c: JobCard) -> dict[str, Any]:
-            return {
-                "number": c.number,
-                "title": c.title,
-                "url": c.url,
-                "headline": c.headline,
-                "action": c.director_action,
-            }
-
-        attention_cards = tuple(self.stuck) + tuple(self.in_progress)
+        def rows(cards: tuple[JobCard, ...]) -> list[dict[str, Any]]:
+            return [asdict(c) for c in cards]
 
         return {
             "generated_at": self.generated_at,
             "repo": self.repo,
-            "your_move": [simple(c) for c in self.needs_you],
-            "attention": [simple(c) for c in attention_cards],
             "counts": {
-                "your_move": len(self.needs_you),
-                "attention": len(attention_cards),
+                "needs_you": len(self.needs_you),
+                "in_progress": len(self.in_progress),
+                "stuck": len(self.stuck),
+                "completed": len(self.completed),
             },
+            "needs_you": rows(self.needs_you),
+            "in_progress": rows(self.in_progress),
+            "stuck": rows(self.stuck),
+            "completed": rows(self.completed),
         }
 
 
@@ -285,6 +283,110 @@ def _director_action_for_card(bucket: str, lifecycle: str | None) -> str:
     return "Open the issue and follow the Director gate instructions."
 
 
+# Chronological phases shown on the Director timeline (forward order):
+# (lifecycle label, human title, owning role).
+TIMELINE_PHASES: tuple[tuple[str, str, str], ...] = (
+    ("new", "Request triaged", "business-owner"),
+    ("awaiting-approval", "Business analysis ready", "Director"),
+    ("director-approved", "Approved — architecture & planning", "architect"),
+    ("designed", "Technical spec ready — development", "developer"),
+    ("implemented", "Code complete — pull request", "developer"),
+    ("validation", "Validation (QA, Security, DevOps, Docs)", "release-manager"),
+    ("release-candidate", "Release candidate", "Director"),
+    ("released", "Released", "Done"),
+)
+
+DIRECTOR_GATES = frozenset({"awaiting-approval", "release-candidate"})
+
+
+def _progress_phase(lifecycle: str | None, labels: tuple[str, ...]) -> str | None:
+    """Resolve the phase a job actually reached on the timeline.
+
+    ``lifecycle`` may collapse to ``blocked`` (an overlay, not a phase). When it
+    is not itself a timeline phase, fall back to the most-advanced lifecycle
+    label present on the issue (``LIFECYCLE_LABELS`` is ordered most-advanced
+    first), skipping the ``blocked`` overlay.
+    """
+    phases = {p[0] for p in TIMELINE_PHASES}
+    if lifecycle in phases:
+        return lifecycle
+    label_set = set(labels)
+    for label in LIFECYCLE_LABELS:
+        if label == "blocked":
+            continue
+        if label in label_set and label in phases:
+            return label
+    return None
+
+
+def _build_events(
+    *,
+    lifecycle: str | None,
+    labels: tuple[str, ...],
+    bucket: str,
+    director_action: str,
+    issue_url: str,
+    target_pr_url: str | None,
+    target_pr_merged: bool,
+    stuck_reasons: tuple[str, ...],
+) -> tuple[dict[str, Any], ...]:
+    """Chronological lifecycle timeline for one job (timeline19 view).
+
+    Step status is one of ``done | current | director | blocked | pending``.
+    The current Director gate carries an ``action`` (message + link) so the UI
+    can surface "request for Director" inline on the timeline.
+    """
+    order = [p[0] for p in TIMELINE_PHASES]
+    current = _progress_phase(lifecycle, labels)
+    cur_idx = order.index(current) if current else -1
+
+    events: list[dict[str, Any]] = []
+    for idx, (label, title, owner) in enumerate(TIMELINE_PHASES):
+        if cur_idx < 0:
+            status = "pending"
+        elif idx < cur_idx:
+            status = "done"
+        elif idx == cur_idx:
+            if bucket == "completed":
+                status = "done"
+            elif label in DIRECTOR_GATES and bucket == "needs_you":
+                status = "director"
+            elif bucket == "stuck":
+                status = "blocked"
+            else:
+                status = "current"
+        else:
+            status = "pending"
+
+        detail = ""
+        action = None
+        if status == "director":
+            detail = director_action or "Director approval required."
+            action = {
+                "label": "Open issue & respond",
+                "url": issue_url,
+                "message": director_action or "Approve or request changes on GitHub.",
+            }
+        elif status == "blocked" and stuck_reasons:
+            detail = stuck_reasons[0]
+        elif label == "implemented" and target_pr_url:
+            detail = "PR merged" if target_pr_merged else "PR open"
+
+        event: dict[str, Any] = {
+            "key": label,
+            "title": title,
+            "owner": owner,
+            "status": status,
+            "detail": detail,
+        }
+        if action:
+            event["action"] = action
+        if label == "implemented" and target_pr_url:
+            event["pr_url"] = target_pr_url
+        events.append(event)
+    return tuple(events)
+
+
 def _load_job_card(
     repo: str,
     row: dict,
@@ -329,6 +431,28 @@ def _load_job_card(
         stuck_reasons=health.stuck_reasons,
     )
 
+    director_action = _director_action_for_card(bucket, derived_lifecycle)
+    agent_rows = tuple(
+        {
+            "role": a.role,
+            "status": a.status,
+            "issue_number": a.issue_number,
+            "issue_url": a.issue_url,
+            "detail": a.detail,
+        }
+        for a in health.agents
+    )
+    events = _build_events(
+        lifecycle=derived_lifecycle,
+        labels=labels,
+        bucket=bucket,
+        director_action=director_action,
+        issue_url=f"https://github.com/{repo}/issues/{number}",
+        target_pr_url=health.target_pr_url,
+        target_pr_merged=health.target_pr_merged,
+        stuck_reasons=health.stuck_reasons,
+    )
+
     return JobCard(
         number=number,
         title=title,
@@ -353,11 +477,12 @@ def _load_job_card(
             health.stuck_reasons,
             health.target_pr_merged,
         ),
-        director_action=_director_action_for_card(bucket, derived_lifecycle),
+        director_action=director_action,
         labels=labels,
         stuck_reasons=health.stuck_reasons,
         suggested_action=health.suggested_action,
-        agents=(),
+        agents=agent_rows,
+        events=events,
     )
 
 
@@ -371,8 +496,9 @@ def _extract_target_repo(body: str) -> str | None:
     return None
 
 
-def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 0) -> DirectorDashboard:
-    """List open parent jobs; only approvals surface on the Director view."""
+def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 15) -> DirectorDashboard:
+    """List parent jobs by bucket. Open jobs surface needs-you / in-progress /
+    stuck; recently closed or released jobs land in ``completed`` (the Done tab)."""
     index = SquadIssueIndex.from_repo(repo, include_closed=include_closed)
     rows = list(index.by_number.values())
 
@@ -383,8 +509,6 @@ def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 0) -> Dir
         "completed": [],
     }
     for row in rows:
-        if str(row.get("state") or "OPEN").upper() == "CLOSED":
-            continue
         card = _load_job_card(repo, row, index=index)
         if card is None:
             continue
