@@ -16,10 +16,10 @@ developer
 
 | Provider | Model |
 | -------- | ----- |
-| huggingface | `Qwen/Qwen2.5-Coder-32B-Instruct` |
+| huggingface | `deepseek-ai/DeepSeek-V4-Flash` |
 | copilot | _(custom agent profile — no model ID)_ |
 
-Default HF model: [Qwen2.5-Coder-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct) — code generation via **Squad Actions agent** (`SQUAD_CODE_RUNTIME=actions`) on target repos.
+Default HF model: [DeepSeek-V4-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash) — code generation via **Squad Actions agent** (`SQUAD_CODE_RUNTIME=actions`) on target repos. Chosen for reliable availability on the HF inference router (the Qwen2.5-Coder provider was returning HTTP 500).
 
 ## Inputs
 
