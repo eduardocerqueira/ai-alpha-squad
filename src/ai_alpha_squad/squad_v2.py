@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from ai_alpha_squad.nudge import issue_has_deliverable
@@ -28,7 +29,11 @@ DELIVERABLE_MARKERS: dict[str, str] = {
 
 RUN_IN_PROGRESS_MARKER = "squad-v2-run:in_progress:"
 RUN_FAILED_MARKER = "squad-v2-run:failed:"
+RUN_RESET_MARKER = "squad-v2-run:reset:"
 MAX_RUN_ATTEMPTS = 3
+# A run with an in_progress marker older than this with no terminal marker is
+# treated as dead (orchestrator timeout is 90m, so this must stay above it).
+STALE_RUN_MINUTES = 120
 
 _TARGET_REPO_RE = re.compile(
     r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)",
@@ -63,10 +68,19 @@ def current_lifecycle(labels: set[str] | frozenset[str]) -> str | None:
 
 
 def extract_target_repo(body: str) -> str | None:
-    for match in _TARGET_REPO_RE.finditer(body or ""):
-        repo = match.group(1)
-        if "ai-alpha-squad" not in repo.lower():
-            return repo
+    text = body or ""
+    # Prefer a URL on a line that explicitly names the target, so incidental
+    # github.com links elsewhere in the body cannot be mistaken for the target.
+    for line in text.splitlines():
+        if "target" not in line.lower():
+            continue
+        for match in _TARGET_REPO_RE.finditer(line):
+            if "ai-alpha-squad" not in match.group(1).lower():
+                return match.group(1)
+    # Fallback: first non-self github URL anywhere in the body.
+    for match in _TARGET_REPO_RE.finditer(text):
+        if "ai-alpha-squad" not in match.group(1).lower():
+            return match.group(1)
     return None
 
 
@@ -135,8 +149,67 @@ def run_in_progress(comments: tuple[dict, ...]) -> str | None:
 
 
 def run_failures(comments: tuple[dict, ...], agent: str) -> int:
-    needle = f"{RUN_FAILED_MARKER}{agent}"
-    return sum(1 for c in comments if needle in (c.get("body") or "").lower())
+    """Count failures for this agent since the most recent reset marker.
+
+    A ``reset`` marker (for this agent or ``all``) clears the counter so a
+    deliberate retry — e.g. after an infra fix — gets a fresh set of attempts
+    instead of staying permanently blocked by stale historical failures.
+    """
+    fail = f"{RUN_FAILED_MARKER}{agent}"
+    reset_agent = f"{RUN_RESET_MARKER}{agent}"
+    reset_all = f"{RUN_RESET_MARKER}all"
+    reset_idx = -1
+    for i, comment in enumerate(comments):
+        body = (comment.get("body") or "").lower()
+        if reset_agent in body or reset_all in body:
+            reset_idx = i
+    return sum(
+        1
+        for i, comment in enumerate(comments)
+        if i > reset_idx and fail in (comment.get("body") or "").lower()
+    )
+
+
+def _comment_timestamp(comment: dict) -> datetime | None:
+    raw = comment.get("createdAt") or comment.get("created_at")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def find_stale_in_progress(
+    comments: tuple[dict, ...],
+    now_iso: str,
+    max_age_minutes: int = STALE_RUN_MINUTES,
+) -> str | None:
+    """Return an agent whose run looks dead: an in_progress marker with no
+    terminal marker after it, older than ``max_age_minutes``.
+
+    Recovers issues orphaned by a cancelled or timed-out run (which never gets
+    to post a failure marker), otherwise stuck idle forever.
+    """
+    agent = run_in_progress(comments)
+    if not agent:
+        return None
+    needle = f"{RUN_IN_PROGRESS_MARKER}{agent}"
+    latest: datetime | None = None
+    for comment in comments:
+        if needle in (comment.get("body") or "").lower():
+            ts = _comment_timestamp(comment)
+            if ts and (latest is None or ts > latest):
+                latest = ts
+    now = None
+    try:
+        now = datetime.fromisoformat(str(now_iso).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        now = None
+    if latest is None or now is None:
+        return None
+    age_minutes = (now - latest).total_seconds() / 60.0
+    return agent if age_minutes >= max_age_minutes else None
 
 
 def next_action(view: IssueView) -> NextAction:
@@ -203,7 +276,11 @@ def next_action(view: IssueView) -> NextAction:
 def is_squad_internal_comment(body: str) -> bool:
     """Comments that must not re-trigger phase watch (avoids feedback loops on #94)."""
     text = (body or "").lower()
-    if RUN_IN_PROGRESS_MARKER in text or RUN_FAILED_MARKER in text:
+    if (
+        RUN_IN_PROGRESS_MARKER in text
+        or RUN_FAILED_MARKER in text
+        or RUN_RESET_MARKER in text
+    ):
         return True
     if "squad hf agent" in text or "squad actions agent" in text:
         return True
@@ -221,3 +298,10 @@ def in_progress_comment(agent: str) -> str:
 def failed_comment(agent: str, error: str) -> str:
     text = (error or "unknown error").strip()[:500]
     return f"{RUN_FAILED_MARKER}{agent} — {text}"
+
+
+def reset_comment(agent: str) -> str:
+    return (
+        f"{RUN_RESET_MARKER}{agent} — failure count cleared; "
+        "agent gets a fresh set of retry attempts."
+    )

@@ -2,9 +2,12 @@
 
 from ai_alpha_squad.squad_v2 import (
     IssueView,
+    extract_target_repo,
+    find_stale_in_progress,
     has_deliverable,
     is_squad_internal_comment,
     next_action,
+    run_failures,
     run_in_progress,
 )
 
@@ -107,7 +110,94 @@ def test_ba_detected():
 def test_internal_comment_detection():
     assert is_squad_internal_comment("squad-v2-run:in_progress:developer")
     assert is_squad_internal_comment("**Squad HF agent result** — foo")
+    assert is_squad_internal_comment("squad-v2-run:reset:developer — cleared")
     assert not is_squad_internal_comment("approve")
+
+
+def test_run_failures_counts_all_without_reset():
+    comments = (
+        {"body": "squad-v2-run:failed:developer — a"},
+        {"body": "squad-v2-run:failed:developer — b"},
+        {"body": "squad-v2-run:failed:developer — c"},
+    )
+    assert run_failures(comments, "developer") == 3
+
+
+def test_reset_marker_clears_failure_count():
+    comments = (
+        {"body": "squad-v2-run:failed:developer — a"},
+        {"body": "squad-v2-run:failed:developer — b"},
+        {"body": "squad-v2-run:failed:developer — c"},
+        {"body": "squad-v2-run:reset:developer — cleared"},
+        {"body": "squad-v2-run:failed:developer — d"},
+    )
+    assert run_failures(comments, "developer") == 1
+
+
+def test_reset_all_clears_failure_count():
+    comments = (
+        {"body": "squad-v2-run:failed:developer — a"},
+        {"body": "squad-v2-run:reset:all — fresh start"},
+    )
+    assert run_failures(comments, "developer") == 0
+
+
+def test_reset_unblocks_developer_dispatch():
+    comments = (
+        {"body": "squad-v2-run:failed:developer — 1"},
+        {"body": "squad-v2-run:failed:developer — 2"},
+        {"body": "squad-v2-run:failed:developer — 3"},
+        {"body": "squad-v2-run:reset:developer — cleared"},
+    )
+    act = next_action(
+        IssueView(94, "OPEN", frozenset({"director-approved"}), comments, "https://github.com/o/r")
+    )
+    assert act.kind == "dispatch"
+    assert act.agent == "developer"
+
+
+def test_retry_limit_blocks_without_reset():
+    comments = tuple({"body": "squad-v2-run:failed:developer — x"} for _ in range(3))
+    act = next_action(
+        IssueView(94, "OPEN", frozenset({"director-approved"}), comments, "https://github.com/o/r")
+    )
+    assert act.kind == "failed"
+
+
+def test_find_stale_in_progress_detects_orphaned_run():
+    comments = (
+        {"body": "squad-v2-run:in_progress:developer", "createdAt": "2026-06-01T10:00:00Z"},
+    )
+    # 3h later, no terminal marker → stale.
+    assert find_stale_in_progress(comments, "2026-06-01T13:00:00Z", 120) == "developer"
+    # Only 30m later → still considered live.
+    assert find_stale_in_progress(comments, "2026-06-01T10:30:00Z", 120) is None
+
+
+def test_find_stale_in_progress_ignores_completed_run():
+    comments = (
+        {"body": "squad-v2-run:in_progress:developer", "createdAt": "2026-06-01T10:00:00Z"},
+        {"body": "squad-v2-run:failed:developer — done", "createdAt": "2026-06-01T10:05:00Z"},
+    )
+    assert find_stale_in_progress(comments, "2026-06-01T20:00:00Z", 120) is None
+
+
+def test_extract_target_repo_prefers_target_line():
+    body = (
+        "See related work at https://github.com/some-org/reference-lib\n"
+        "Target repo: https://github.com/eduardocerqueira/experimental-hello-world\n"
+    )
+    assert extract_target_repo(body) == "eduardocerqueira/experimental-hello-world"
+
+
+def test_extract_target_repo_falls_back_to_first_url():
+    body = "Implement here: https://github.com/o/r and reference https://github.com/x/y"
+    assert extract_target_repo(body) == "o/r"
+
+
+def test_extract_target_repo_skips_self():
+    body = "Queue: https://github.com/eduardocerqueira/ai-alpha-squad/issues/94"
+    assert extract_target_repo(body) is None
 
 
 def test_developer_deliverable_requires_heading_not_inline_mention():

@@ -12,6 +12,7 @@ export SQUAD_V2=1
 
 FORMAT="${ROOT}/scripts/format-squad-comment.py"
 DISPATCH="${ROOT}/scripts/squad-dispatch-subissue.sh"
+SYNC="${ROOT}/scripts/squad-sync-planning-labels.sh"
 
 ACTION="$(python3 -c "
 from ai_alpha_squad.squad_v2 import IssueView, next_action
@@ -130,3 +131,8 @@ fi
 
 rm -f "$INSTRUCTIONS"
 echo "Dispatched $AGENT on #$ISSUE"
+
+# Advance lifecycle labels immediately (the agent ran inline and just posted its
+# deliverable) instead of waiting up to 15m for the next phase-watch cron tick.
+chmod +x "$SYNC" 2>/dev/null || true
+"$SYNC" "$REPO" "$ISSUE" || true

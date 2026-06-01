@@ -14,7 +14,7 @@ Canonical spec from [TODO.md](../TODO.md) (lines 40–54). Restore point before 
 | Director gates | `awaiting-approval`, `release-candidate` only |
 | Concurrency | **Sequential** — one agent run at a time per issue |
 | Labels | Lifecycle labels only — **no priority** (`medium`, etc.) |
-| Reliability | Phase watch + nudges + explicit failure comments |
+| Reliability | Phase watch + stale-run recovery + explicit failure comments + reset marker |
 
 ## Lifecycle (labels)
 
@@ -58,6 +58,35 @@ gh variable set SQUAD_V2 --repo eduardocerqueira/ai-alpha-squad --body "1"
 
 While `SQUAD_V2=1`, prefer v2 workflows; legacy orchestrator steps should no-op (guard added in follow-up PRs).
 
+## Reliability & recovery
+
+The pipeline is sequential and self-healing within these bounds:
+
+- **Retry cap** — an agent gets `MAX_RUN_ATTEMPTS` (3) failures before the issue is
+  labelled `blocked`. Failures are counted **since the last reset marker**, not for
+  the issue's whole lifetime, so historical failures from since-fixed bugs don't
+  permanently wedge a job.
+- **Stale-run recovery** — an `in_progress` marker with no terminal marker, older
+  than `SQUAD_V2_STALE_MINUTES` (120m; must stay above the 90m orchestrator
+  timeout), is auto-recovered by the phase-watch tick (posts a failure marker so
+  the issue stops looking "active"). This handles runs cancelled or timed out
+  before they could report.
+- **No mid-run cancellation** — the orchestrator uses `cancel-in-progress: false`
+  so an unrelated `labeled` event can't kill a 90m inline developer build and
+  orphan its branch/PR.
+
+**Manual recovery** — to retry a `blocked` issue (or one that hit the retry cap),
+re-run the orchestrator. A `workflow_dispatch` run clears the failure count
+(posts `squad-v2-run:reset:<agent>`) and removes `blocked` automatically:
+
+```bash
+gh workflow run "Squad v2 orchestrator" --repo eduardocerqueira/ai-alpha-squad \
+  -f issue_number=<n> -f lifecycle_label=director-approved
+```
+
+To reset by hand without re-running, comment `squad-v2-run:reset:developer`
+(or `:all`) on the issue and remove the `blocked` label.
+
 ## Director
 
 ```bash
@@ -79,7 +108,8 @@ Unchanged intent: **Your move** = gates; **Attention** = open jobs in active pha
 - [x] Spec (this doc) + `squad_v2.py`
 - [x] `squad-v2-dispatch.sh`, `squad-v2-tick.sh`
 - [x] Workflows `squad-v2-orchestrator.yml`, `squad-v2-phase-watch.yml`
-- [ ] Gate legacy `squad-orchestrator.yml` when `SQUAD_V2=1`
+- [x] Gate legacy `squad-orchestrator.yml` / `squad-phase-watch.yml` when `SQUAD_V2=1` (job-level `if: vars.SQUAD_V2 != '1'`)
+- [x] Retry-count reset marker + stale-run recovery + no mid-run cancellation
 - [ ] Remove unused Copilot workflows after one green E2E
 - [ ] Update `.agents/issue-lifecycle.md` to v2 as default
 - [ ] New test job issue after merge
