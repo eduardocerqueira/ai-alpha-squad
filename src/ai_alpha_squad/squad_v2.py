@@ -83,21 +83,39 @@ def squad_work_branch(agent: str, issue: int) -> str:
     return f"squad/{slug}-issue-{issue}"
 
 
+def _latest_marker_index(comments: tuple[dict, ...], needle: str) -> int | None:
+    idx: int | None = None
+    for i, comment in enumerate(comments):
+        if needle in (comment.get("body") or "").lower():
+            idx = i
+    return idx
+
+
 def _failure_after_in_progress(comments: tuple[dict, ...], agent: str) -> bool:
     """True if a failed marker appears after the latest in_progress marker for this agent."""
-    in_progress_idx: int | None = None
-    failure_idx: int | None = None
     needle_prog = f"{RUN_IN_PROGRESS_MARKER}{agent}"
     needle_fail = f"{RUN_FAILED_MARKER}{agent}"
-    for idx, comment in enumerate(comments):
-        body = (comment.get("body") or "").lower()
-        if needle_prog in body:
-            in_progress_idx = idx
-        if needle_fail in body:
-            failure_idx = idx
+    in_progress_idx = _latest_marker_index(comments, needle_prog)
+    failure_idx = _latest_marker_index(comments, needle_fail)
     if in_progress_idx is None or failure_idx is None:
         return False
     return failure_idx > in_progress_idx
+
+
+def _agent_run_completed_after_in_progress(comments: tuple[dict, ...], agent: str) -> bool:
+    """True if an Actions/HF result comment was posted after the latest in_progress marker."""
+    needle_prog = f"{RUN_IN_PROGRESS_MARKER}{agent}"
+    in_progress_idx = _latest_marker_index(comments, needle_prog)
+    if in_progress_idx is None:
+        return False
+    slug = agent.replace("-", " ")
+    for comment in comments[in_progress_idx + 1 :]:
+        body = (comment.get("body") or "").lower()
+        if "squad actions agent result" in body and slug in body:
+            return True
+        if "squad hf agent result" in body and slug in body:
+            return True
+    return False
 
 
 def run_in_progress(comments: tuple[dict, ...]) -> str | None:
@@ -109,6 +127,8 @@ def run_in_progress(comments: tuple[dict, ...]) -> str | None:
             if has_deliverable(comments, agent):
                 continue
             if _failure_after_in_progress(comments, agent):
+                continue
+            if _agent_run_completed_after_in_progress(comments, agent):
                 continue
             return agent
     return None

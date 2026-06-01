@@ -136,7 +136,11 @@ if [[ -n "$PR_URL" ]]; then
 fi
 
 if [[ -z "$PR_URL" ]]; then
-  echo "No PR was created on ${TARGET_REPO} — check issue #${ISSUE} result comment and workflow logs." >&2
+  echo "No PR was created on ${TARGET_REPO} — see issue #${ISSUE} agent result comment and workflow logs." >&2
+  # Agent may have run (e.g. max turns); avoid duplicate dispatch-failed if finalize posted.
+  if [[ -s "$SUMMARY_FILE" ]]; then
+    exit 0
+  fi
   exit 1
 fi
 

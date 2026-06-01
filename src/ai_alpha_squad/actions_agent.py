@@ -235,9 +235,9 @@ Tools:
 - run_command: {{"command": "npm install"}}  (allowlisted: npm, pnpm, yarn, npx, node, python, make, cargo, go, git status/diff/add/commit)
 - finish: {{"summary": "what you did"}}
 
-Start with list_dir on "." then implement all required files before finish.
-If the task lists multiple languages, create every language before calling finish.
-Output only the JSON object."""
+Use list_dir once at the start, then prefer write_file for each artifact.
+If the task lists multiple languages, create every language, then call finish immediately.
+Do not repeat list_dir on the same path. Output only the JSON object."""
 
     user = (
         f"## GitHub issue context\n\n{issue_context}\n\n"
@@ -269,9 +269,17 @@ Output only the JSON object."""
         if tool_name == "finish":
             return str(tool_args.get("summary", content)), True
         result = execute_tool(workdir, tool_name, tool_args)
+        remaining = MAX_TURNS - _turn - 1
+        urgency = ""
+        if remaining <= 15:
+            urgency = (
+                f"\n\nURGENT: {remaining} turn(s) left. "
+                'Call {{"tool": "finish", "args": {{"summary": "..."}}}} now '
+                "with what you completed."
+            )
         conversation = (
             f"{user}\n\n---\nLast tool: {tool_name}\nResult:\n{result}\n\n"
-            "Next: one JSON tool object."
+            f"Next: one JSON tool object.{urgency}"
         )
 
     return "Agent loop reached max turns without finish.", False
