@@ -91,7 +91,7 @@ fi
 python3 -m ai_alpha_squad.actions_agent finalize \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$SUMMARY_FILE" "${PR_URL:-}"
 
-# Director visibility: dashboard (site/director), not issue comment spam.
+# Director visibility: dashboard (site/director); issue comments opt-in only.
 if [[ -n "$PR_URL" ]] && [[ "${SQUAD_DIRECTOR_STATUS_COMMENTS:-0}" == "1" ]]; then
   chmod +x "${ROOT}/scripts/squad-post-director-status.sh"
   ./scripts/squad-post-director-status.sh "$QUEUE_REPO" "$ISSUE" \
