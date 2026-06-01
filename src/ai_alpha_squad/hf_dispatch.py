@@ -24,6 +24,40 @@ HF_ROUTER_URL = os.environ.get(
 MAX_ISSUE_CHARS = int(os.environ.get("SQUAD_HF_MAX_ISSUE_CHARS", "12000"))
 MAX_OUTPUT_TOKENS = int(os.environ.get("SQUAD_HF_MAX_OUTPUT_TOKENS", "4096"))
 
+# HF router policy suffixes: https://huggingface.co/docs/inference-providers/index
+HF_ROUTER_POLICIES = frozenset({"cheapest", "fastest", "preferred"})
+
+
+def hf_provider_policy() -> str | None:
+    """Router policy from SQUAD_HF_PROVIDER_POLICY (default cheapest). None = no suffix."""
+    raw = os.environ.get("SQUAD_HF_PROVIDER_POLICY", "cheapest").strip().lower()
+    if raw in ("", "none", "off", "0", "false", "no"):
+        return None
+    if raw in HF_ROUTER_POLICIES:
+        return raw
+    return "cheapest"
+
+
+def router_model_id(model: str) -> str:
+    """
+    Model id sent to the HF router.
+
+    Appends ``:cheapest`` (or ``:fastest`` / ``:preferred``) so the router picks the
+    lowest-price live provider for that model. Skips when the id already has a
+    policy or explicit provider suffix after the model name.
+    """
+    model = model.strip()
+    if not model:
+        return model
+    policy = hf_provider_policy()
+    if policy is None:
+        return model
+    _repo, slash, name = model.rpartition("/")
+    segment = name if slash else model
+    if ":" in segment:
+        return model
+    return f"{model}:{policy}"
+
 
 def hf_run_enabled() -> bool:
     """When false, only post dispatch comment (manual or external runner)."""
@@ -113,8 +147,9 @@ def chat_completion(
     user: str,
     token: str,
 ) -> str:
+    routed_model = router_model_id(model)
     payload = {
-        "model": model,
+        "model": routed_model,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},

@@ -13,6 +13,7 @@ Tracked in [issue #85](https://github.com/eduardocerqueira/ai-alpha-squad/issues
 | `HF_TOKEN` | GitHub Secret / `.env` | Required for HF planning + Actions coding loop |
 | `SQUAD_HF_DEFAULT_MODEL` | GitHub Variable or `.env` | Default HF model if agent has no override |
 | `SQUAD_HF_RUN_IN_CI` | GitHub Variable | `1` run HF inference in Actions; `0` dispatch comment only |
+| `SQUAD_HF_PROVIDER_POLICY` | GitHub Variable / `.env` | `cheapest` (default), `fastest`, `preferred`, or `none` — appended to model id as `:cheapest` etc. on [HF router](https://router.huggingface.co/v1/chat/completions) requests |
 | `SQUAD_HF_ARCHITECT_SUBISSUES` | Env | `1` (default) create sub-issues after Architect HF run |
 | `squad-config.yaml` → `ai:` | `.agents/squad-config.yaml` | `provider`, `code_runtime`, per-agent overrides |
 
@@ -36,7 +37,7 @@ gh secret set HF_TOKEN --repo OWNER/ai-alpha-squad
 
 | Mode | Dispatch | Best for |
 | ---- | -------- | -------- |
-| **hf** | `hf_dispatch` → [HF router](https://router.huggingface.co/v1/chat/completions) | BA, tech spec, QA/security reports |
+| **hf** | `hf_dispatch` → [HF router](https://router.huggingface.co/v1/chat/completions) with `:cheapest` routing by default | BA, tech spec, QA/security reports |
 | **actions** | `squad-actions-agent.yml` + tool loop | Implementation PRs on target repo |
 | **copilot** (legacy) | `copilot-swe-agent[bot]` assign | Deprecated |
 
