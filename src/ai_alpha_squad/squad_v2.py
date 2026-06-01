@@ -20,12 +20,20 @@ LIFECYCLE_LABELS_V2: tuple[str, ...] = (
 )
 
 GATE_LABELS = frozenset({"awaiting-approval", "release-candidate"})
-AGENTS_V2 = ("business-owner", "developer")
+AGENTS_V2 = ("business-owner", "developer", "qa")
 
 DELIVERABLE_MARKERS: dict[str, str] = {
     "business-owner": "# Business Analysis",
     "developer": "# Developer Deliverable",
+    "qa": "# QA Report",
 }
+
+# QA verdict markers embedded in the # QA Report comment, parsed deterministically
+# so the orchestrator never interprets prose.
+QA_PASS_MARKER = "squad-v2-qa:pass"
+QA_FAIL_MARKER = "squad-v2-qa:fail"
+# Max Developer⇄QA rework rounds before escalating to the Director.
+MAX_QA_ROUNDS = 3
 
 RUN_IN_PROGRESS_MARKER = "squad-v2-run:in_progress:"
 RUN_FAILED_MARKER = "squad-v2-run:failed:"
@@ -93,6 +101,52 @@ def has_deliverable(comments: tuple[dict, ...], agent: str) -> bool:
     if not marker:
         return False
     return issue_has_deliverable(list(comments), marker)
+
+
+def _latest_deliverable_index(comments: tuple[dict, ...], agent: str) -> int | None:
+    """Index of the agent's most recent deliverable comment (by heading)."""
+    from ai_alpha_squad.nudge import has_heading_marker, is_orchestrator_noise
+
+    marker = DELIVERABLE_MARKERS.get(agent, "")
+    if not marker:
+        return None
+    idx: int | None = None
+    for i, comment in enumerate(comments):
+        body = comment.get("body") or ""
+        if is_orchestrator_noise(body):
+            continue
+        if has_heading_marker(body, marker):
+            idx = i
+    return idx
+
+
+def latest_qa_verdict(comments: tuple[dict, ...]) -> tuple[int | None, str | None]:
+    """Index and verdict ('pass'|'fail') of the most recent QA verdict marker."""
+    idx: int | None = None
+    verdict: str | None = None
+    for i, comment in enumerate(comments):
+        body = (comment.get("body") or "").lower()
+        if QA_FAIL_MARKER in body:
+            idx, verdict = i, "fail"
+        elif QA_PASS_MARKER in body:
+            idx, verdict = i, "pass"
+    return idx, verdict
+
+
+def qa_fail_rounds(comments: tuple[dict, ...]) -> int:
+    return sum(1 for c in comments if QA_FAIL_MARKER in (c.get("body") or "").lower())
+
+
+def qa_passed(comments: tuple[dict, ...]) -> bool:
+    """True when the latest developer deliverable has since been QA-approved."""
+    dev_idx = _latest_deliverable_index(comments, "developer")
+    qa_idx, verdict = latest_qa_verdict(comments)
+    return (
+        dev_idx is not None
+        and qa_idx is not None
+        and qa_idx > dev_idx
+        and verdict == "pass"
+    )
 
 
 def squad_work_branch(agent: str, issue: int) -> str:
@@ -252,23 +306,49 @@ def next_action(view: IssueView) -> NextAction:
         return NextAction("gate", reason="Director must approve BA")
 
     if lc == "director-approved":
-        if has_deliverable(view.comments, "developer"):
-            return NextAction(
-                "idle",
-                reason="Developer deliverable posted — sync should add release-candidate",
-            )
         if not extract_target_repo(view.body):
             return NextAction("failed", reason="Missing target repo URL in issue body")
-        if run_failures(view.comments, "developer") >= MAX_RUN_ATTEMPTS:
+
+        dev_idx = _latest_deliverable_index(view.comments, "developer")
+        if dev_idx is None:
+            if run_failures(view.comments, "developer") >= MAX_RUN_ATTEMPTS:
+                return NextAction(
+                    "failed", agent="developer", reason="Developer exceeded retry limit"
+                )
+            return NextAction(
+                "dispatch",
+                agent="developer",
+                reason="Implement on target repo; post # Developer Deliverable",
+            )
+
+        # Developer deliverable exists → QA gates it before release-candidate.
+        qa_idx, verdict = latest_qa_verdict(view.comments)
+        if qa_idx is None or qa_idx < dev_idx:
+            # Latest developer deliverable has not been QA-reviewed yet.
+            if run_failures(view.comments, "qa") >= MAX_RUN_ATTEMPTS:
+                return NextAction("failed", agent="qa", reason="QA agent failed to run")
+            return NextAction(
+                "dispatch", agent="qa", reason="QA review of the developer deliverable"
+            )
+        if verdict == "pass":
+            return NextAction(
+                "idle", reason="QA passed — sync should add release-candidate"
+            )
+        # QA rejected the latest deliverable → Developer reworks (capped).
+        if qa_fail_rounds(view.comments) >= MAX_QA_ROUNDS:
             return NextAction(
                 "failed",
-                agent="developer",
-                reason="Developer exceeded retry limit",
+                agent="qa",
+                reason=f"QA rejected the deliverable {MAX_QA_ROUNDS} times",
+            )
+        if run_failures(view.comments, "developer") >= MAX_RUN_ATTEMPTS:
+            return NextAction(
+                "failed", agent="developer", reason="Developer exceeded retry limit"
             )
         return NextAction(
             "dispatch",
             agent="developer",
-            reason="Implement on target repo; post # Developer Deliverable",
+            reason="QA requested changes — rework the deliverable",
         )
 
     if lc == "release-candidate":
@@ -286,6 +366,8 @@ def is_squad_internal_comment(body: str) -> bool:
         or RUN_RESET_MARKER in text
         or RUN_SETUP_FAILED_MARKER in text
     ):
+        return True
+    if QA_PASS_MARKER in text or QA_FAIL_MARKER in text:
         return True
     if "squad hf agent" in text or "squad actions agent" in text:
         return True

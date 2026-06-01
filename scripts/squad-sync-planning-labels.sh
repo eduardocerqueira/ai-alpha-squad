@@ -102,21 +102,21 @@ PY
 }
 
 sync_release_candidate() {
-  # v2 only: developer deliverable on the issue → release-candidate gate.
+  # v2 only: developer deliverable QA-approved → release-candidate gate.
   [[ "${SQUAD_V2:-}" == "1" ]] || return 0
   grep -q 'director-approved' <<<"$LABELS" || return 0
   if python3 - "$REPO" "$ISSUE" <<'PY'
 import json, subprocess, sys
 repo, issue = sys.argv[1], sys.argv[2]
 sys.path.insert(0, "src")
-from ai_alpha_squad.squad_v2 import has_deliverable
+from ai_alpha_squad.squad_v2 import qa_passed
 
 proc = subprocess.run(
     ["gh", "issue", "view", issue, "--repo", repo, "--json", "comments"],
     capture_output=True, text=True, check=True,
 )
 comments = tuple(json.loads(proc.stdout)["comments"])
-raise SystemExit(0 if has_deliverable(comments, "developer") else 1)
+raise SystemExit(0 if qa_passed(comments) else 1)
 PY
   then
     gh issue edit "$ISSUE" --repo "$REPO" \

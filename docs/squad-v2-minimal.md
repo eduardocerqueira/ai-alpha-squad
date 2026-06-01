@@ -7,7 +7,7 @@ Canonical spec from [TODO.md](../TODO.md) (lines 40–54). Restore point before 
 | Rule | Detail |
 |------|--------|
 | Source of truth | One **parent** GitHub issue per job (Director opens it) |
-| Agents | **Business Owner** → **Developer** only |
+| Agents | **Business Owner** → **Developer** → **QA** (acceptance gate) |
 | Deliverables | **Comments on the same issue** — no sub-issues |
 | AI | **Hugging Face** inference only (no Copilot assign API) |
 | Runner | **GitHub Actions** (`SQUAD_ORCHESTRATOR_TOKEN`) |
@@ -28,8 +28,12 @@ awaiting-approval
   → director-approved
 
 director-approved
-  → Developer (HF planning comment + Actions for target-repo PR when needed)
-  → release-candidate (when dev deliverable + PR recorded on issue)
+  → Developer (Actions: target-repo branch + PR) posts # Developer Deliverable
+  → QA (HF) reviews the PR vs the issue's success criteria, posts # QA Report:
+       squad-v2-qa:pass → release-candidate
+       squad-v2-qa:fail → Developer reworks (up to MAX_QA_ROUNDS=3), then re-QA;
+                          after the cap the issue is blocked for the Director
+  → release-candidate (when QA passes)
 
 release-candidate
   → Director APPROVE / REJECT
@@ -100,8 +104,9 @@ Unchanged intent: **Your move** = gates; **Attention** = open jobs in active pha
 1. Director opens issue with `new` + target repo in body.
 2. BO runs → `# Business Analysis` → `awaiting-approval`.
 3. Director `APPROVE` → `director-approved`.
-4. Developer runs → **one PR** on target repo (branch `squad/developer-issue-<n>`) + `# Developer Deliverable` on issue → `release-candidate`.
-5. Director release approval → `released`.
+4. Developer runs → **one PR** on target repo (branch `squad/developer-issue-<n>`) + `# Developer Deliverable` on issue.
+5. QA runs → reviews the PR against the issue success criteria → `# QA Report` with `squad-v2-qa:pass`/`:fail`. On fail, Developer reworks until QA passes (cap 3) → `release-candidate`.
+6. Director release approval → `released`.
 
 ## Implementation checklist
 
