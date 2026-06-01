@@ -26,7 +26,7 @@ flowchart TD
 | -------- | ------- | ------ |
 | [squad-orchestrator.yml](../.github/workflows/squad-orchestrator.yml) | `issues: labeled`, `opened` | Dispatch Copilot agent for lifecycle label |
 | [squad-phase-watch.yml](../.github/workflows/squad-phase-watch.yml) | schedule 15m, `repository_dispatch`, sub-issue closed, comments | Advance phases, sync labels, nudge stuck agents |
-| [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Copilot PR opened | Close planning PRs; nudge agent or sync labels |
+| [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Schedule every 10m, Copilot PR opened, `workflow_dispatch` | Close planning PRs (scheduled path needs no per-PR workflow approval); nudge agent or sync labels |
 | [director-gate.yml](../.github/workflows/director-gate.yml) | `director-approved`, Director comments | Enforce approval gates |
 | [squad-project-sync.yml](../.github/workflows/squad-project-sync.yml) | Issue opened / labeled | Sync [Director project board](director-project-board.md) fields |
 
@@ -99,6 +99,7 @@ When a squad-linked PR merges, the queue repo receives `repository_dispatch` →
 | `squad-dispatch-copilot.sh` | Label → Copilot assign |
 | `squad-dispatch-validation.sh` | Fan-out validation agents (bash parallel locally; **matrix** in orchestrator workflow) |
 | `squad-approve-copilot-workflows.sh` | Approve pending Actions runs on Copilot PRs |
+| `squad-scan-planning-prs.sh` | Scheduled scan: guard all open Copilot PRs on queue repo |
 | `squad-advance-implemented.sh` | Dev PR merged → `implemented` |
 | `squad-advance-validation.sh` | All validators done → `validation` |
 | `squad-phase-tick.sh` | Run advance checks for active jobs |

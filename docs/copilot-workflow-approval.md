@@ -7,8 +7,16 @@ When Copilot opens a pull request, GitHub may require a maintainer to **approve 
 | Mechanism | When |
 | --------- | ---- |
 | [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Closes mistaken **planning PRs** on `ai-alpha-squad` (Business Owner / Architect deliver on issues) |
-| `scripts/squad-approve-copilot-workflows.sh` | Called from the PR guard — attempts to **approve pending workflow runs** on the PR head SHA |
+| **Scheduled scan** (`*/10` on `main`) | `squad-scan-planning-prs.sh` — closes planning PRs **without** you approving workflows on each Copilot branch |
+| `pull_request` trigger (optional) | Faster close when workflows on the PR branch are already approved |
+| `scripts/squad-approve-copilot-workflows.sh` | Attempts to **approve pending workflow runs** on the PR head SHA when the guard runs |
 | Issue-first agents | `business-owner` and `architect` custom agents use **read/search tools only** (no branch/PR on the queue repo) |
+
+**You do not need to approve workflows on planning PRs** for the squad to recover: wait up to ~10 minutes after Copilot opens a PR, or run:
+
+```bash
+gh workflow run squad-copilot-pr-guard.yml --repo eduardocerqueira/ai-alpha-squad
+```
 
 ## One-time repo settings (Director)
 
