@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, ExternalLink, GitPullRequest, LogOut, RefreshCw } from "lucide-react";
 import type { Bucket, Dashboard, JobCard } from "@/types";
 import { cn, prNumber, relativeTime } from "@/lib/utils";
@@ -35,10 +35,10 @@ async function fetchDashboard(live = false): Promise<Dashboard> {
 }
 
 // Job tabs: Open (needs-you / stuck) · In progress · Done (released/closed).
-const GROUPS: { key: TabKey; label: string; buckets: Bucket[] }[] = [
-  { key: "open", label: "Open", buckets: ["needs_you", "stuck"] },
-  { key: "in_progress", label: "In progress", buckets: ["in_progress"] },
-  { key: "done", label: "Done", buckets: ["completed"] },
+const GROUPS: { key: TabKey; label: string; buckets: Bucket[]; empty: string }[] = [
+  { key: "open", label: "Open", buckets: ["needs_you", "stuck"], empty: "Nothing needs your attention — no open jobs." },
+  { key: "in_progress", label: "In progress", buckets: ["in_progress"], empty: "No jobs in progress right now." },
+  { key: "done", label: "Done", buckets: ["completed"], empty: "No completed jobs yet." },
 ];
 
 function jobsInGroup(data: Dashboard | null, key: TabKey): JobCard[] {
@@ -115,10 +115,15 @@ export default function App() {
     [data],
   );
 
-  // Keep the active tab valid: if it has no jobs, fall to the first non-empty.
+  // On first data load only, default to the first non-empty tab (unless the URL
+  // pinned one). After that, never auto-switch — the user can freely open any
+  // tab, including empty ones (which show an empty state).
+  const didDefaultTab = useRef(false);
   useEffect(() => {
-    if (!data) return;
-    if (jobsInGroup(data, activeTab).length === 0) {
+    if (!data || didDefaultTab.current) return;
+    didDefaultTab.current = true;
+    const urlTab = new URLSearchParams(window.location.search).get("tab");
+    if (!urlTab && jobsInGroup(data, activeTab).length === 0) {
       const firstWithJobs = GROUPS.find((g) => jobsInGroup(data, g.key).length > 0);
       if (firstWithJobs) setActiveTab(firstWithJobs.key);
     }
@@ -212,7 +217,9 @@ export default function App() {
           {tabJobs.length > 0 ? (
             <JobSwitcher jobs={tabJobs} selected={selected ?? tabJobs[0].number} onSelect={setSelected} />
           ) : (
-            <p className="text-sm text-muted">No jobs in this tab.</p>
+            <div className="rounded-lg border border-dashed border-border bg-surface/40 p-10 text-center text-sm text-muted">
+              {GROUPS.find((g) => g.key === activeTab)?.empty ?? "No jobs in this tab."}
+            </div>
           )}
         </>
       )}
