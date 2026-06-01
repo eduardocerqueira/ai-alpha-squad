@@ -93,8 +93,15 @@ export default function App() {
         setAuthEmail("");
       }
     })();
+    // Background tabs throttle setInterval — refetch when the tab regains focus
+    // so returning to it (e.g. after approving on GitHub) shows current data.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
 
