@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-from dataclasses import asdict, dataclass
+import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from ai_alpha_squad.hf_dispatch import parse_parent_issue_number
-from ai_alpha_squad.job_pipeline import analyze_job
+from ai_alpha_squad.job_pipeline import SquadIssueIndex, analyze_job
 from ai_alpha_squad.nudge import PHASE_MARKERS, issue_has_deliverable
 from ai_alpha_squad.project_sync import (
     AGENT_PENDING_ON_ISSUE,
@@ -18,6 +22,25 @@ from ai_alpha_squad.project_sync import (
 )
 
 DEFAULT_REPO = "eduardocerqueira/ai-alpha-squad"
+
+
+class GhCliError(RuntimeError):
+    """``gh`` CLI failed (auth, rate limit, network)."""
+
+    def __init__(self, args: list[str], returncode: int, message: str) -> None:
+        self.args_list = args
+        self.returncode = returncode
+        self.message = message.strip()
+        super().__init__(self.message or f"gh exited {returncode}")
+
+
+def _short_gh_error(err: GhCliError) -> str:
+    msg = err.message
+    if "rate limit" in msg.lower():
+        return "GitHub API rate limit — wait a few minutes or use cached data below"
+    if "auth" in msg.lower() or "401" in msg or "403" in msg:
+        return "GitHub auth failed — run: gh auth login"
+    return msg.splitlines()[0][:200] if msg else f"gh failed (exit {err.returncode})"
 SUBISSUE_TITLE_PREFIXES = (
     "[Developer]",
     "[QA]",
@@ -41,6 +64,8 @@ class JobCard:
     target_pr_url: str | None
     target_pr_merged: bool
     summary: str
+    headline: str
+    director_action: str
     labels: tuple[str, ...]
     stuck_reasons: tuple[str, ...]
     suggested_action: str
@@ -57,22 +82,26 @@ class DirectorDashboard:
     completed: tuple[JobCard, ...]
 
     def to_json(self) -> dict[str, Any]:
-        def rows(cards: tuple[JobCard, ...]) -> list[dict[str, Any]]:
-            return [asdict(c) for c in cards]
+        def simple(c: JobCard) -> dict[str, Any]:
+            return {
+                "number": c.number,
+                "title": c.title,
+                "url": c.url,
+                "headline": c.headline,
+                "action": c.director_action,
+            }
+
+        attention_cards = tuple(self.stuck) + tuple(self.in_progress)
 
         return {
             "generated_at": self.generated_at,
             "repo": self.repo,
+            "your_move": [simple(c) for c in self.needs_you],
+            "attention": [simple(c) for c in attention_cards],
             "counts": {
-                "needs_you": len(self.needs_you),
-                "in_progress": len(self.in_progress),
-                "stuck": len(self.stuck),
-                "completed": len(self.completed),
+                "your_move": len(self.needs_you),
+                "attention": len(attention_cards),
             },
-            "needs_you": rows(self.needs_you),
-            "in_progress": rows(self.in_progress),
-            "stuck": rows(self.stuck),
-            "completed": rows(self.completed),
         }
 
 
@@ -81,9 +110,78 @@ def _gh_json(args: list[str]) -> Any:
         ["gh", *args],
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
     )
+    if proc.returncode != 0:
+        raise GhCliError(
+            args,
+            proc.returncode,
+            (proc.stderr or proc.stdout or "").strip(),
+        )
     return json.loads(proc.stdout)
+
+
+def load_cached_dashboard(cache_path: Path) -> dict[str, Any]:
+    """Load last written ``jobs.json`` snapshot."""
+    data = json.loads(cache_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"invalid dashboard cache: {cache_path}")
+    return data
+
+
+_LIVE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_LIVE_CACHE_LOCK = Lock()
+_DEFAULT_TTL_SEC = 300
+
+
+def _dashboard_ttl_sec() -> int:
+    raw = os.environ.get("SQUAD_DASHBOARD_TTL_SEC", str(_DEFAULT_TTL_SEC))
+    try:
+        return max(30, int(raw))
+    except ValueError:
+        return _DEFAULT_TTL_SEC
+
+
+def fetch_dashboard_json(
+    repo: str = DEFAULT_REPO,
+    *,
+    cache_path: Path | None = None,
+    include_closed: int = 15,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """Build live dashboard from GitHub; fall back to cache when ``gh`` fails."""
+    ttl = _dashboard_ttl_sec()
+    if not force_refresh:
+        with _LIVE_CACHE_LOCK:
+            hit = _LIVE_CACHE.get(repo)
+            if hit and (time.time() - hit[0]) < ttl:
+                data = dict(hit[1])
+                data["cache_ttl_sec"] = ttl
+                return data
+
+    try:
+        data = build_dashboard(repo, include_closed=include_closed).to_json()
+        data["cache_ttl_sec"] = ttl
+        with _LIVE_CACHE_LOCK:
+            _LIVE_CACHE[repo] = (time.time(), data)
+        if cache_path is not None:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        return data
+    except GhCliError as err:
+        with _LIVE_CACHE_LOCK:
+            hit = _LIVE_CACHE.get(repo)
+            if hit:
+                data = dict(hit[1])
+                data["stale"] = True
+                data["fetch_error"] = _short_gh_error(err)
+                return data
+        if cache_path is None or not cache_path.is_file():
+            raise
+        data = load_cached_dashboard(cache_path)
+        data["stale"] = True
+        data["fetch_error"] = _short_gh_error(err)
+        return data
 
 
 def _is_parent_job(title: str, body: str) -> bool:
@@ -109,10 +207,11 @@ def _classify_bucket(
     planning: PlanningDeliverables,
     stuck_reasons: tuple[str, ...],
 ) -> str:
-    if stuck_reasons:
-        return "stuck"
+    # Closed/released jobs are done — do not surface pipeline noise on the Director view.
     if state.upper() == "CLOSED" or lifecycle == "released":
         return "completed"
+    if stuck_reasons:
+        return "stuck"
     if lifecycle == "blocked" or active_agent in (AGENT_PENDING_ON_ISSUE, "Blocked"):
         return "stuck"
     if needs_director == "Yes" or lifecycle in ("awaiting-approval", "release-candidate"):
@@ -142,7 +241,56 @@ def _summary_for_card(
     return f"Phase `{lifecycle or '—'}`"
 
 
-def _load_job_card(repo: str, row: dict) -> JobCard | None:
+def _headline_for_card(
+    bucket: str,
+    lifecycle: str | None,
+    stuck_reasons: tuple[str, ...],
+    pr_merged: bool,
+) -> str:
+    lc = lifecycle or ""
+    if bucket == "needs_you":
+        if lc == "awaiting-approval":
+            return "Approve the Business Analysis."
+        if lc == "release-candidate":
+            return "Approve or reject the release."
+        return "Your approval is required."
+    if bucket == "stuck":
+        if stuck_reasons:
+            text = stuck_reasons[0]
+            if "validation" in text.lower():
+                return "Validation stalled — squad may need a nudge."
+            if "PR merged" in text:
+                return "PR merged but the pipeline did not advance."
+            return text if len(text) <= 100 else text[:97] + "…"
+        return "This job is blocked."
+    if bucket == "in_progress":
+        if pr_merged and lc == "implemented":
+            return "PR merged; validation in progress."
+        if lc == "validation":
+            return "Release checks running — wait unless you are asked to approve."
+        if lc == "designed":
+            return "Developer is building — nothing needed from you."
+        return "Squad is working — nothing needed from you."
+    return "This job is done."
+
+
+def _director_action_for_card(bucket: str, lifecycle: str | None) -> str:
+    if bucket != "needs_you":
+        return ""
+    lc = lifecycle or ""
+    if lc == "awaiting-approval":
+        return "Open the issue and reply APPROVE (or REQUEST CHANGES)."
+    if lc == "release-candidate":
+        return "Open the issue and reply APPROVE or REJECT."
+    return "Open the issue and follow the Director gate instructions."
+
+
+def _load_job_card(
+    repo: str,
+    row: dict,
+    *,
+    index: SquadIssueIndex,
+) -> JobCard | None:
     title = str(row.get("title") or "")
     body = str(row.get("body") or "")
     if not _is_parent_job(title, body):
@@ -154,24 +302,16 @@ def _load_job_card(repo: str, row: dict) -> JobCard | None:
     state = str(row.get("state") or "OPEN")
     updated_at = str(row.get("updatedAt") or "")
 
-    comments: list[dict] = []
-    try:
-        detail = _gh_json(
-            [
-                "issue",
-                "view",
-                str(number),
-                "--repo",
-                repo,
-                "--json",
-                "comments",
-            ]
-        )
-        comments = detail.get("comments") or []
-    except subprocess.CalledProcessError:
-        pass
+    comments: list[dict] = list(row.get("comments") or index.issue_comments(number))
 
-    health = analyze_job(repo, number, labels=label_set, comments=comments, body=body)
+    health = analyze_job(
+        repo,
+        number,
+        labels=label_set,
+        comments=comments,
+        body=body,
+        index=index,
+    )
     lifecycle = health.effective_lifecycle
     planning = _planning_from_comments(comments)
     derived = derive_state(label_set, planning=planning)
@@ -187,17 +327,6 @@ def _load_job_card(repo: str, row: dict) -> JobCard | None:
         needs_director=derived.needs_director,
         planning=planning,
         stuck_reasons=health.stuck_reasons,
-    )
-
-    agent_rows = tuple(
-        {
-            "role": a.role,
-            "status": a.status,
-            "issue_number": a.issue_number,
-            "issue_url": a.issue_url,
-            "detail": a.detail,
-        }
-        for a in health.agents
     )
 
     return JobCard(
@@ -218,10 +347,17 @@ def _load_job_card(repo: str, row: dict) -> JobCard | None:
             health.target_pr_merged,
             health.suggested_action,
         ),
+        headline=_headline_for_card(
+            bucket,
+            derived_lifecycle,
+            health.stuck_reasons,
+            health.target_pr_merged,
+        ),
+        director_action=_director_action_for_card(bucket, derived_lifecycle),
         labels=labels,
         stuck_reasons=health.stuck_reasons,
         suggested_action=health.suggested_action,
-        agents=agent_rows,
+        agents=(),
     )
 
 
@@ -235,38 +371,10 @@ def _extract_target_repo(body: str) -> str | None:
     return None
 
 
-def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 15) -> DirectorDashboard:
-    """List parent jobs and classify into Director buckets."""
-    open_rows = _gh_json(
-        [
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--state",
-            "open",
-            "--json",
-            "number,title,body,state,labels,updatedAt",
-            "--limit",
-            "100",
-        ]
-    )
-    closed_rows: list[dict] = []
-    if include_closed > 0:
-        closed_rows = _gh_json(
-            [
-                "issue",
-                "list",
-                "--repo",
-                repo,
-                "--state",
-                "closed",
-                "--json",
-                "number,title,body,state,labels,updatedAt",
-                "--limit",
-                str(include_closed),
-            ]
-        )
+def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 0) -> DirectorDashboard:
+    """List open parent jobs; only approvals surface on the Director view."""
+    index = SquadIssueIndex.from_repo(repo, include_closed=include_closed)
+    rows = list(index.by_number.values())
 
     buckets: dict[str, list[JobCard]] = {
         "needs_you": [],
@@ -274,8 +382,10 @@ def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 15) -> Di
         "stuck": [],
         "completed": [],
     }
-    for row in list(open_rows) + list(closed_rows):
-        card = _load_job_card(repo, row)
+    for row in rows:
+        if str(row.get("state") or "OPEN").upper() == "CLOSED":
+            continue
+        card = _load_job_card(repo, row, index=index)
         if card is None:
             continue
         buckets[card.bucket].append(card)
