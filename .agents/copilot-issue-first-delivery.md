@@ -52,7 +52,7 @@ For planning PRs, the guard **polls the issue for up to ~1 minute** when the PR 
 
 A **scheduled scan every 5 minutes** (runs on `main`) closes matching PRs, promotes deliverables, and reconciles open `new` / `director-approved` issues even if you never approve workflows on the Copilot branch. The `pull_request` trigger is optional for faster cleanup when workflows are already approved.
 
-**Orchestrator reconcile job:** After dispatching Business Owner or Architect, [`squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) runs `reconcile-planning` for up to **35 minutes** (poll every 3 minutes): promote from PR → sync labels → project board.
+**Orchestrator reconcile job:** After dispatching Business Owner or Architect, [`squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) runs a **single fast** `reconcile-planning` pass (promote from PR → sync labels → project board). Ongoing retries come from the 5-minute PR guard scan and phase-watch tick, which avoids long issue-level workflow locks.
 
 Custom agents `business-owner` and `architect` use **read/search tools only** (no `edit`) to reduce spurious draft PRs on this repo.
 
