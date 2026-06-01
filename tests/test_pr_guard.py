@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from ai_alpha_squad.pr_guard import (
+    is_copilot_assignee,
     is_work_queue_repo,
+    issue_numbers_from_pr_text,
+    pick_guard_issue_number,
     product_paths_in_diff,
     should_close_queue_product_pr,
 )
@@ -55,3 +58,43 @@ def test_no_close_on_target_repo() -> None:
     )
     assert close is False
     assert reason == ""
+
+
+def test_pick_open_issue_over_closed_closes() -> None:
+    picked = pick_guard_issue_number(
+        [15],
+        [17],
+        state_by_number={15: "CLOSED", 17: "OPEN"},
+    )
+    assert picked == 17
+
+
+def test_pick_highest_open_when_multiple() -> None:
+    picked = pick_guard_issue_number(
+        [],
+        [12, 17],
+        state_by_number={12: "OPEN", 17: "OPEN"},
+    )
+    assert picked == 17
+
+
+def test_no_pick_when_all_closed() -> None:
+    assert (
+        pick_guard_issue_number(
+            [15],
+            [],
+            state_by_number={15: "CLOSED"},
+        )
+        is None
+    )
+
+
+def test_issue_numbers_from_pr_text() -> None:
+    nums = issue_numbers_from_pr_text("Closes #15\nRelated to issue #17")
+    assert nums == [15, 17]
+
+
+def test_is_copilot_assignee() -> None:
+    assert is_copilot_assignee("Copilot")
+    assert is_copilot_assignee("app/copilot-swe-agent")
+    assert not is_copilot_assignee("eduardocerqueira")

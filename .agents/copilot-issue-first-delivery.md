@@ -53,4 +53,6 @@ A **scheduled scan every 10 minutes** (runs on `main`) closes matching PRs even 
 
 Custom agents `business-owner` and `architect` use **read/search tools only** (no `edit`) to reduce spurious draft PRs on this repo.
 
+**PR guard recovery:** Closing a planning or product PR does **not** force-nudge Copilot. The guard prefers **open** linked issues (e.g. #17 over closed #15), skips closed issues, never re-dispatches on product/extension closes, and only re-assigns architect when Copilot is **not** already on the issue. **Squad phase watch** runs `squad-recover-architect.sh` for `director-approved` jobs missing Copilot.
+
 [`.github/workflows/squad-phase-watch.yml`](../.github/workflows/squad-phase-watch.yml) runs `squad-nudge-stuck.sh` on a schedule and when issue comments arrive.
