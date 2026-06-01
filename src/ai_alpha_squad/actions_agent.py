@@ -237,6 +237,8 @@ Tools:
 
 Use list_dir once at the start, then prefer write_file for each artifact.
 If the task lists multiple languages, create every language, then call finish immediately.
+The "Progress so far" list below shows the tools you have ALREADY run this session —
+do not repeat completed work, and once every required artifact exists call finish.
 Do not repeat list_dir on the same path. Output only the JSON object."""
 
     user = (
@@ -245,12 +247,30 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
         "Repository root is the current working directory for tools."
     )
 
-    conversation = user
+    # Running transcript of completed actions. The model is otherwise stateless
+    # per call, so without this it cannot track which artifacts it already wrote
+    # and never confidently calls finish (it churns until max turns).
+    history: list[str] = []
+
+    def build_conversation(extra: str = "") -> str:
+        parts = [user]
+        if history:
+            parts.append("## Progress so far (tools you already ran this session)\n" + "\n".join(history))
+        parts.append("Next: reply with ONE JSON tool object." + extra)
+        return "\n\n---\n".join(parts)
+
     for _turn in range(MAX_TURNS):
+        remaining = MAX_TURNS - _turn
+        urgency = ""
+        if remaining <= 15:
+            urgency = (
+                "\n\nURGENT: " + str(remaining) + " turn(s) left. Call "
+                '{"tool": "finish", "args": {"summary": "..."}} now with what you completed.'
+            )
         content = chat_completion(
             model,
             system=system,
-            user=conversation,
+            user=build_conversation(urgency),
             token=token,
         )
         parsed = parse_tool_call(content)
@@ -259,28 +279,21 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
                 f"[actions] turn {_turn + 1}/{MAX_TURNS}: unparsed ({len(content)} chars)",
                 file=sys.stderr,
             )
-            conversation = (
-                f"{user}\n\n---\nModel response (unparsed):\n{content[:2000]}\n\n"
-                "Reply with a single JSON tool object."
-            )
+            history.append(f"[turn {_turn + 1}] (model output was not valid JSON; reminded to emit a tool object)")
             continue
         tool_name, tool_args = parsed
         print(f"[actions] turn {_turn + 1}/{MAX_TURNS}: {tool_name}", file=sys.stderr)
         if tool_name == "finish":
             return str(tool_args.get("summary", content)), True
         result = execute_tool(workdir, tool_name, tool_args)
-        remaining = MAX_TURNS - _turn - 1
-        urgency = ""
-        if remaining <= 15:
-            urgency = (
-                f"\n\nURGENT: {remaining} turn(s) left. "
-                'Call {{"tool": "finish", "args": {{"summary": "..."}}}} now '
-                "with what you completed."
-            )
-        conversation = (
-            f"{user}\n\n---\nLast tool: {tool_name}\nResult:\n{result}\n\n"
-            f"Next: one JSON tool object.{urgency}"
+        arg_hint = str(tool_args.get("path") or tool_args.get("command") or "").strip()
+        result_brief = result if len(result) <= 400 else result[:400] + "…(truncated)"
+        history.append(
+            f"[turn {_turn + 1}] {tool_name} {arg_hint}".rstrip() + f" -> {result_brief}"
         )
+        # Bound transcript size; a 10-artifact task stays well under this.
+        while len(history) > 1 and sum(len(h) for h in history) > 12000:
+            history.pop(0)
 
     return "Agent loop reached max turns without finish.", False
 

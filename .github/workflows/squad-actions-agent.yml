@@ -38,7 +38,7 @@ jobs:
       SQUAD_AI_PROVIDER: ${{ vars.SQUAD_AI_PROVIDER }}
       SQUAD_CODE_RUNTIME: ${{ vars.SQUAD_CODE_RUNTIME }}
       SQUAD_HF_DEFAULT_MODEL: ${{ vars.SQUAD_HF_DEFAULT_MODEL }}
-      SQUAD_ACTIONS_MAX_TURNS: "50"
+      SQUAD_ACTIONS_MAX_TURNS: "120"
       SQUAD_ACTIONS_STRATEGY: "scaffold"
       SQUAD_ACTIONS_SCAFFOLD_GREENFIELD: ${{ vars.SQUAD_V2 == '1' && '0' || '1' }}
       SQUAD_V2: ${{ vars.SQUAD_V2 }}
@@ -67,3 +67,14 @@ jobs:
             "${{ inputs.agent }}" \
             "${{ inputs.target_repo }}" \
             "$INSTR"
+
+      - name: Record failure marker (v2 retry cap)
+        # This workflow runs the agent directly (not via squad-v2-dispatch.sh), so
+        # on failure it must post the failure marker itself — otherwise the v2
+        # retry cap never engages and phase-watch re-dispatches forever.
+        if: failure() && vars.SQUAD_V2 == '1'
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          MARKER="$(python3 -c "from ai_alpha_squad.squad_v2 import failed_comment; print(failed_comment('${{ inputs.agent }}', 'Actions agent workflow failed — see run log'))")"
+          gh issue comment "${{ inputs.issue_number }}" --repo "${{ inputs.queue_repo }}" --body "$MARKER"
