@@ -45,6 +45,18 @@ Env overrides: `SQUAD_NUDGE_COOLDOWN_MINUTES`, `SQUAD_NUDGE_MIN_AGE_MINUTES`.
 
 Scripts: `squad-nudge-stuck.sh`, `squad-sync-planning-labels.sh`.
 
+## Autonomous planning fallback (Copilot recovery)
+
+When Copilot cannot post issue-first `# Business Analysis` or `# Technical Specification` (common on the queue repo), the orchestrator can complete planning from `docs/jobs/job-*.md` after repeated nudges or failed reconcile:
+
+| Trigger | Script |
+| ------- | ------ |
+| Reconcile finds no deliverable | `squad-autonomous-planning-fallback.py` (orchestrator tries before nudge) |
+| Phase watch nudge threshold | Same script before re-dispatch |
+| Manual | `python3 scripts/squad-autonomous-planning-fallback.py REPO N --phase business-owner --force` |
+
+Env: `SQUAD_AUTONOMOUS_PLANNING=1` (default), `SQUAD_MAX_PLANNING_NUDGES=2`. Director approval gates are unchanged — fallback only unblocks `awaiting-approval` / architect handoff.
+
 ## Label → action map
 
 | Label added | Auto action | Copilot agent |

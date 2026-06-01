@@ -174,8 +174,13 @@ jobs:
             PHASE="architect"
           fi
           if [ -n "$PHASE" ]; then
-            ./scripts/squad-nudge-stuck.sh "$REPO" "$ISSUE_NUMBER" --phase "$PHASE" --force \
-              --reason "Reconcile found no substantive deliverable on issue or linked Copilot PR."
+            chmod +x ./scripts/squad-autonomous-planning-fallback.py
+            if ./scripts/squad-autonomous-planning-fallback.py "$REPO" "$ISSUE_NUMBER" --phase "$PHASE" --force; then
+              ./scripts/squad-sync-planning-labels.sh "$REPO" "$ISSUE_NUMBER" || true
+            else
+              ./scripts/squad-nudge-stuck.sh "$REPO" "$ISSUE_NUMBER" --phase "$PHASE" --force \
+                --reason "Reconcile found no substantive deliverable on issue or linked Copilot PR."
+            fi
           fi
 
   # Phase 4 — parallel validation (QA, Security, DevOps, Tech Writer)
