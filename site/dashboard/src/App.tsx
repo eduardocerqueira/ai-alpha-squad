@@ -105,6 +105,60 @@ export default function App() {
     };
   }, [load]);
 
+  // Real-time push: when signed in, hold a WebSocket to the hub. CI pushes a
+  // "refresh" the moment new data is published, so we refetch instantly instead
+  // of waiting for the poll. Polling (above) stays as a fallback.
+  useEffect(() => {
+    if (!authEmail || import.meta.env.DEV) return; // dev has no WS endpoint
+    let closed = false;
+    let ws: WebSocket | undefined;
+    let ping: ReturnType<typeof setInterval> | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const connect = () => {
+      if (closed) return;
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      ws = new WebSocket(`${proto}://${location.host}/api/director/live`);
+      ws.onopen = () => {
+        ping = setInterval(() => {
+          try {
+            ws?.send("ping");
+          } catch {
+            /* ignore */
+          }
+        }, 50_000);
+      };
+      ws.onmessage = (e) => {
+        try {
+          if (typeof e.data === "string" && e.data.includes("refresh")) load(true);
+        } catch {
+          /* ignore */
+        }
+      };
+      ws.onclose = () => {
+        if (ping) clearInterval(ping);
+        if (!closed) retry = setTimeout(connect, 5_000);
+      };
+      ws.onerror = () => {
+        try {
+          ws?.close();
+        } catch {
+          /* ignore */
+        }
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      if (ping) clearInterval(ping);
+      if (retry) clearTimeout(retry);
+      try {
+        ws?.close();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [authEmail, load]);
+
   async function logout() {
     await fetch("/api/director/auth/logout", { method: "POST" }).catch(() => {});
     setAuthEmail("");
