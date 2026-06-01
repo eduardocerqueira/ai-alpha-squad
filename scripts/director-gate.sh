@@ -40,7 +40,12 @@ grant_director_approval() {
   if ! has_label "director-approved"; then
     gh issue edit "$ISSUE" --repo "$REPO" --add-label "director-approved"
   fi
-  local msg="**Director gate:** \`director-approved\` recorded (${source}). Architect dispatch follows."
+  local msg
+  if [[ "${SQUAD_V2:-}" == "1" ]]; then
+    msg="**Director gate:** \`director-approved\` recorded (${source}). Developer dispatch follows (Squad v2)."
+  else
+    msg="**Director gate:** \`director-approved\` recorded (${source}). Architect dispatch follows."
+  fi
   local body
   body="$(python3 "$FORMAT_COMMENT" notice --message "$msg" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
   gh issue comment "$ISSUE" --repo "$REPO" --body "$body"
@@ -120,12 +125,18 @@ handle_comment() {
     exit 0
   fi
 
-  if ! has_label "awaiting-approval"; then
-    echo "Director APPROVE comment but issue not awaiting-approval; skip"
-    exit 0
+  if has_label "release-candidate"; then
+    gh issue edit "$ISSUE" --repo "$REPO" \
+      --add-label "released" --remove-label "release-candidate" 2>/dev/null || true
+    local rmsg="**Director gate:** \`released\` recorded (${source}). Job complete."
+    local rbody
+    rbody="$(python3 "$FORMAT_COMMENT" notice --message "$rmsg" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
+    gh issue comment "$ISSUE" --repo "$REPO" --body "$rbody"
+  elif has_label "awaiting-approval"; then
+    grant_director_approval "GitHub comment from \`${DIRECTOR}\`"
+  else
+    echo "Director APPROVE comment but issue not awaiting-approval or release-candidate; skip"
   fi
-
-  grant_director_approval "GitHub comment from \`${DIRECTOR}\`"
 }
 
 case "$MODE" in

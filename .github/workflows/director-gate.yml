@@ -22,6 +22,7 @@ jobs:
     if: github.event.issue.state == 'open'
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      SQUAD_V2: ${{ vars.SQUAD_V2 }}
       REPO: ${{ github.repository }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
       SQUAD_DIRECTOR_LOGIN: ${{ vars.SQUAD_DIRECTOR_LOGIN }}

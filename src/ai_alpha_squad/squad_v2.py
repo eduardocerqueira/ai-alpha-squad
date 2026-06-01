@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from ai_alpha_squad.nudge import issue_has_deliverable
+
 LIFECYCLE_LABELS_V2: tuple[str, ...] = (
     "released",
     "blocked",
@@ -68,23 +70,23 @@ def extract_target_repo(body: str) -> str | None:
     return None
 
 
-def _comment_text(comments: tuple[dict, ...]) -> str:
-    return "\n".join(str(c.get("body") or "") for c in comments)
-
-
 def has_deliverable(comments: tuple[dict, ...], agent: str) -> bool:
     marker = DELIVERABLE_MARKERS.get(agent, "")
     if not marker:
         return False
-    return marker.lower() in _comment_text(comments).lower()
+    return issue_has_deliverable(list(comments), marker)
 
 
 def run_in_progress(comments: tuple[dict, ...]) -> str | None:
     for comment in reversed(comments):
         body = (comment.get("body") or "").lower()
         for agent in AGENTS_V2:
-            if f"{RUN_IN_PROGRESS_MARKER}{agent}" in body:
-                return agent
+            if f"{RUN_IN_PROGRESS_MARKER}{agent}" not in body:
+                continue
+            # Stale marker left after a successful deliverable (common when label sync races).
+            if has_deliverable(comments, agent):
+                continue
+            return agent
     return None
 
 
