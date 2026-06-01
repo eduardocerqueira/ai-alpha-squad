@@ -108,3 +108,72 @@ def test_finish_summary_never_echoes_raw_toolcall():
     raw = '{"tool":"finish","args":{}}'
     out = _finish_summary({}, raw)
     assert '"tool"' not in out and out
+
+
+# --- destructive-change safety guard ---
+
+_DESTRUCTIVE_DIFF = """diff --git a/seeker/util.py b/seeker/util.py
+index d78fa504..b23e20e5 100755
+--- a/seeker/util.py
++++ b/seeker/util.py
+@@ -13,120 +13,13 @@
+-def get_config(section, parameter):
+-    config = ConfigParser()
+-    return json.loads(config.get(section, parameter))
+-
+-
+-def build_regex():
+-    return "x"
+-
+-
+ def purge():
+-    day = get_config("purge", "day")
+-    files = listdir(SNIPPET_DIR)
+-    for file in files:
+-        with open(SNIPPET_DIR / file, "r") as fp:
+-            data = fp.read()
++    pass
+"""
+
+_TARGETED_DIFF = """diff --git a/seeker/util.py b/seeker/util.py
+--- a/seeker/util.py
++++ b/seeker/util.py
+@@ -50,7 +50,7 @@
+ def purge():
+     files = listdir(SNIPPET_DIR)
+     for file in files:
+-        with open(SNIPPET_DIR / file, "r") as fp:
++        with open(SNIPPET_DIR / file, "r", encoding="utf-8", errors="ignore") as fp:
+             data = fp.read()
+"""
+
+
+def test_assess_change_safety_flags_removed_defs():
+    from ai_alpha_squad.actions_agent import assess_change_safety
+    violations = assess_change_safety(_DESTRUCTIVE_DIFF)
+    assert violations  # not empty
+    joined = " ".join(violations)
+    assert "get_config" in joined and "build_regex" in joined
+
+
+def test_assess_change_safety_allows_targeted_fix():
+    from ai_alpha_squad.actions_agent import assess_change_safety
+    assert assess_change_safety(_TARGETED_DIFF) == []
+
+
+def test_assess_change_safety_ignores_purely_additive_diff():
+    # New-file / greenfield work only adds lines — must never be flagged.
+    from ai_alpha_squad.actions_agent import assess_change_safety
+    additive = "diff --git a/hello.py b/hello.py\n--- a/hello.py\n+++ b/hello.py\n" + "".join(
+        f"+line {i}\n" for i in range(60)
+    )
+    assert assess_change_safety(additive) == []
+
+
+def test_diff_file_stats_counts():
+    from ai_alpha_squad.actions_agent import diff_file_stats
+    stats = diff_file_stats(_DESTRUCTIVE_DIFF)
+    assert "seeker/util.py" in stats
+    s = stats["seeker/util.py"]
+    assert s["removed"] > s["added"]
+    assert {"get_config", "build_regex"} <= s["removed_defs"]
