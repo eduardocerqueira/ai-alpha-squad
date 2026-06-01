@@ -39,7 +39,8 @@ checkout_work_branch() {
   cd "$workdir"
   git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git"
   if git ls-remote --heads origin "$BRANCH" | grep -q .; then
-    git fetch origin "$BRANCH"
+    # Shallow clone (-b main) does not include other branches until explicitly fetched.
+    git fetch --depth 1 origin "${BRANCH}:refs/heads/${BRANCH}"
     git checkout "$BRANCH"
     git pull --rebase origin "$BRANCH" || git pull origin "$BRANCH" || true
   else
