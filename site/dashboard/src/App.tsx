@@ -234,6 +234,12 @@ export default function App() {
                   <ExternalLink className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
                 </a>
                 <p className="mt-1 text-sm text-muted">{job.headline || job.summary}</p>
+                {job.blocked && (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-danger/50 bg-[color:rgba(248,113,113,0.08)] px-2 py-1 text-xs text-danger">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    <span><code className="font-mono">blocked</code> label set on the issue — clear it if the squad has moved on.</span>
+                  </p>
+                )}
               </div>
               {job.target_pr_url && (
                 <a

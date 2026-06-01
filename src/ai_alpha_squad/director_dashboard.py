@@ -18,6 +18,7 @@ from ai_alpha_squad.nudge import PHASE_MARKERS, issue_has_deliverable
 from ai_alpha_squad.project_sync import (
     AGENT_PENDING_ON_ISSUE,
     LIFECYCLE_LABELS,
+    PHASE_TO_AGENT,
     PlanningDeliverables,
     derive_state,
 )
@@ -60,6 +61,7 @@ class JobCard:
     lifecycle: str | None
     active_agent: str
     bucket: str
+    blocked: bool
     updated_at: str
     target_repo: str | None
     target_pr_url: str | None
@@ -319,6 +321,34 @@ def _progress_phase(lifecycle: str | None, labels: tuple[str, ...]) -> str | Non
     return None
 
 
+def _effective_phase(
+    lifecycle: str | None,
+    labels: tuple[str, ...],
+    *,
+    has_spec: bool,
+    pr_url: str | None,
+    pr_merged: bool,
+) -> str | None:
+    """Phase the job has *actually* reached, advancing past lagging labels using
+    artifacts. A label can fall behind (or get stuck on ``blocked``) while the
+    squad has already produced a spec or opened a PR — trust the artifacts."""
+    order = [p[0] for p in TIMELINE_PHASES]
+    phase = _progress_phase(lifecycle, labels)
+    idx = order.index(phase) if phase in order else -1
+
+    def at_least(label: str) -> None:
+        nonlocal idx
+        idx = max(idx, order.index(label))
+
+    if has_spec:
+        at_least("designed")
+    if pr_url and not pr_merged:
+        at_least("implemented")
+    if pr_merged:
+        at_least("validation")  # code merged → past implementation
+    return order[idx] if idx >= 0 else phase
+
+
 def _build_events(
     *,
     lifecycle: str | None,
@@ -422,16 +452,34 @@ def _load_job_card(
     else:
         derived_lifecycle = derived.lifecycle
 
+    # `blocked` is an overlay flag, not a phase: surface it but trust the
+    # artifacts (spec, PR) for the real phase the squad has reached.
+    blocked = "blocked" in label_set or derived_lifecycle == "blocked"
+    effective_lifecycle = _effective_phase(
+        derived_lifecycle,
+        labels,
+        has_spec=planning.has_technical_spec,
+        pr_url=health.target_pr_url,
+        pr_merged=health.target_pr_merged,
+    )
+    # Active agent from the real phase (so a stale `blocked` label doesn't read
+    # as "Blocked" and wrongly bucket an advancing job as stuck).
+    active_agent = (
+        PHASE_TO_AGENT.get(effective_lifecycle, derived.active_agent)
+        if effective_lifecycle
+        else derived.active_agent
+    )
+
     bucket = _classify_bucket(
         state=state,
-        lifecycle=derived_lifecycle,
-        active_agent=derived.active_agent,
+        lifecycle=effective_lifecycle,
+        active_agent=active_agent,
         needs_director=derived.needs_director,
         planning=planning,
         stuck_reasons=health.stuck_reasons,
     )
 
-    director_action = _director_action_for_card(bucket, derived_lifecycle)
+    director_action = _director_action_for_card(bucket, effective_lifecycle)
     agent_rows = tuple(
         {
             "role": a.role,
@@ -443,7 +491,7 @@ def _load_job_card(
         for a in health.agents
     )
     events = _build_events(
-        lifecycle=derived_lifecycle,
+        lifecycle=effective_lifecycle,
         labels=labels,
         bucket=bucket,
         director_action=director_action,
@@ -457,23 +505,24 @@ def _load_job_card(
         number=number,
         title=title,
         url=f"https://github.com/{repo}/issues/{number}",
-        lifecycle=derived_lifecycle,
-        active_agent=derived.active_agent,
+        lifecycle=effective_lifecycle,
+        active_agent=active_agent,
         bucket=bucket,
+        blocked=blocked,
         updated_at=updated_at,
         target_repo=_extract_target_repo(body),
         target_pr_url=health.target_pr_url,
         target_pr_merged=health.target_pr_merged,
         summary=_summary_for_card(
             bucket,
-            derived_lifecycle,
+            effective_lifecycle,
             health.stuck_reasons,
             health.target_pr_merged,
             health.suggested_action,
         ),
         headline=_headline_for_card(
             bucket,
-            derived_lifecycle,
+            effective_lifecycle,
             health.stuck_reasons,
             health.target_pr_merged,
         ),

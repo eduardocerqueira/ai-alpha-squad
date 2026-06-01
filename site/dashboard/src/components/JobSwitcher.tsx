@@ -36,7 +36,10 @@ export function JobSwitcher({
           >
             <div className="flex items-center justify-between gap-2">
               <span className="font-mono text-xs text-muted">#{job.number}</span>
-              <Badge variant={meta.variant}>{meta.label}</Badge>
+              <span className="flex items-center gap-1">
+                {job.blocked && <Badge variant="danger">blocked</Badge>}
+                <Badge variant={meta.variant}>{meta.label}</Badge>
+              </span>
             </div>
             <span
               className={cn(

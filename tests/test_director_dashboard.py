@@ -6,6 +6,7 @@ from pathlib import Path
 from ai_alpha_squad.director_dashboard import (
     GhCliError,
     _classify_bucket,
+    _effective_phase,
     _headline_for_card,
     _is_parent_job,
     fetch_dashboard_json,
@@ -76,6 +77,30 @@ def test_closed_issue_not_blocked_when_pipeline_stale():
         stuck_reasons=("Parent has `implemented` but validation agents were never dispatched",),
     )
     assert bucket == "completed"
+
+
+def test_effective_phase_advances_past_blocked_label_with_artifacts():
+    # #111-style: labels say blocked + director-approved, but a dev PR is open.
+    # Trust the artifacts — the real phase is `implemented`, not blocked.
+    phase = _effective_phase(
+        "blocked",
+        ("blocked", "director-approved"),
+        has_spec=True,
+        pr_url="https://github.com/o/r/pull/14",
+        pr_merged=False,
+    )
+    assert phase == "implemented"
+
+
+def test_effective_phase_keeps_label_when_no_artifacts():
+    phase = _effective_phase(
+        "director-approved",
+        ("director-approved",),
+        has_spec=False,
+        pr_url=None,
+        pr_merged=False,
+    )
+    assert phase == "director-approved"
 
 
 def test_headline_needs_you_approval():

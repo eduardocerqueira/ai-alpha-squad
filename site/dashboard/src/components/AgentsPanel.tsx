@@ -16,14 +16,16 @@ const ROLE_LABELS: Record<string, string> = {
 
 const STATUS_TEXT: Record<NormStatus, string> = {
   done: "text-green",
-  working: "text-green",
+  review: "text-amber",
+  progress: "text-amber",
   blocked: "text-danger",
   idle: "text-muted",
 };
 
 const STATUS_LABEL: Record<NormStatus, string> = {
   done: "Done",
-  working: "Working",
+  review: "In review",
+  progress: "In progress",
   blocked: "Blocked",
   idle: "Idle",
 };
@@ -59,7 +61,7 @@ function AgentDetail({ detail }: { detail: string }) {
 }
 
 function AgentRow({ agent }: { agent: Agent }) {
-  const norm = normalizeAgentStatus(agent.status);
+  const norm = normalizeAgentStatus(agent.status, agent.detail);
   const label = ROLE_LABELS[agent.role] ?? agent.role;
   return (
     <li className="flex items-start gap-3 rounded-lg border border-border bg-surface px-3 py-2.5">
