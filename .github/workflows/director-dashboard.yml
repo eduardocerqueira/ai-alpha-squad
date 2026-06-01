@@ -1,4 +1,4 @@
-# Publish Director dashboard JSON (single job visibility — not issue comments).
+# Optional: refresh site/public/director/jobs.json (legacy). Disabled when SQUAD_V2=1 — use squad-director-now.sh.
 name: Director dashboard
 
 permissions:
@@ -12,14 +12,20 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_run:
-    workflows: [Squad orchestrator, Squad phase watch]
+    workflows:
+      - Squad orchestrator
+      - Squad phase watch
+      - Squad v2 orchestrator
+      - Squad v2 phase watch
     types: [completed]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.repository == 'eduardocerqueira/ai-alpha-squad'
+    if: >-
+      github.repository == 'eduardocerqueira/ai-alpha-squad' &&
+      vars.SQUAD_V2 != '1'
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
@@ -29,19 +35,38 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]" 2>/dev/null || true
+
       - name: Build dashboard JSON
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           chmod +x ./scripts/squad-director-dashboard.py
-          python3 ./scripts/squad-director-dashboard.py --write site/public/director/jobs.json
+          ./scripts/squad-director-dashboard.py --write site/public/director/jobs.json
 
-      - name: Commit dashboard data
+      - name: Upload snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: director-jobs-json
+          path: site/public/director/jobs.json
+          retention-days: 7
+
+      # main is branch-protected (PR + ci-test). Push to a data branch; do not fail the job on push errors.
+      - name: Publish JSON to director-jobs-json branch
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B director-jobs-json
           git add site/public/director/jobs.json
           if git diff --staged --quiet; then
             echo "No dashboard changes"
             exit 0
           fi
           git commit -m "chore(director): refresh dashboard jobs.json"
-          git push
+          if git push -f origin director-jobs-json; then
+            echo "Pushed to director-jobs-json branch"
+          else
+            echo "::warning::Could not push dashboard JSON (branch protection or permissions). Artifact uploaded; use ./scripts/squad-director-now.sh locally."
+          fi
