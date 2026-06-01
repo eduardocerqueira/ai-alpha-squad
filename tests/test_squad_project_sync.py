@@ -1,5 +1,9 @@
 """Unit tests for squad project lifecycle/agent derivation."""
-from ai_alpha_squad.project_sync import derive_state
+from ai_alpha_squad.project_sync import (
+    PARALLEL_VALIDATION_AGENT,
+    derive_state,
+    format_active_agent,
+)
 
 
 def test_awaiting_approval_shows_director():
@@ -20,6 +24,20 @@ def test_subissue_qa():
     derived = derive_state({"qa", "implemented"})
     assert derived.lifecycle == "implemented"
     assert derived.active_agent == "qa"
+
+
+def test_implemented_parallel_validation_agents():
+    derived = derive_state({"qa", "security", "devops", "implemented"})
+    assert derived.active_agent == PARALLEL_VALIDATION_AGENT
+
+
+def test_architect_copilot_session_suffix():
+    derived = derive_state({"director-approved", "business-owner"}, copilot_sessions=2)
+    assert derived.active_agent == "architect (Copilot x2)"
+
+
+def test_format_active_agent_single_session():
+    assert format_active_agent("architect", copilot_sessions=1) == "architect"
 
 
 def test_blocked():

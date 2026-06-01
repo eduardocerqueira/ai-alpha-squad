@@ -37,12 +37,19 @@ LIFECYCLE_OPTIONS = (
 ACTIVE_AGENT_OPTIONS = (
     "Director",
     "business-owner",
+    "business-owner (Copilot x2)",
+    "business-owner (Copilot x3)",
     "architect",
+    "architect (Copilot x2)",
+    "architect (Copilot x3)",
     "developer",
+    "developer (Copilot x2)",
+    "developer (Copilot x3)",
     "qa",
     "security",
     "devops",
     "tech-writer",
+    "validation (parallel)",
     "release-manager",
     "Done",
     "Blocked",
@@ -87,6 +94,59 @@ def gh_json(args: list[str]) -> dict | list:
         check=True,
     )
     return json.loads(proc.stdout)
+
+
+def is_copilot_login(login: str) -> bool:
+    lowered = login.lower()
+    return "copilot" in lowered
+
+
+def count_copilot_sessions(repo: str, issue_number: int, assignees: tuple[str, ...]) -> int:
+    """Open Copilot PRs linked to this issue (proxy for parallel Copilot agent sessions)."""
+    prs = gh_json(
+        [
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            "open",
+            "--limit",
+            "50",
+            "--json",
+            "number,author,body,title",
+        ]
+    )
+    needle_hash = f"#{issue_number}"
+    needle_path = f"issues/{issue_number}"
+    linked = 0
+    for pr in prs:
+        author = (pr.get("author") or {}).get("login", "")
+        if not is_copilot_login(author):
+            continue
+        text = f"{pr.get('title', '')}\n{pr.get('body', '')}"
+        if needle_hash in text or needle_path in text:
+            linked += 1
+    if linked > 0:
+        return linked
+    if any(is_copilot_login(login) for login in assignees):
+        return 1
+    return 0
+
+
+def resolve_agent_option(agent_field: dict, active_agent: str) -> tuple[str, str]:
+    """Return (option_id, name written). Falls back to base agent if option not on board yet."""
+    try:
+        return option_id(agent_field, active_agent), active_agent
+    except KeyError:
+        fallback = active_agent.split(" (Copilot")[0]
+        if fallback != active_agent:
+            print(
+                f"Active agent option {active_agent!r} not on project — "
+                f"add it in Project settings (see docs/director-project-board.md). "
+                f"Using {fallback!r} for this sync."
+            )
+        return option_id(agent_field, fallback), fallback
 
 
 def load_issue(repo: str, issue_number: int) -> IssueState:
@@ -266,7 +326,9 @@ def sync_issue(
     ensure_project_item: bool = True,
 ) -> Derived:
     issue = load_issue(repo, issue_number)
-    derived = derive_state(set(issue.labels))
+    copilot_sessions = count_copilot_sessions(repo, issue_number, issue.assignees)
+    session_count = max(copilot_sessions, 1)
+    derived = derive_state(set(issue.labels), copilot_sessions=session_count)
     project = ensure_fields(owner, project_number)
     project_id = project["id"]
 
@@ -292,11 +354,12 @@ def sync_issue(
             lifecycle_field["id"],
             option_id(lifecycle_field, derived.lifecycle),
         )
+    agent_option_id, _ = resolve_agent_option(agent_field, derived.active_agent)
     set_single_select(
         project_id,
         item_id,
         agent_field["id"],
-        option_id(agent_field, derived.active_agent),
+        agent_option_id,
     )
     set_single_select(
         project_id,
