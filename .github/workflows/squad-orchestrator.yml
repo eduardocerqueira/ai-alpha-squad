@@ -164,7 +164,19 @@ jobs:
             ./scripts/squad-dispatch-copilot.sh \
             ./scripts/squad-dispatch-subissue.sh \
             ./scripts/squad-resolve-guard-issue.py
-          ./scripts/squad-reconcile-planning-deliverables.sh "$REPO" "$ISSUE_NUMBER" || true
+          if ./scripts/squad-reconcile-planning-deliverables.sh "$REPO" "$ISSUE_NUMBER"; then
+            exit 0
+          fi
+          PHASE=""
+          if [ "${{ needs.orchestrate.outputs.lifecycle_label }}" = "new" ]; then
+            PHASE="business-owner"
+          elif [ "${{ needs.orchestrate.outputs.lifecycle_label }}" = "director-approved" ]; then
+            PHASE="architect"
+          fi
+          if [ -n "$PHASE" ]; then
+            ./scripts/squad-nudge-stuck.sh "$REPO" "$ISSUE_NUMBER" --phase "$PHASE" --force \
+              --reason "Reconcile found no substantive deliverable on issue or linked Copilot PR."
+          fi
 
   # Phase 4 — parallel validation (QA, Security, DevOps, Tech Writer)
   dispatch-validation:

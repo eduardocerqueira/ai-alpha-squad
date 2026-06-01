@@ -4,7 +4,8 @@ name: Squad phase watch
 
 permissions:
   issues: write
-  pull-requests: read
+  pull-requests: write
+  actions: write
 
 on:
   schedule:
@@ -77,10 +78,17 @@ jobs:
             ./scripts/squad-advance-validation.sh \
             ./scripts/squad-find-subissues.py \
             ./scripts/squad-nudge-stuck.sh \
-            ./scripts/squad-sync-planning-labels.sh
+            ./scripts/squad-sync-planning-labels.sh \
+            ./scripts/squad-scan-planning-prs.sh \
+            ./scripts/squad-reconcile-planning-deliverables.sh \
+            ./scripts/squad-copilot-pr-guard.sh \
+            ./scripts/squad-promote-pr-deliverable.py \
+            ./scripts/squad-approve-copilot-workflows.sh
           PARENT="${{ steps.parent.outputs.number }}"
           if [ -n "$PARENT" ]; then
             ./scripts/squad-phase-tick.sh "$REPO" "$PARENT"
           else
             ./scripts/squad-phase-tick.sh "$REPO"
           fi
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src

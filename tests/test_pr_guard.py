@@ -6,6 +6,8 @@ from ai_alpha_squad.pr_guard import (
     is_work_queue_repo,
     issue_numbers_from_pr_text,
     pick_guard_issue_number,
+    pr_looks_like_planning_handoff,
+    pr_looks_like_product_handoff,
     product_paths_in_diff,
     should_close_queue_product_pr,
 )
@@ -48,6 +50,21 @@ def test_close_on_wip_extension_title_when_diff_empty() -> None:
         body="",
     )
     assert close is True
+
+
+def test_ba_handoff_not_product_pr_when_diff_empty() -> None:
+    title = "Business Analysis handoff for Job 1: Squad Director (issue-first)"
+    body = "Squad Director VS Code extension scope. # Business Analysis in summary."
+    assert pr_looks_like_planning_handoff(title, body) is True
+    assert pr_looks_like_product_handoff(title, body) is False
+    close, reason = should_close_queue_product_pr(
+        "eduardocerqueira/ai-alpha-squad",
+        changed_paths=[],
+        title=title,
+        body=body,
+    )
+    assert close is False
+    assert reason == ""
 
 
 def test_no_close_on_target_repo() -> None:

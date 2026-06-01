@@ -58,6 +58,17 @@ PRODUCT_PR_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Business Owner / Architect planning handoffs often mention the product name — not product PRs.
+PLANNING_HANDOFF_RE = re.compile(
+    r"(business\s+analysis|technical\s+specification|issue-first|"
+    r"planning\s+handoff|ba\.md|tech[-_ ]?spec)",
+    re.IGNORECASE,
+)
+PLANNING_MARKER_HEADING_RE = re.compile(
+    r"(?m)^#\s+(Business Analysis|Technical Specification)\s*$",
+    re.IGNORECASE,
+)
+
 
 def is_work_queue_repo(repo: str) -> bool:
     return repo.lower().endswith("/ai-alpha-squad") or repo.lower() == "ai-alpha-squad"
@@ -89,7 +100,26 @@ def product_paths_in_diff(paths: list[str]) -> list[str]:
     return flagged
 
 
+def pr_looks_like_planning_handoff(title: str, body: str) -> bool:
+    """Copilot BO/Architect PR on the queue repo (issue-first), even with empty diff."""
+    text = f"{title}\n{body}"
+    if PLANNING_MARKER_HEADING_RE.search(text):
+        return True
+    if re.search(r"(?i)business\s+analysis\s+handoff", title):
+        return True
+    if re.search(r"(?i)technical\s+specification\s+handoff", title):
+        return True
+    if "issue-first" in text.lower() and PLANNING_HANDOFF_RE.search(text):
+        return True
+    # WIP extension implementation titles are product work, not planning.
+    if re.search(r"(?i)\[wip\].*(vscode|vs code).*extension", title):
+        return False
+    return False
+
+
 def pr_looks_like_product_handoff(title: str, body: str) -> bool:
+    if pr_looks_like_planning_handoff(title, body):
+        return False
     text = f"{title}\n{body}"
     return bool(PRODUCT_PR_TITLE_RE.search(text))
 
