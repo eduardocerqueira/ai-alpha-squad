@@ -16,6 +16,10 @@ from ai_alpha_squad.agent_models import (
     resolve_model,
 )
 from ai_alpha_squad.comments import format_squad_comment
+from ai_alpha_squad.actions_scaffold import (
+    apply_vscode_squad_director_scaffold,
+    is_greenfield_repo,
+)
 from ai_alpha_squad.hf_dispatch import (
     chat_completion,
     fetch_issue_context_with_parent,
@@ -244,12 +248,17 @@ Output only the JSON object."""
         )
         parsed = parse_tool_call(content)
         if not parsed:
+            print(
+                f"[actions] turn {_turn + 1}/{MAX_TURNS}: unparsed ({len(content)} chars)",
+                file=sys.stderr,
+            )
             conversation = (
                 f"{user}\n\n---\nModel response (unparsed):\n{content[:2000]}\n\n"
                 "Reply with a single JSON tool object."
             )
             continue
         tool_name, tool_args = parsed
+        print(f"[actions] turn {_turn + 1}/{MAX_TURNS}: {tool_name}", file=sys.stderr)
         if tool_name == "finish":
             return str(tool_args.get("summary", content)), True
         result = execute_tool(workdir, tool_name, tool_args)
@@ -276,6 +285,14 @@ def post_dispatch(
     post_issue_comment(queue_repo, issue, dispatch_body)
 
 
+def _scaffold_greenfield_enabled() -> bool:
+    return os.environ.get("SQUAD_ACTIONS_SCAFFOLD_GREENFIELD", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+
+
 def run_coding_loop(
     queue_repo: str,
     issue: int,
@@ -284,17 +301,37 @@ def run_coding_loop(
     *,
     workdir: Path,
 ) -> str:
+    strategy = os.environ.get("SQUAD_ACTIONS_STRATEGY", "scaffold").strip().lower()
+    scaffold_summary = ""
+
+    if _scaffold_greenfield_enabled() and is_greenfield_repo(workdir):
+        paths = apply_vscode_squad_director_scaffold(workdir)
+        scaffold_summary = (
+            f"Applied deterministic greenfield scaffold ({len(paths)} paths) "
+            "for Squad Director v1 (Job 1)."
+        )
+        print(f"[actions] {scaffold_summary}", file=sys.stderr)
+        if strategy == "scaffold":
+            return scaffold_summary
+
     token = os.environ.get("HF_TOKEN", "").strip()
     if not token:
         raise RuntimeError("HF_TOKEN is required for Squad Actions agent")
     issue_context = fetch_issue_context_with_parent(queue_repo, issue)
-    summary, _finished = run_agent_loop(
+    summary, finished = run_agent_loop(
         workdir,
         agent=agent,
         instructions=instructions,
         issue_context=issue_context,
         token=token,
     )
+    if scaffold_summary and finished:
+        return f"{scaffold_summary}\n\n{summary}"
+    if scaffold_summary and not finished:
+        return (
+            f"{scaffold_summary}\n\nLLM loop did not finish ({summary}); "
+            "scaffold files are still eligible for PR."
+        )
     return summary
 
 
