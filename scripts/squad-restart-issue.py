@@ -39,8 +39,25 @@ def collapse_reset_banners(body: str) -> str:
     return "\n".join(out).strip() + "\n"
 
 
+def strip_reset_banners(body: str) -> str:
+    """Remove all reset banner blocks from a body."""
+    lines = body.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if RESET_LINE_RE.match(line):
+            i += 1
+            while i < len(lines) and lines[i].startswith(">"):
+                i += 1
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out).strip() + "\n"
+
+
 def prepend_reset_banner(body: str, previous_issue: int) -> str:
-    body = collapse_reset_banners(body).lstrip()
+    body = strip_reset_banners(collapse_reset_banners(body)).lstrip()
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     banner = (
         f"> **Director reset ({stamp}):** Job restarted on this issue. "
