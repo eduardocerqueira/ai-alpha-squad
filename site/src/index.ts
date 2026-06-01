@@ -116,8 +116,11 @@ async function handleDirectorJobs(env: Env, force: boolean): Promise<Response> {
         return new Response(body, {
           status: 200,
           headers: {
+            // Never let the browser/edge cache the API response — clients must
+            // always get the Worker's current view. (The ~60s cache lives only
+            // on the Worker's subrequest to the data branch, above.)
             "Content-Type": "application/json",
-            "Cache-Control": force ? "no-store" : `public, max-age=${DIRECTOR_JOBS_TTL_SEC}`,
+            "Cache-Control": "no-store",
             "X-Data-Source": "live",
           },
         });
