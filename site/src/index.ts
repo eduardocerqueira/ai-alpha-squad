@@ -1,3 +1,13 @@
+import {
+  clearSessionCookie,
+  createMagicToken,
+  createSessionCookie,
+  isAllowed,
+  MAGIC_TTL_MINUTES,
+  sessionEmail,
+  verifyMagicToken,
+} from "./auth";
+
 export interface Env {
   EMAIL: SendEmail;
   ASSETS: Fetcher;
@@ -8,6 +18,9 @@ export interface Env {
   CONTACT_DELIVERY_EMAIL: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_EMAIL_SEND_TOKEN: string;
+  // Director dashboard auth
+  AUTH_SECRET: string;
+  DIRECTOR_ALLOWED_EMAILS: string;
 }
 
 interface ContactPayload {
@@ -51,7 +64,29 @@ export default {
       return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY });
     }
 
+    if (url.pathname === "/api/director/auth/request" && request.method === "POST") {
+      return handleAuthRequest(request, env, url);
+    }
+
+    if (url.pathname === "/api/director/auth/verify" && request.method === "GET") {
+      return handleAuthVerify(request, env, url);
+    }
+
+    if (url.pathname === "/api/director/auth/me" && request.method === "GET") {
+      const email = await sessionEmail(env, request);
+      return email ? json({ email }) : json({ error: "unauthorized" }, 401);
+    }
+
+    if (url.pathname === "/api/director/auth/logout" && request.method === "POST") {
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Set-Cookie": clearSessionCookie() },
+      });
+    }
+
     if (url.pathname === "/api/director/jobs" && request.method === "GET") {
+      const email = await sessionEmail(env, request);
+      if (!email) return json({ error: "unauthorized" }, 401);
       return handleDirectorJobs(env, url);
     }
 
@@ -104,6 +139,114 @@ async function handleDirectorJobs(env: Env, url: URL): Promise<Response> {
     },
     503,
   );
+}
+
+// ---- Director dashboard auth ------------------------------------------------
+
+interface AuthRequestPayload {
+  email?: string;
+}
+
+/** Email a magic link to an allow-listed address. Always returns a generic ok
+ *  so the endpoint does not reveal who is on the allowlist. */
+async function handleAuthRequest(request: Request, env: Env, url: URL): Promise<Response> {
+  let body: AuthRequestPayload;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  const email = trim(body.email, MAX_EMAIL).toLowerCase();
+  const generic = json({
+    ok: true,
+    message: "If that email is authorized, a sign-in link is on its way.",
+  });
+
+  if (!isValidEmail(email) || !env.AUTH_SECRET || !isAllowed(env, email)) {
+    return generic; // do not disclose allowlist / config state
+  }
+
+  try {
+    const token = await createMagicToken(env, email);
+    const link = `${url.origin}/api/director/auth/verify?token=${encodeURIComponent(token)}`;
+    await sendMagicLinkEmail(env, email, link);
+  } catch (err) {
+    console.error("Magic link send failed:", err);
+    return json({ error: "Unable to send sign-in link. Try again shortly." }, 502);
+  }
+  return generic;
+}
+
+/** Validate a magic token, set the session cookie, and bounce to the dashboard. */
+async function handleAuthVerify(request: Request, env: Env, url: URL): Promise<Response> {
+  const token = url.searchParams.get("token") || "";
+  const email = token ? await verifyMagicToken(env, token) : null;
+  if (!email) {
+    return new Response(loginRedirectHtml("This sign-in link is invalid or expired."), {
+      status: 401,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+  const cookie = await createSessionCookie(env, email);
+  return new Response(null, {
+    status: 302,
+    headers: { Location: "/director/", "Set-Cookie": cookie },
+  });
+}
+
+function loginRedirectHtml(message: string): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="3;url=/director/"><title>Director</title><style>body{background:#050505;color:#f0f0f0;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0}a{color:#22c55e}</style></head><body><div><p>${escapeHtml(message)}</p><p><a href="/director/">Back to sign in</a></p></div></body></html>`;
+}
+
+async function sendMagicLinkEmail(env: Env, to: string, link: string): Promise<void> {
+  const subject = "Your Director dashboard sign-in link";
+  const text = [
+    "Sign in to the AI Alpha Squad Director dashboard:",
+    "",
+    link,
+    "",
+    `This link expires in ${MAGIC_TTL_MINUTES} minutes and can only be used by ${to}.`,
+    "If you did not request it, ignore this email.",
+  ].join("\n");
+  const html = `
+    <p>Sign in to the <strong>AI Alpha Squad Director dashboard</strong>:</p>
+    <p><a href="${escapeHtml(link)}" style="display:inline-block;background:#22c55e;color:#000;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">Open the dashboard</a></p>
+    <p style="color:#888;font-size:13px">Or paste this URL: <br>${escapeHtml(link)}</p>
+    <p style="color:#888;font-size:12px">This link expires in ${MAGIC_TTL_MINUTES} minutes and only works for ${escapeHtml(to)}. If you did not request it, ignore this email.</p>
+  `;
+  await deliverEmail(env, { to, subject, text, html });
+}
+
+/** Send via the account REST API when configured (works to any recipient),
+ *  else the Workers Email Routing binding. */
+async function deliverEmail(
+  env: Env,
+  msg: { to: string; subject: string; text: string; html: string },
+): Promise<void> {
+  const from = { address: env.CONTACT_FROM_EMAIL, name: "AI Alpha Squad" };
+  if (env.CLOUDFLARE_EMAIL_SEND_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/email/sending/send`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.CLOUDFLARE_EMAIL_SEND_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ to: msg.to, from, subject: msg.subject, text: msg.text, html: msg.html }),
+      },
+    );
+    const data = (await res.json()) as { success?: boolean; errors?: { message?: string }[] };
+    if (data.success) return;
+    throw new Error(data.errors?.[0]?.message ?? `Email API HTTP ${res.status}`);
+  }
+  await env.EMAIL.send({
+    to: msg.to,
+    from: { email: from.address, name: from.name },
+    subject: msg.subject,
+    text: msg.text,
+    html: msg.html,
+  });
 }
 
 async function handleContact(request: Request, env: Env): Promise<Response> {

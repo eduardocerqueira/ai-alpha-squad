@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ExternalLink, GitPullRequest, RefreshCw } from "lucide-react";
+import { AlertCircle, ExternalLink, GitPullRequest, LogOut, RefreshCw } from "lucide-react";
 import type { Bucket, Dashboard, JobCard } from "@/types";
 import { cn, prNumber, relativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Timeline } from "@/components/Timeline";
 import { AgentsPanel } from "@/components/AgentsPanel";
 import { JobSwitcher } from "@/components/JobSwitcher";
 import { StatusTabs, type TabDef, type TabKey } from "@/components/StatusTabs";
+import { Login } from "@/components/Login";
 
 // Live endpoint (Worker fetches fresh data); static jobs.json is the fallback
 // when served without the Worker (plain static host).
@@ -15,12 +16,15 @@ const JOBS_URL = "/api/director/jobs";
 const JOBS_FALLBACK_URL = "/director/jobs.json";
 const REFRESH_MS = 60_000;
 
+class UnauthorizedError extends Error {}
+
 async function fetchDashboard(live = false): Promise<Dashboard> {
   // `live` asks the backend to rebuild from GitHub now (manual Refresh).
   // Supported by `squad-director-dashboard.py --serve --live`; harmless elsewhere.
   const primary = live ? `${JOBS_URL}?live=1&refresh=1` : JOBS_URL;
   for (const u of [primary, JOBS_URL, JOBS_FALLBACK_URL]) {
     const res = await fetch(u, { cache: "no-store" });
+    if (res.status === 401) throw new UnauthorizedError();
     if (!res.ok) continue;
     const text = await res.text();
     if (text.trimStart().startsWith("{")) return JSON.parse(text) as Dashboard;
@@ -47,6 +51,8 @@ export default function App() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // null = checking, "" = not signed in, email = signed in
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
     return t === "in_progress" || t === "done" ? t : "open";
@@ -59,18 +65,53 @@ export default function App() {
       setData(await fetchDashboard(live));
       setError(null);
     } catch (e) {
+      if (e instanceof UnauthorizedError) {
+        setAuthEmail("");
+        return;
+      }
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Initial load + periodic auto-refresh (an open tab picks up CI updates).
+  // Check session, then load + auto-refresh while signed in.
   useEffect(() => {
-    load();
-    const id = setInterval(() => load(), REFRESH_MS);
-    return () => clearInterval(id);
+    let timer: ReturnType<typeof setInterval> | undefined;
+    (async () => {
+      try {
+        const res = await fetch("/api/director/auth/me", { cache: "no-store" });
+        if (res.ok) {
+          const me = (await res.json()) as { email?: string };
+          setAuthEmail(me.email || "signed-in");
+          load();
+          timer = setInterval(() => load(), REFRESH_MS);
+        } else {
+          setAuthEmail("");
+        }
+      } catch {
+        setAuthEmail("");
+      }
+    })();
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [load]);
+
+  async function logout() {
+    await fetch("/api/director/auth/logout", { method: "POST" }).catch(() => {});
+    setAuthEmail("");
+    setData(null);
+  }
+
+  if (authEmail === null) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center text-muted">
+        <RefreshCw className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+  if (authEmail === "") return <Login />;
 
   const tabs: TabDef[] = useMemo(
     () =>
@@ -138,6 +179,10 @@ export default function App() {
           >
             <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
             Refresh
+          </Button>
+          <Button variant="ghost" size="sm" onClick={logout} title={authEmail || undefined}>
+            <LogOut className="h-4 w-4" />
+            Sign out
           </Button>
         </div>
       </header>

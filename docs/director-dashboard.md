@@ -44,10 +44,32 @@ falling back to the `jobs.json` bundled at deploy time. The page also
 - **Local `--serve --live`:** Refresh rebuilds **live from GitHub** via `gh`
   (`?live=1&refresh=1`).
 
+### Sign-in (magic link)
+
+The dashboard is gated by a self-contained magic-link login (Cloudflare Email +
+signed session cookie). The job-data API (`/api/director/jobs`) returns `401`
+without a valid session; the static shell is public but shows only the login form
+until you sign in.
+
+- **Who can sign in:** the `DIRECTOR_ALLOWED_EMAILS` var (comma-separated) in
+  [`site/wrangler.jsonc`](../site/wrangler.jsonc).
+- **Secret:** tokens/cookies are signed by `AUTH_SECRET` — set it once before deploy:
+  ```bash
+  cd site && wrangler secret put AUTH_SECRET   # use: openssl rand -hex 32
+  ```
+- **Flow:** enter your email → click the emailed link (15-min expiry) → a 7-day
+  HttpOnly session cookie is set → **Sign out** clears it.
+- **Local `wrangler dev`:** copy `site/.dev.vars.example` → `site/.dev.vars` and set
+  `AUTH_SECRET`.
+
+> The Python `--serve` preview below has **no login** — it's the read-only local
+> snapshot view. The `npm run dev` server stubs auth so you see the dashboard
+> directly.
+
 ### Local preview
 
 ```bash
-# Static snapshot (no GitHub calls):
+# Static snapshot (no GitHub calls, no login):
 ./scripts/squad-director-dashboard.py --serve
 
 # Live: the Refresh button rebuilds from GitHub on demand:

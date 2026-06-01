@@ -20,11 +20,24 @@ function serveJobsJson(): Plugin {
       res.end(JSON.stringify({ error: "jobs.json not found — run ./scripts/squad-director-dashboard.py --write" }));
     }
   };
+  const jsonRes = (res: import("node:http").ServerResponse, obj: unknown) => {
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(JSON.stringify(obj));
+  };
   return {
     name: "serve-director-jobs-json",
     configureServer(server) {
       server.middlewares.use("/api/director/jobs", handler);
       server.middlewares.use("/director/jobs.json", handler);
+      // Dev auth stub: signed in as a local dev user so login is skipped.
+      server.middlewares.use("/api/director/auth/me", (_req, res) =>
+        jsonRes(res, { email: "dev@localhost" }),
+      );
+      server.middlewares.use("/api/director/auth/request", (_req, res) =>
+        jsonRes(res, { ok: true }),
+      );
+      server.middlewares.use("/api/director/auth/logout", (_req, res) => jsonRes(res, { ok: true }));
     },
   };
 }

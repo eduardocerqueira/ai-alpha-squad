@@ -10,7 +10,10 @@
     "CONTACT_FROM_EMAIL": "noreply@aialphasquad.com",
     "CONTACT_DELIVERY_EMAIL": "",
     "CLOUDFLARE_ACCOUNT_ID": "",
-    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA"
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+    // Director dashboard allowlist (comma-separated). AUTH_SECRET is a secret:
+    //   cd site && wrangler secret put AUTH_SECRET
+    "DIRECTOR_ALLOWED_EMAILS": "eduardomcerqueira@gmail.com"
   },
   "assets": {
     "directory": "./public",
