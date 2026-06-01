@@ -68,6 +68,11 @@ fi
 python3 -m ai_alpha_squad.actions_agent finalize \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$SUMMARY_FILE" "${PR_URL:-}"
 
+if [[ -z "$PR_URL" ]]; then
+  echo "No PR was created on ${TARGET_REPO} — check issue #${ISSUE} result comment and workflow logs." >&2
+  exit 1
+fi
+
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   echo "dispatched=true" >> "$GITHUB_OUTPUT"
   echo "agent=$AGENT" >> "$GITHUB_OUTPUT"

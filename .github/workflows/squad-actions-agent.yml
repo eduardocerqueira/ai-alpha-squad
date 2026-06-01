@@ -36,6 +36,7 @@ jobs:
       SQUAD_AI_PROVIDER: ${{ vars.SQUAD_AI_PROVIDER }}
       SQUAD_CODE_RUNTIME: ${{ vars.SQUAD_CODE_RUNTIME }}
       SQUAD_HF_DEFAULT_MODEL: ${{ vars.SQUAD_HF_DEFAULT_MODEL }}
+      SQUAD_ACTIONS_MAX_TURNS: "50"
       SQUAD_ACTIONS_INLINE: "1"
       DISPATCH_LABEL: ${{ inputs.agent }}
     steps:

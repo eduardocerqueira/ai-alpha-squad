@@ -11,6 +11,13 @@ import pytest
 from ai_alpha_squad import hf_dispatch as hd
 
 
+def test_parse_parent_issue_number():
+    body = "| Parent Issue | #64 |\n| Target repo | `org/repo` |"
+    assert hd.parse_parent_issue_number(body) == 64
+    assert hd.parse_parent_issue_number("see https://github.com/x/issues/64") == 64
+    assert hd.parse_parent_issue_number("no parent") is None
+
+
 def test_hf_run_enabled_defaults_true(monkeypatch):
     monkeypatch.delenv("SQUAD_HF_RUN_IN_CI", raising=False)
     assert hd.hf_run_enabled() is True

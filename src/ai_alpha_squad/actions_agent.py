@@ -16,9 +16,13 @@ from ai_alpha_squad.agent_models import (
     resolve_model,
 )
 from ai_alpha_squad.comments import format_squad_comment
-from ai_alpha_squad.hf_dispatch import chat_completion, fetch_issue_context, post_issue_comment
+from ai_alpha_squad.hf_dispatch import (
+    chat_completion,
+    fetch_issue_context_with_parent,
+    post_issue_comment,
+)
 
-MAX_TURNS = int(os.environ.get("SQUAD_ACTIONS_MAX_TURNS", "30"))
+MAX_TURNS = int(os.environ.get("SQUAD_ACTIONS_MAX_TURNS", "50"))
 COMMAND_TIMEOUT = int(os.environ.get("SQUAD_ACTIONS_CMD_TIMEOUT", "300"))
 
 _TOOL_JSON_RE = re.compile(
@@ -115,9 +119,37 @@ def execute_tool(workdir: Path, name: str, args: dict) -> str:
     return f"error: unknown tool {name!r}"
 
 
+def _extract_json_object(text: str, start: int) -> str | None:
+    depth = 0
+    for i in range(start, len(text)):
+        ch = text[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 def parse_tool_call(content: str) -> tuple[str, dict] | None:
     content = content.strip()
-    for candidate in (content,):
+    fenced = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", content, re.IGNORECASE)
+    if fenced:
+        content = fenced.group(1).strip()
+    candidates = [content]
+    if fenced:
+        candidates.append(content)
+    idx = 0
+    while True:
+        start = content.find("{", idx)
+        if start < 0:
+            break
+        blob = _extract_json_object(content, start)
+        if blob:
+            candidates.append(blob)
+        idx = start + 1
+    for candidate in candidates:
         match = _TOOL_JSON_RE.search(candidate)
         if match:
             try:
@@ -126,12 +158,12 @@ def parse_tool_call(content: str) -> tuple[str, dict] | None:
                     return str(data["tool"]), dict(data.get("args") or {})
             except json.JSONDecodeError:
                 pass
-    try:
-        data = json.loads(content)
-        if isinstance(data, dict) and "tool" in data:
-            return str(data["tool"]), dict(data.get("args") or {})
-    except json.JSONDecodeError:
-        return None
+        try:
+            data = json.loads(candidate)
+            if isinstance(data, dict) and "tool" in data:
+                return str(data["tool"]), dict(data.get("args") or {})
+        except json.JSONDecodeError:
+            continue
     return None
 
 
@@ -181,17 +213,19 @@ def run_agent_loop(
     system = f"""You are the AI Alpha Squad `{agent}` agent running in GitHub Actions on a cloned repository.
 Work only inside the repository root. Implement the task using tools.
 
-Respond with a single JSON object per message (no markdown fences):
+The repo may be greenfield (only README.md). Scaffold a minimal VS Code extension per the parent issue Technical Specification: package.json, tsconfig.json, src/extension.ts, .vscodeignore, README updates.
+
+Respond with ONE JSON object per message — no markdown fences, no extra text:
 {{"tool": "<name>", "args": {{...}}}}
 
 Tools:
 - read_file: {{"path": "relative/path"}}
 - write_file: {{"path": "relative/path", "content": "..."}}
 - list_dir: {{"path": "."}}
-- run_command: {{"command": "npm test"}}  (allowlisted prefixes only)
-- finish: {{"summary": "what you did", "commit_message": "optional"}}
+- run_command: {{"command": "npm install"}}  (allowlisted: npm, pnpm, yarn, npx, node, python, make, cargo, go, git status/diff/add/commit)
+- finish: {{"summary": "what you did"}}
 
-When implementation is complete and tests pass (or you documented blockers), call finish.
+Start with list_dir on "." then write_file for each needed file. Call finish when done.
 Output only the JSON object."""
 
     user = (
@@ -253,7 +287,7 @@ def run_coding_loop(
     token = os.environ.get("HF_TOKEN", "").strip()
     if not token:
         raise RuntimeError("HF_TOKEN is required for Squad Actions agent")
-    issue_context = fetch_issue_context(queue_repo, issue)
+    issue_context = fetch_issue_context_with_parent(queue_repo, issue)
     summary, _finished = run_agent_loop(
         workdir,
         agent=agent,
