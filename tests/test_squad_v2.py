@@ -48,6 +48,14 @@ def test_sequential_blocks_second_dispatch():
     assert act.kind == "idle"
 
 
+def test_stale_in_progress_ignored_after_deliverable():
+    comments = (
+        {"body": "squad-v2-run:in_progress:business-owner"},
+        {"body": "# Business Analysis\n\n" + "x" * 50},
+    )
+    assert run_in_progress(comments) is None
+
+
 def test_ba_detected():
     assert has_deliverable(({"body": "# Business Analysis\n\nx" * 50},), "business-owner")
 

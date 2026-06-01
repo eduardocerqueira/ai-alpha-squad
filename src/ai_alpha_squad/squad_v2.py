@@ -81,8 +81,12 @@ def run_in_progress(comments: tuple[dict, ...]) -> str | None:
     for comment in reversed(comments):
         body = (comment.get("body") or "").lower()
         for agent in AGENTS_V2:
-            if f"{RUN_IN_PROGRESS_MARKER}{agent}" in body:
-                return agent
+            if f"{RUN_IN_PROGRESS_MARKER}{agent}" not in body:
+                continue
+            # Stale marker left after a successful deliverable (common when label sync races).
+            if has_deliverable(comments, agent):
+                continue
+            return agent
     return None
 
 
