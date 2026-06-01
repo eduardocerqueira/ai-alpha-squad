@@ -26,7 +26,7 @@ flowchart TD
 | -------- | ------- | ------ |
 | [squad-orchestrator.yml](../.github/workflows/squad-orchestrator.yml) | `issues: labeled`, `opened` | Dispatch Copilot agent for lifecycle label |
 | [squad-phase-watch.yml](../.github/workflows/squad-phase-watch.yml) | schedule 15m, `repository_dispatch`, sub-issue closed, comments | Advance phases, sync labels, nudge stuck agents |
-| [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Schedule every 10m, Copilot PR opened, `workflow_dispatch` | Close planning PRs (scheduled path needs no per-PR workflow approval); nudge agent or sync labels |
+| [squad-copilot-pr-guard.yml](../.github/workflows/squad-copilot-pr-guard.yml) | Schedule every 10m, Copilot PR opened, `workflow_dispatch` | Close planning PRs + **queue-repo product/extension PRs** (no per-PR workflow approval on schedule); nudge agent or sync labels |
 | [director-gate.yml](../.github/workflows/director-gate.yml) | `director-approved`, Director comments | Enforce approval gates |
 | [squad-project-sync.yml](../.github/workflows/squad-project-sync.yml) | Issue opened / labeled | Sync [Director project board](director-project-board.md) fields |
 
