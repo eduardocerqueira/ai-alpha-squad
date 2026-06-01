@@ -8,6 +8,8 @@ import {
   verifyMagicToken,
 } from "./auth";
 
+export { DashboardHub } from "./dashboard-hub";
+
 export interface Env {
   EMAIL: SendEmail;
   ASSETS: Fetcher;
@@ -21,7 +23,12 @@ export interface Env {
   // Director dashboard auth
   AUTH_SECRET: string;
   DIRECTOR_ALLOWED_EMAILS: string;
+  // Real-time push (CI → browsers)
+  NOTIFY_SECRET: string;
+  DASHBOARD_HUB: DurableObjectNamespace;
 }
+
+const DASHBOARD_HUB_NAME = "global";
 
 interface ContactPayload {
   name?: string;
@@ -89,6 +96,29 @@ export default {
       if (!email) return json({ error: "unauthorized" }, 401);
       const force = url.searchParams.get("refresh") === "1" || url.searchParams.get("live") === "1";
       return handleDirectorJobs(env, force);
+    }
+
+    // Authenticated dashboards open a WebSocket here; the hub pushes "refresh"
+    // when CI publishes new data, so the UI updates without polling.
+    if (url.pathname === "/api/director/live") {
+      if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+        return json({ error: "expected websocket" }, 426);
+      }
+      const email = await sessionEmail(env, request);
+      if (!email) return json({ error: "unauthorized" }, 401);
+      const stub = env.DASHBOARD_HUB.get(env.DASHBOARD_HUB.idFromName(DASHBOARD_HUB_NAME));
+      return stub.fetch(request);
+    }
+
+    // CI (director-dashboard.yml) calls this after publishing the data branch.
+    if (url.pathname === "/api/director/notify" && request.method === "POST") {
+      const auth = request.headers.get("Authorization") || "";
+      const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+      if (!env.NOTIFY_SECRET || token !== env.NOTIFY_SECRET) {
+        return json({ error: "unauthorized" }, 401);
+      }
+      const stub = env.DASHBOARD_HUB.get(env.DASHBOARD_HUB.idFromName(DASHBOARD_HUB_NAME));
+      return stub.fetch("https://hub.local/notify", { method: "POST" });
     }
 
     return env.ASSETS.fetch(request);
