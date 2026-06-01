@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -23,6 +24,12 @@ HF_ROUTER_URL = os.environ.get(
 )
 MAX_ISSUE_CHARS = int(os.environ.get("SQUAD_HF_MAX_ISSUE_CHARS", "12000"))
 MAX_OUTPUT_TOKENS = int(os.environ.get("SQUAD_HF_MAX_OUTPUT_TOKENS", "4096"))
+
+# Transient HF failures (rate limit / upstream outage) should be retried with
+# backoff rather than failing the whole agent run on a single blip.
+HF_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+HF_MAX_ATTEMPTS = int(os.environ.get("SQUAD_HF_MAX_ATTEMPTS", "4"))
+HF_RETRY_BASE_SECONDS = float(os.environ.get("SQUAD_HF_RETRY_BASE_SECONDS", "2"))
 
 # HF router policy suffixes: https://huggingface.co/docs/inference-providers/index
 HF_ROUTER_POLICIES = frozenset({"cheapest", "fastest", "preferred"})
@@ -140,6 +147,37 @@ def fetch_issue_context_with_parent(repo: str, issue: int) -> str:
     return "\n".join(parts)
 
 
+def _hf_post_with_retry(req: "urllib.request.Request") -> dict:
+    """POST to HF, retrying transient 5xx/429 with exponential backoff.
+
+    Non-retryable errors (auth/4xx other than 429) raise immediately. Without
+    this, a single transient HF blip fails the entire agent run.
+    """
+    last_detail = ""
+    for attempt in range(HF_MAX_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(req, timeout=600) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            last_detail = exc.read().decode("utf-8", errors="replace")
+            retryable = exc.code in HF_RETRYABLE_STATUS
+            if not retryable or attempt == HF_MAX_ATTEMPTS - 1:
+                raise RuntimeError(f"HF inference HTTP {exc.code}: {last_detail[:2000]}") from exc
+            status = exc.code
+        except urllib.error.URLError as exc:
+            if attempt == HF_MAX_ATTEMPTS - 1:
+                raise RuntimeError(f"HF inference network error: {exc}") from exc
+            status = "network error"
+        delay = HF_RETRY_BASE_SECONDS * (2**attempt)
+        print(
+            f"[hf] transient failure ({status}); retry {attempt + 1}/{HF_MAX_ATTEMPTS - 1} in {delay:.0f}s",
+            file=sys.stderr,
+        )
+        time.sleep(delay)
+    # Unreachable: the final attempt always raises above.
+    raise RuntimeError(f"HF inference failed after {HF_MAX_ATTEMPTS} attempts: {last_detail[:2000]}")
+
+
 def chat_completion(
     model: str,
     *,
@@ -165,12 +203,7 @@ def chat_completion(
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=600) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HF inference HTTP {exc.code}: {detail[:2000]}") from exc
+    body = _hf_post_with_retry(req)
 
     choices = body.get("choices") or []
     if not choices:

@@ -162,3 +162,59 @@ def test_dispatch_full_run(monkeypatch):
     assert "Squad HF agent dispatched" in comments[0]
     assert "Squad HF agent result" in comments[1]
     assert "# Business Analysis" in comments[1]
+
+
+def _http_error(code):
+    import urllib.error
+    return urllib.error.HTTPError(
+        url="https://router.huggingface.co/v1/chat/completions",
+        code=code, msg="err", hdrs=None, fp=BytesIO(b'{"error":"transient"}'),
+    )
+
+
+class _OkResp:
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+    def read(self):
+        return json.dumps({"choices": [{"message": {"content": "ok done"}}]}).encode()
+
+
+def test_chat_completion_retries_transient_5xx(monkeypatch):
+    monkeypatch.setattr(hd.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+    def fake_urlopen(req, timeout=0):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise _http_error(500)
+        return _OkResp()
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        out = hd.chat_completion("m", system="s", user="u", token="t")
+    assert out == "ok done"
+    assert calls["n"] == 3  # failed twice, succeeded on the third
+
+
+def test_chat_completion_gives_up_after_max_attempts(monkeypatch):
+    monkeypatch.setattr(hd.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(hd, "HF_MAX_ATTEMPTS", 3)
+    calls = {"n": 0}
+    def fake_urlopen(req, timeout=0):
+        calls["n"] += 1
+        raise _http_error(503)
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        with pytest.raises(RuntimeError, match="HF inference HTTP 503"):
+            hd.chat_completion("m", system="s", user="u", token="t")
+    assert calls["n"] == 3  # exhausted all attempts
+
+
+def test_chat_completion_does_not_retry_4xx(monkeypatch):
+    monkeypatch.setattr(hd.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+    def fake_urlopen(req, timeout=0):
+        calls["n"] += 1
+        raise _http_error(401)
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        with pytest.raises(RuntimeError, match="HF inference HTTP 401"):
+            hd.chat_completion("m", system="s", user="u", token="t")
+    assert calls["n"] == 1  # no retry on auth error
