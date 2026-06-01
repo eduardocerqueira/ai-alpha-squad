@@ -56,7 +56,9 @@ A **scheduled scan every 5 minutes** (runs on `main`) closes matching PRs, promo
 
 Custom agents `business-owner` and `architect` use **read/search tools only** (no `edit`) to reduce spurious draft PRs on this repo.
 
-**PR guard recovery:** Closing a planning or product PR does **not** force-nudge Copilot. The guard prefers **open** linked issues (e.g. #57 over closed #15), skips closed issues, never re-dispatches on product/extension closes, and only re-assigns when Copilot is **not** already on the issue. **Squad phase watch** runs `squad-recover-architect.sh` for `director-approved` jobs missing Copilot.
+**PR guard recovery:** Planning handoffs (titles like “Business Analysis handoff”, `issue-first`) are **not** closed as product/extension PRs even when the body mentions “VS Code extension”. Phase watch runs the PR scan with `pull-requests: write` so guards can close/promote without waiting for fork workflow approval.
+
+Closing a planning or product PR does **not** force-nudge Copilot when Copilot is already assigned (avoids loops). The guard prefers **open** linked issues (e.g. #57 over closed #15), skips closed issues, never re-dispatches on product/extension closes, and only re-assigns when Copilot is **not** already on the issue. **Squad phase watch** runs `squad-recover-architect.sh` for `director-approved` jobs missing Copilot.
 
 **PR → issue promotion:** If the PR **body or changed markdown on the branch** (e.g. `business-analysis.md`, `ba.md`) contains a full `# Business Analysis` or `# Technical Specification` (not a stub with `...`), the guard **copies it onto the issue**, runs `squad-sync-planning-labels.sh`, updates the project board, and unassigns Copilot after BA (Director gate next).
 

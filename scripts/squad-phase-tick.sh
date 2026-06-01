@@ -39,9 +39,25 @@ tick_parent() {
   "$ADVANCE_VAL" "$REPO" "$parent" || true
 }
 
+run_planning_reconcile_and_scan() {
+  chmod +x "$RECONCILE" "${ROOT}/scripts/squad-scan-planning-prs.sh" \
+    "${ROOT}/scripts/squad-copilot-pr-guard.sh" \
+    "${ROOT}/scripts/squad-approve-copilot-workflows.sh" \
+    "${ROOT}/scripts/squad-promote-pr-deliverable.py" 2>/dev/null || true
+  export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+  for parent in $(gh issue list --repo "$REPO" --label new --state open --json number -q '.[].number' 2>/dev/null || true); do
+    [[ -n "$parent" ]] && "$RECONCILE" "$REPO" "$parent" || true
+  done
+  for parent in $(gh issue list --repo "$REPO" --label director-approved --state open --json number -q '.[].number' 2>/dev/null || true); do
+    [[ -n "$parent" ]] && "$RECONCILE" "$REPO" "$parent" || true
+  done
+  "${ROOT}/scripts/squad-scan-planning-prs.sh" "$REPO" || true
+}
+
 if [[ -n "$PARENT_FILTER" ]]; then
   tick_parent "$PARENT_FILTER"
   chmod +x "$NUDGE" "$SYNC" "$RECOVER_ARCH"
+  run_planning_reconcile_and_scan
   "$RECOVER_ARCH" "$REPO" "$PARENT_FILTER" || true
   "$NUDGE" "$REPO" "$PARENT_FILTER" || true
   exit 0
@@ -55,18 +71,8 @@ for parent in $(gh issue list --repo "$REPO" --label implemented --state open --
   [[ -n "$parent" ]] && tick_parent "$parent"
 done
 
-chmod +x "$NUDGE" "$SYNC" "$RECOVER_ARCH" "$RECONCILE" \
-  "${ROOT}/scripts/squad-copilot-pr-guard.sh" \
-  "${ROOT}/scripts/squad-approve-copilot-workflows.sh" \
-  "${ROOT}/scripts/squad-promote-pr-deliverable.py" 2>/dev/null || true
-export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
-
-for parent in $(gh issue list --repo "$REPO" --label new --state open --json number -q '.[].number' 2>/dev/null || true); do
-  [[ -n "$parent" ]] && "$RECONCILE" "$REPO" "$parent" || true
-done
-for parent in $(gh issue list --repo "$REPO" --label director-approved --state open --json number -q '.[].number' 2>/dev/null || true); do
-  [[ -n "$parent" ]] && "$RECONCILE" "$REPO" "$parent" || true
-done
+chmod +x "$NUDGE" "$SYNC" "$RECOVER_ARCH"
+run_planning_reconcile_and_scan
 
 "$RECOVER_ARCH" "$REPO" || true
 "$NUDGE" "$REPO" || true
