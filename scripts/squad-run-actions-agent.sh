@@ -140,6 +140,11 @@ Re-run after the agent makes a *targeted* change." 2>/dev/null || true
   exit 1
 }
 
+# Completeness backstop: if the task enumerates N files to create, a partial
+# result (e.g. the agent hit max turns) must not become a finished deliverable.
+# Counted BEFORE commit while new files are still untracked.
+INCOMPLETE_MSG="$(python3 -m ai_alpha_squad.actions_agent check-complete "$WORKDIR" "$INSTRUCTIONS_FILE" 2>/dev/null)" && COMPLETE=1 || COMPLETE=0
+
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
   git add -A
   git -c 'user.name=github-actions[bot]' \
@@ -156,6 +161,15 @@ fi
 # THIS run added commits: an idempotent re-run on a branch that already has work
 # still has an open PR, and that PR is the deliverable.
 PR_URL="$(ensure_pull_request)"
+
+# If the work is incomplete, preserve progress on the branch but do NOT finalize —
+# posting no deliverable keeps the issue out of release-candidate. The failure is
+# retryable; a re-run continues from the pushed branch (idempotent).
+if [[ "${COMPLETE:-1}" == "0" ]]; then
+  echo "error: incomplete deliverable — ${INCOMPLETE_MSG}" >&2
+  gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "**Squad developer — incomplete, not finalized.** ${INCOMPLETE_MSG}. Progress was pushed to \`${BRANCH}\`${PR_URL:+ (PR ${PR_URL})}; a re-run will continue from there." 2>/dev/null || true
+  exit 1
+fi
 
 export SQUAD_V2="${SQUAD_V2:-}"
 python3 -m ai_alpha_squad.actions_agent finalize \
