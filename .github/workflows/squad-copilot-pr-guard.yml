@@ -11,13 +11,14 @@ permissions:
 on:
   pull_request:
     types: [opened, ready_for_review, reopened]
+  schedule:
+    # Runs on main — closes planning PRs without Director approving each PR's workflows
+    - cron: "*/10 * * * *"
   workflow_dispatch:
     inputs:
       pr_number:
-        description: Pull request number to guard
-        required: true
-
-# New workflow — first run may require repo Actions approval in GitHub UI.
+        description: Pull request number to guard (omit to scan all open Copilot PRs)
+        required: false
 
 jobs:
   guard:
@@ -35,7 +36,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Guard Copilot planning PR
+      - name: Guard single Copilot planning PR
+        if: github.event_name == 'pull_request' || inputs.pr_number != ''
         run: |
           chmod +x ./scripts/squad-copilot-pr-guard.sh \
             ./scripts/squad-nudge-stuck.sh \
@@ -44,3 +46,9 @@ jobs:
             ./scripts/squad-dispatch-subissue.sh \
             ./scripts/squad-approve-copilot-workflows.sh
           ./scripts/squad-copilot-pr-guard.sh "$REPO" "$PR_NUMBER"
+
+      - name: Scan and guard all open Copilot planning PRs
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.pr_number == '')
+        run: |
+          chmod +x ./scripts/squad-scan-planning-prs.sh
+          ./scripts/squad-scan-planning-prs.sh "$REPO"
