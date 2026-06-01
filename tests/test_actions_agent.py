@@ -267,3 +267,45 @@ def test_loop_allows_finish_when_no_required_count(tmp_path, monkeypatch):
         tmp_path, agent="developer", instructions="Fix the bug in util.py", issue_context="c", token="t"
     )
     assert finished is True and "fixed" in summary
+
+
+# --- filename-based completeness (robust across idempotent continues) ---
+
+def test_expected_artifact_files_lists_filenames():
+    from ai_alpha_squad.actions_agent import expected_artifact_files
+    task = "1. A — `a.py`\n2. B — `b.py`\n3. C — `c.py`"
+    assert expected_artifact_files(task) == ["a.py", "b.py", "c.py"]
+
+
+def test_expected_artifact_files_takes_first_filename_per_line():
+    # Item 23 of #120: "23. Prolog — `hello.pro`  (note: `hello.pl` is taken)"
+    from ai_alpha_squad.actions_agent import expected_artifact_files
+    task = "1. X — `x.a`\n2. Y — `y.b`\n3. Prolog — `hello.pro` (note: `hello.pl` taken)"
+    assert expected_artifact_files(task) == ["x.a", "y.b", "hello.pro"]
+
+
+def test_loop_counts_preexisting_files_for_completion(tmp_path, monkeypatch):
+    """Idempotent continue: a required file already on disk counts, so the agent
+    only needs to create the rest before finish is allowed."""
+    (tmp_path / "a.py").write_text("exists from a prior run\n")
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 20)
+    task = "1. A — `a.py`\n2. B — `b.py`\n3. C — `c.py`"
+    calls = {"n": 0}
+
+    def fake_chat(model, *, system, user, token):
+        calls["n"] += 1
+        if not (tmp_path / "b.py").exists():
+            return '{"tool":"write_file","args":{"path":"b.py","content":"x"}}'
+        if not (tmp_path / "c.py").exists():
+            return '{"tool":"write_file","args":{"path":"c.py","content":"x"}}'
+        return '{"tool":"finish","args":{"summary":"done"}}'
+
+    monkeypatch.setattr(actions_agent, "chat_completion", fake_chat)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions=task, issue_context="c", token="t"
+    )
+    assert finished is True
+    # a.py was never rewritten (it pre-existed); only b/c created.
+    assert (tmp_path / "a.py").read_text() == "exists from a prior run\n"
+    assert (tmp_path / "b.py").exists() and (tmp_path / "c.py").exists()
