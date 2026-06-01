@@ -364,6 +364,28 @@ h1 .sub {
   color: var(--text);
 }
 
+.prose a {
+  color: var(--green);
+  text-decoration: none;
+  border-bottom: 1px solid var(--green-dim);
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.prose a:hover {
+  color: #4ade80;
+  border-bottom-color: var(--green);
+}
+
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+}
+
 .flow-wrap {
   margin: 2.5rem 0;
   padding: 1.5rem;
@@ -481,6 +503,19 @@ h1 .sub {
 .turnstile-wrap {
   margin-bottom: 1rem;
   min-height: 65px;
+  display: flex;
+  justify-content: center;
+}
+
+.turnstile-wrap #turnstile-widget {
+  display: inline-block;
+}
+
+/* Strip Turnstile's default light border/shadow so it blends into the dark theme */
+.turnstile-wrap iframe {
+  border: none !important;
+  border-radius: 6px;
+  box-shadow: none !important;
 }
 
 .visually-hidden {
