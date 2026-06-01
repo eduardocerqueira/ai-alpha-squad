@@ -19,8 +19,11 @@ on:
         required: true
 
 concurrency:
+  # Do NOT cancel in-progress: the developer agent runs inline for up to 90m,
+  # and cancelling mid-run orphans the branch/PR and leaves a dangling
+  # in_progress marker that idles the issue. Queue instead.
   group: squad-v2-${{ github.event.issue.number || inputs.issue_number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   orchestrate:
@@ -59,6 +62,19 @@ jobs:
           else
             echo "name=${LABEL}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Reset failure count on manual re-run
+        # A deliberate workflow_dispatch re-run is a fresh session: clear the
+        # failure counter and lift any `blocked` label so an issue that hit the
+        # retry limit (e.g. before an infra fix) can proceed again.
+        if: github.event_name == 'workflow_dispatch' && contains(fromJSON('["new","director-approved"]'), steps.lc.outputs.name)
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          if [ "${{ steps.lc.outputs.name }}" = "new" ]; then AGENT=business-owner; else AGENT=developer; fi
+          MARKER="$(python3 -c "from ai_alpha_squad.squad_v2 import reset_comment; print(reset_comment('$AGENT'))")"
+          gh issue comment "$ISSUE" --repo "$REPO" --body "$MARKER"
+          gh issue edit "$ISSUE" --repo "$REPO" --remove-label blocked 2>/dev/null || true
 
       - name: Dispatch v2 agent
         if: contains(fromJSON('["new","director-approved"]'), steps.lc.outputs.name)

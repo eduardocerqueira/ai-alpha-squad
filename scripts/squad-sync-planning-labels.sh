@@ -55,6 +55,10 @@ PY
 }
 
 sync_architect() {
+  # v1 only — v2 has no architect/designed phase. Skip to avoid mislabelling.
+  if [[ "${SQUAD_V2:-}" == "1" ]]; then
+    return 0
+  fi
   if ! grep -q 'director-approved' <<<"$LABELS"; then
     return 0
   fi
@@ -97,6 +101,31 @@ PY
   echo "Synced architect labels on #$ISSUE"
 }
 
+sync_release_candidate() {
+  # v2 only: developer deliverable on the issue → release-candidate gate.
+  [[ "${SQUAD_V2:-}" == "1" ]] || return 0
+  grep -q 'director-approved' <<<"$LABELS" || return 0
+  if python3 - "$REPO" "$ISSUE" <<'PY'
+import json, subprocess, sys
+repo, issue = sys.argv[1], sys.argv[2]
+sys.path.insert(0, "src")
+from ai_alpha_squad.squad_v2 import has_deliverable
+
+proc = subprocess.run(
+    ["gh", "issue", "view", issue, "--repo", repo, "--json", "comments"],
+    capture_output=True, text=True, check=True,
+)
+comments = tuple(json.loads(proc.stdout)["comments"])
+raise SystemExit(0 if has_deliverable(comments, "developer") else 1)
+PY
+  then
+    gh issue edit "$ISSUE" --repo "$REPO" \
+      --add-label "release-candidate" --remove-label "director-approved" 2>/dev/null || true
+    echo "Synced developer release-candidate on #$ISSUE"
+  fi
+}
+
 cleanup_stale_business_owner_label
 sync_ba
 sync_architect
+sync_release_candidate

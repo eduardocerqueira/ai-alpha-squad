@@ -15,32 +15,39 @@ SYNC="${ROOT}/scripts/squad-sync-planning-labels.sh"
 sync_labels() {
   local issue="$1"
   chmod +x "$SYNC" 2>/dev/null || true
+  # Label transitions (BA→awaiting-approval, dev deliverable→release-candidate)
+  # live in the shared sync script, gated by SQUAD_V2.
   "$SYNC" "$REPO" "$issue" || true
-  # v2: after developer deliverable heading on issue, move to release-candidate
-  if gh issue view "$issue" --repo "$REPO" --json labels -q '.labels[].name' 2>/dev/null \
-    | grep -qx 'director-approved'; then
-    if python3 - "$REPO" "$issue" <<'PY'
-import json, subprocess, sys
+}
+
+# Recover an orphaned run: an in_progress marker with no terminal marker, older
+# than the stale threshold (a cancelled/timed-out run never posts a result).
+# Posting a failure marker clears the "active" state and counts as an attempt.
+recover_stale_run() {
+  local issue="$1"
+  python3 - "$REPO" "$issue" <<'PY' || true
+import json, os, subprocess, sys
+from datetime import datetime, timezone
+
 repo, issue = sys.argv[1], sys.argv[2]
 sys.path.insert(0, "src")
-from ai_alpha_squad.squad_v2 import DELIVERABLE_MARKERS, has_deliverable
+from ai_alpha_squad.squad_v2 import find_stale_in_progress, failed_comment
 
-proc = subprocess.run(
-    ["gh", "issue", "view", issue, "--repo", repo, "--json", "comments"],
-    capture_output=True, text=True, check=True,
-)
-comments = tuple(json.loads(proc.stdout)["comments"])
-raise SystemExit(0 if has_deliverable(comments, "developer") else 1)
+data = json.loads(subprocess.check_output(
+    ["gh", "issue", "view", issue, "--repo", repo, "--json", "comments"], text=True))
+comments = tuple(data.get("comments") or ())
+max_age = int(os.environ.get("SQUAD_V2_STALE_MINUTES", "120"))
+agent = find_stale_in_progress(comments, datetime.now(timezone.utc).isoformat(), max_age)
+if agent:
+    body = failed_comment(agent, f"stale run auto-recovered after {max_age}m with no result")
+    subprocess.run(["gh", "issue", "comment", issue, "--repo", repo, "--body", body], check=True)
+    print(f"recovered stale {agent} run on #{issue}")
 PY
-    then
-      gh issue edit "$issue" --repo "$REPO" \
-        --add-label "release-candidate" --remove-label "director-approved" 2>/dev/null || true
-    fi
-  fi
 }
 
 tick_issue() {
   local issue="$1"
+  recover_stale_run "$issue"
   sync_labels "$issue"
   chmod +x "$DISPATCH"
   "$DISPATCH" "$REPO" "$issue" || true
