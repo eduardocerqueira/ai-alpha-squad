@@ -49,6 +49,11 @@ checkout_work_branch() {
 ensure_pull_request() {
   local existing
   existing="$(gh pr list --repo "$TARGET_REPO" --head "$BRANCH" --state open --json url -q '.[0].url' 2>/dev/null || true)"
+  if [[ -z "$existing" ]]; then
+    # Reuse any open squad PR for this issue (legacy timestamp branches).
+    existing="$(gh pr list --repo "$TARGET_REPO" --state open --json url,headRefName -q \
+      ".[] | select(.headRefName | test(\"^squad/${AGENT}-issue-${ISSUE}\")) | .url" 2>/dev/null | head -1 || true)"
+  fi
   if [[ -n "$existing" ]]; then
     echo "$existing"
     return 0
