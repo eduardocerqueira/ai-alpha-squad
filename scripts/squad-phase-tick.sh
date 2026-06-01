@@ -13,6 +13,7 @@ NUDGE="${ROOT}/scripts/squad-nudge-stuck.sh"
 SYNC="${ROOT}/scripts/squad-sync-planning-labels.sh"
 VALIDATION="${ROOT}/scripts/squad-dispatch-validation.sh"
 RECOVER_ARCH="${ROOT}/scripts/squad-recover-architect.sh"
+RECONCILE="${ROOT}/scripts/squad-reconcile-planning-deliverables.sh"
 
 dispatch_missing_validation() {
   local parent="$1"
@@ -54,7 +55,19 @@ for parent in $(gh issue list --repo "$REPO" --label implemented --state open --
   [[ -n "$parent" ]] && tick_parent "$parent"
 done
 
-chmod +x "$NUDGE" "$SYNC" "$RECOVER_ARCH"
+chmod +x "$NUDGE" "$SYNC" "$RECOVER_ARCH" "$RECONCILE" \
+  "${ROOT}/scripts/squad-copilot-pr-guard.sh" \
+  "${ROOT}/scripts/squad-approve-copilot-workflows.sh" \
+  "${ROOT}/scripts/squad-promote-pr-deliverable.py" 2>/dev/null || true
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+for parent in $(gh issue list --repo "$REPO" --label new --state open --json number -q '.[].number' 2>/dev/null || true); do
+  [[ -n "$parent" ]] && "$RECONCILE" "$REPO" "$parent" || true
+done
+for parent in $(gh issue list --repo "$REPO" --label director-approved --state open --json number -q '.[].number' 2>/dev/null || true); do
+  [[ -n "$parent" ]] && "$RECONCILE" "$REPO" "$parent" || true
+done
+
 "$RECOVER_ARCH" "$REPO" || true
 "$NUDGE" "$REPO" || true
 

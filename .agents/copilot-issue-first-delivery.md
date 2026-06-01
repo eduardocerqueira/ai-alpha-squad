@@ -8,7 +8,8 @@ Business Owner and Architect on **ai-alpha-squad** deliver on the **GitHub issue
 
 - **Preferred:** Cursor (local/cloud) agent posts `# Business Analysis` / `# Technical Specification` via `gh issue comment`
 - **Fallback:** Director or Cursor posts using `./scripts/squad-post-issue-deliverable.sh`
-- **Not sufficient:** Copilot PR on `ai-alpha-squad` with BA only in the PR body (Squad PR guard closes it)
+- **Automated recovery:** Orchestrator and PR guard copy substantive deliverables from the **PR body or branch `.md` files** onto the issue (no Director `gh` commands). See `squad-reconcile-planning-deliverables.py`.
+- **Not sufficient:** Copilot PR on `ai-alpha-squad` with only a summary stub (no full `# Business Analysis` section)
 
 Developer, QA, Security, DevOps, and Tech Writer on **target product repos** remain Copilot-first (PR-based).
 
@@ -49,13 +50,15 @@ If you already opened a draft PR by mistake: post the artifact on the issue, com
 
 For planning PRs, the guard **polls the issue for up to ~1 minute** when the PR body also lacks the marker, **approves pending workflow runs** when possible, then **nudges** the agent on the issue thread if the marker is still missing. Product/extension PRs close **immediately** (no wait).
 
-A **scheduled scan every 10 minutes** (runs on `main`) closes matching PRs even if you never approve workflows on the Copilot branch. The `pull_request` trigger is optional for faster cleanup when workflows are already approved.
+A **scheduled scan every 5 minutes** (runs on `main`) closes matching PRs, promotes deliverables, and reconciles open `new` / `director-approved` issues even if you never approve workflows on the Copilot branch. The `pull_request` trigger is optional for faster cleanup when workflows are already approved.
+
+**Orchestrator reconcile job:** After dispatching Business Owner or Architect, [`squad-orchestrator.yml`](../.github/workflows/squad-orchestrator.yml) runs `reconcile-planning` for up to **35 minutes** (poll every 3 minutes): promote from PR → sync labels → project board.
 
 Custom agents `business-owner` and `architect` use **read/search tools only** (no `edit`) to reduce spurious draft PRs on this repo.
 
 **PR guard recovery:** Closing a planning or product PR does **not** force-nudge Copilot. The guard prefers **open** linked issues (e.g. #57 over closed #15), skips closed issues, never re-dispatches on product/extension closes, and only re-assigns when Copilot is **not** already on the issue. **Squad phase watch** runs `squad-recover-architect.sh` for `director-approved` jobs missing Copilot.
 
-**PR → issue promotion:** If the PR body contains a full `# Business Analysis` or `# Technical Specification` (not a stub with `...`), the guard **copies it onto the issue**, runs `squad-sync-planning-labels.sh`, updates the project board, and unassigns Copilot after BA (Director gate next).
+**PR → issue promotion:** If the PR **body or changed markdown on the branch** (e.g. `business-analysis.md`, `ba.md`) contains a full `# Business Analysis` or `# Technical Specification` (not a stub with `...`), the guard **copies it onto the issue**, runs `squad-sync-planning-labels.sh`, updates the project board, and unassigns Copilot after BA (Director gate next).
 
 **Project board:** While `new` or `director-approved` but the required heading is **missing on the issue**, Active agent shows **blocked — post on issue** (not “business-owner still working”).
 

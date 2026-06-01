@@ -13,7 +13,7 @@ on:
     types: [opened, ready_for_review, reopened]
   schedule:
     # Runs on main — closes planning PRs without Director approving each PR's workflows
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       pr_number:
@@ -52,5 +52,8 @@ jobs:
       - name: Scan and guard all open Copilot planning PRs
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.pr_number == '')
         run: |
-          chmod +x ./scripts/squad-scan-planning-prs.sh
+          chmod +x ./scripts/squad-scan-planning-prs.sh \
+            ./scripts/squad-reconcile-planning-deliverables.sh \
+            ./scripts/squad-promote-pr-deliverable.py \
+            ./scripts/squad-approve-copilot-workflows.sh
           ./scripts/squad-scan-planning-prs.sh "$REPO"

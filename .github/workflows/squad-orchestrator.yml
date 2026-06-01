@@ -4,6 +4,8 @@ name: Squad orchestrator
 
 permissions:
   issues: write
+  pull-requests: write
+  actions: write
 
 on:
   issues:
@@ -129,6 +131,39 @@ jobs:
         run: |
           chmod +x ./scripts/notify-director-lifecycle.sh
           ./scripts/notify-director-lifecycle.sh "dispatched-${{ steps.dispatch.outputs.agent }}" "$ISSUE_NUMBER" "$REPO" || true
+
+  # After BO/Architect dispatch: poll Copilot PRs, promote deliverables onto the issue, sync labels/board.
+  reconcile-planning:
+    needs: orchestrate
+    if: >-
+      needs.orchestrate.outputs.lifecycle_label == 'new' ||
+      needs.orchestrate.outputs.lifecycle_label == 'director-approved'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ needs.orchestrate.outputs.issue_number }}
+      PYTHONPATH: ${{ github.workspace }}/src
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Reconcile planning deliverables (issue-first)
+        run: |
+          chmod +x ./scripts/squad-reconcile-planning-deliverables.sh \
+            ./scripts/squad-copilot-pr-guard.sh \
+            ./scripts/squad-promote-pr-deliverable.py \
+            ./scripts/squad-approve-copilot-workflows.sh \
+            ./scripts/squad-sync-planning-labels.sh \
+            ./scripts/squad-nudge-stuck.sh \
+            ./scripts/squad-dispatch-copilot.sh \
+            ./scripts/squad-dispatch-subissue.sh \
+            ./scripts/squad-resolve-guard-issue.py
+          ./scripts/squad-reconcile-planning-deliverables.sh "$REPO" "$ISSUE_NUMBER" --wait-minutes 35 || true
 
   # Phase 4 — parallel validation (QA, Security, DevOps, Tech Writer)
   dispatch-validation:
