@@ -16,6 +16,8 @@ All squad documentation lives in this directory. The former `doc/` folder has be
 | [infrastructure-prerequisites.md](infrastructure-prerequisites.md) | Credentials, Cloudflare, GitHub, job-specific secrets (before first job) |
 | [agent-runtime-strategy.md](agent-runtime-strategy.md) | Cloud (GitHub Copilot agent) vs local Cursor |
 
+**Research:** [GitAgent Protocol (GAP) vs AI Alpha Squad](../docs/gap-comparison.md) — comparison and optional adoption path.
+
 ## Agent definitions
 
 | Label | Agent file |
