@@ -10,8 +10,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from ai_alpha_squad.agent_models import model_summary, resolve_model, resolve_provider
-from ai_alpha_squad.comments import format_hf_dispatch_comment, format_hf_result_comment
+from ai_alpha_squad.agent_models import model_summary, resolve_dispatch_mode, resolve_model
+from ai_alpha_squad.comments import (
+    format_hf_dispatch_comment,
+    format_hf_result_comment,
+    format_orchestrator_notice,
+)
 
 HF_ROUTER_URL = os.environ.get(
     "SQUAD_HF_ROUTER_URL",
@@ -128,8 +132,8 @@ def dispatch(
 
     Returns True when dispatched (comment posted or inference completed).
     """
-    if resolve_provider() != "huggingface":
-        raise RuntimeError("hf_dispatch called but SQUAD_AI_PROVIDER is not huggingface")
+    if resolve_dispatch_mode(agent) != "hf":
+        raise RuntimeError(f"hf_dispatch called but dispatch mode for {agent!r} is not hf")
 
     model = resolve_model(agent, "huggingface")
     summary = model_summary(agent, "huggingface")
@@ -167,6 +171,25 @@ def dispatch(
     )
     result_body = format_hf_result_comment(agent, content, model=model)
     post_issue_comment(repo, issue, result_body)
+
+    if agent == "architect" and os.environ.get("SQUAD_HF_ARCHITECT_SUBISSUES", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    ):
+        from ai_alpha_squad.architect_subissues import ensure_architect_subissues
+
+        created = ensure_architect_subissues(repo, issue)
+        if created:
+            roles = ", ".join(f"`{role}` #{num}" for role, num in sorted(created.items()))
+            post_issue_comment(
+                repo,
+                issue,
+                format_orchestrator_notice(
+                    f"**Squad orchestrator:** Architect sub-issues created — {roles}."
+                ),
+            )
+
     return True
 
 

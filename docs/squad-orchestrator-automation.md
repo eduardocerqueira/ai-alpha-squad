@@ -61,10 +61,10 @@ Env: `SQUAD_AUTONOMOUS_PLANNING=1` (default), `SQUAD_MAX_PLANNING_NUDGES=2`. Dir
 
 | Label added | Auto action | Copilot agent |
 | ----------- | ----------- | ------------- |
-| `new` | Dispatch | `business-owner` |
+| `new` | Dispatch | `business-owner` (HF) |
 | `awaiting-approval` | Optional WhatsApp notify (GitHub comment `APPROVE` always works) | — |
-| `director-approved` | Dispatch (Director gate) | `architect` |
-| `designed` | Dispatch Developer sub-issue | `developer` on target repo |
+| `director-approved` | Dispatch (Director gate) | `architect` (HF + sub-issues script) |
+| `designed` | Dispatch Developer sub-issue | `developer` via **Squad Actions agent** (HF tool loop + PR) |
 | `implemented` | **Parallel** dispatch (matrix job) on validation sub-issues | `qa`, `security`, `devops`, `tech-writer` (4 concurrent workflow jobs) |
 | `validation` | Dispatch | `release-manager` |
 | `release-candidate` | Optional WhatsApp notify | — |

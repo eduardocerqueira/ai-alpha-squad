@@ -3,7 +3,8 @@
 
 # AI runtime — override with env SQUAD_AI_PROVIDER (copilot | huggingface)
 ai:
-  provider: copilot
+  provider: huggingface
+  code_runtime: actions
   defaults:
     huggingface: meta-llama/Meta-Llama-3.1-8B-Instruct
   agents:

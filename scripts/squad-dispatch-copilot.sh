@@ -157,23 +157,8 @@ fi
 export DISPATCH_LABEL="$LABEL"
 export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
 
-PROVIDER="${SQUAD_DISPATCH_PROVIDER:-}"
-if [[ -z "$PROVIDER" ]]; then
-  PROVIDER="$(python3 -c 'from ai_alpha_squad.agent_models import resolve_provider; print(resolve_provider())')"
-fi
-
-if [[ "$PROVIDER" == "huggingface" ]]; then
-  chmod +x "${ROOT}/scripts/squad-dispatch-subissue.sh"
-  HF_RUN="${ROOT}/scripts/squad-run-hf-agent.sh"
-  chmod +x "$HF_RUN"
-  if "$HF_RUN" "$REPO" "$DISPATCH_ISSUE" "$AGENT" "$INSTRUCTIONS_FILE"; then
-    rm -f "$INSTRUCTIONS_FILE"
-    exit 0
-  fi
-  rm -f "$INSTRUCTIONS_FILE"
-  exit 1
-fi
-
-chmod +x "$DISPATCH"
+chmod +x "$DISPATCH" \
+  "${ROOT}/scripts/squad-run-hf-agent.sh" \
+  "${ROOT}/scripts/squad-run-actions-agent.sh"
 "$DISPATCH" "$REPO" "$DISPATCH_ISSUE" "$AGENT" "$TARGET_REPO" "$INSTRUCTIONS_FILE"
 rm -f "$INSTRUCTIONS_FILE"

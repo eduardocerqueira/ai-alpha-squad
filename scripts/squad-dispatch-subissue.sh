@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Assign Copilot custom agent to a single issue/sub-issue.
+# Dispatch a squad agent on a single issue/sub-issue (HF, Actions, or legacy Copilot).
 # Usage: squad-dispatch-subissue.sh <queue_repo> <issue_number> <agent> <target_repo> [instructions_file]
 set -euo pipefail
 
@@ -15,25 +15,35 @@ export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
 export SQUAD_ICON_REPO="${SQUAD_ICON_REPO:-$REPO}"
 export SQUAD_ICON_REF="${SQUAD_ICON_REF:-main}"
 
-PROVIDER="${SQUAD_DISPATCH_PROVIDER:-}"
-if [[ -z "$PROVIDER" ]]; then
-  PROVIDER="$(python3 -c 'from ai_alpha_squad.agent_models import resolve_provider; print(resolve_provider())')"
-fi
-
-if [[ "$PROVIDER" == "huggingface" ]]; then
-  chmod +x "${ROOT}/scripts/squad-run-hf-agent.sh"
-  export DISPATCH_LABEL="${DISPATCH_LABEL:-$AGENT}"
-  exec "${ROOT}/scripts/squad-run-hf-agent.sh" "$REPO" "$ISSUE" "$AGENT" "$INSTRUCTIONS_FILE"
-fi
-
-OWNER="${REPO%%/*}"
-NAME="${REPO#*/}"
-
 if [[ -z "$INSTRUCTIONS_FILE" ]]; then
   echo "instructions file required"
   exit 1
 fi
 
+MODE="$(python3 -c "from ai_alpha_squad.agent_models import resolve_dispatch_mode; print(resolve_dispatch_mode('${AGENT}'))")"
+export DISPATCH_LABEL="${DISPATCH_LABEL:-$AGENT}"
+
+case "$MODE" in
+  actions)
+    chmod +x "${ROOT}/scripts/squad-run-actions-agent.sh"
+    exec "${ROOT}/scripts/squad-run-actions-agent.sh" \
+      "$REPO" "$ISSUE" "$AGENT" "$TARGET_REPO" "$INSTRUCTIONS_FILE"
+    ;;
+  hf)
+    chmod +x "${ROOT}/scripts/squad-run-hf-agent.sh"
+    exec "${ROOT}/scripts/squad-run-hf-agent.sh" "$REPO" "$ISSUE" "$AGENT" "$INSTRUCTIONS_FILE"
+    ;;
+  copilot)
+    ;;
+  *)
+    echo "Unknown dispatch mode: $MODE" >&2
+    exit 1
+    ;;
+esac
+
+# --- Legacy Copilot assign API (SQUAD_CODE_RUNTIME=copilot) ---
+OWNER="${REPO%%/*}"
+NAME="${REPO#*/}"
 INSTRUCTIONS="$(cat "$INSTRUCTIONS_FILE")"
 
 if gh issue view "$ISSUE" --repo "$REPO" --json assignees -q \

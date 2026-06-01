@@ -34,7 +34,12 @@ role_should_dispatch() {
 import json, os, subprocess, sys
 
 sys.path.insert(0, os.environ.get("PYTHONPATH", "src"))
-from ai_alpha_squad.agent_models import HF_DISPATCH_MARKER, HF_RESULT_MARKER
+from ai_alpha_squad.agent_models import (
+    ACTIONS_DISPATCH_MARKER,
+    ACTIONS_RESULT_MARKER,
+    HF_DISPATCH_MARKER,
+    HF_RESULT_MARKER,
+)
 from ai_alpha_squad.validation_dispatch import role_dispatch_marker
 
 repo, sub_issue, role = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -49,16 +54,25 @@ if data.get("state") == "CLOSED":
     raise SystemExit(1)
 
 marker = role_dispatch_marker(role).lower()
-hf_markers = (HF_DISPATCH_MARKER.lower(), HF_RESULT_MARKER.lower())
+squad_markers = (
+    HF_DISPATCH_MARKER.lower(),
+    HF_RESULT_MARKER.lower(),
+    ACTIONS_DISPATCH_MARKER.lower(),
+    ACTIONS_RESULT_MARKER.lower(),
+)
 for comment in data.get("comments") or []:
     body = (comment.get("body") or "").lower()
     if marker in body:
         raise SystemExit(1)
-    if any(m in body for m in hf_markers) and f"`{role}`" in body:
+    if any(m in body for m in squad_markers) and f"`{role}`" in body:
         raise SystemExit(1)
 
 assignees = [a.get("login", "").lower() for a in data.get("assignees") or []]
-if any("copilot" in login for login in assignees) and os.environ.get("SQUAD_FORCE_NUDGE") != "1":
+if (
+    any("copilot" in login for login in assignees)
+    and os.environ.get("SQUAD_FORCE_NUDGE") != "1"
+    and os.environ.get("SQUAD_CODE_RUNTIME", "actions") == "copilot"
+):
     raise SystemExit(1)
 raise SystemExit(0)
 PY

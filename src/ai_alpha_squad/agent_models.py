@@ -7,11 +7,19 @@ import re
 from pathlib import Path
 
 SUPPORTED_PROVIDERS = frozenset({"copilot", "huggingface"})
+SUPPORTED_CODE_RUNTIMES = frozenset({"actions", "copilot"})
+SUPPORTED_DISPATCH_MODES = frozenset({"hf", "actions", "copilot"})
+
 DEFAULT_PROVIDER = "copilot"
+DEFAULT_CODE_RUNTIME = "actions"
 DEFAULT_HF_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+
+CODING_AGENT_SLUGS = frozenset({"developer", "devops"})
 
 HF_DISPATCH_MARKER = "Squad HF agent dispatched"
 HF_RESULT_MARKER = "Squad HF agent result"
+ACTIONS_DISPATCH_MARKER = "Squad Actions agent dispatched"
+ACTIONS_RESULT_MARKER = "Squad Actions agent result"
 
 _AGENT_SLUGS = {
     "business-owner",
@@ -51,6 +59,9 @@ _CONFIG_AGENT_MODEL = re.compile(
     r"(?:[ \t].*\n)*?[ \t]+([a-z][a-z0-9_-]*):\s*\n"
     r"(?:[ \t].*\n)*?[ \t]+([a-z][a-z0-9_-]*):\s*([^\s#]+)\s*$",
 )
+_CONFIG_CODE_RUNTIME = re.compile(
+    r"(?ms)^ai:\s*\n(?:[ \t].*\n)*?[ \t]+code_runtime:\s*([a-z][a-z0-9_-]*)\s*$",
+)
 
 
 def repo_root() -> Path:
@@ -83,6 +94,71 @@ def _load_config_text() -> str:
     if not path:
         return ""
     return path.read_text(encoding="utf-8")
+
+
+def resolve_code_runtime() -> str:
+    """Coding runtime for developer/devops: SQUAD_CODE_RUNTIME > squad-config > default actions."""
+    env = os.environ.get("SQUAD_CODE_RUNTIME", "").strip().lower()
+    if env:
+        if env not in SUPPORTED_CODE_RUNTIMES:
+            raise ValueError(
+                f"SQUAD_CODE_RUNTIME={env!r} invalid; use: {', '.join(sorted(SUPPORTED_CODE_RUNTIMES))}"
+            )
+        return env
+
+    text = _load_config_text()
+    match = _CONFIG_CODE_RUNTIME.search(text)
+    if match:
+        runtime = match.group(1).lower()
+        if runtime in SUPPORTED_CODE_RUNTIMES:
+            return runtime
+
+    if resolve_provider() == "huggingface":
+        return DEFAULT_CODE_RUNTIME
+    return "copilot"
+
+
+def _config_agent_provider(agent_slug: str) -> str | None:
+    text = _load_config_text()
+    if not text:
+        return None
+    slug = normalize_agent_slug(agent_slug)
+    pattern = re.compile(
+        rf"(?ms)^[ \t]+{re.escape(slug)}:\s*\n"
+        r"(?:[ \t].*\n)*?[ \t]+provider:\s*([a-z][a-z0-9_-]*)\s*$",
+    )
+    match = pattern.search(text)
+    if not match:
+        return None
+    provider = match.group(1).lower()
+    if provider in SUPPORTED_PROVIDERS:
+        return provider
+    return None
+
+
+def resolve_provider_for_agent(agent_slug: str) -> str:
+    """Per-agent AI provider override, else global resolve_provider()."""
+    cfg = _config_agent_provider(agent_slug)
+    if cfg:
+        return cfg
+    return resolve_provider()
+
+
+def resolve_dispatch_mode(agent_slug: str) -> str:
+    """
+    How to run an agent: hf (issue comment), actions (coding loop), copilot (legacy assign).
+
+    Coding agents (developer, devops) use SQUAD_CODE_RUNTIME when set to actions.
+    Other agents use resolve_provider_for_agent (huggingface -> hf, else copilot).
+    """
+    slug = normalize_agent_slug(agent_slug)
+    if slug in CODING_AGENT_SLUGS and resolve_code_runtime() == "actions":
+        return "actions"
+    if slug in CODING_AGENT_SLUGS and resolve_code_runtime() == "copilot":
+        return "copilot"
+    if resolve_provider_for_agent(slug) == "huggingface":
+        return "hf"
+    return "copilot"
 
 
 def resolve_provider() -> str:
@@ -198,8 +274,12 @@ def resolve_model(agent_slug: str, provider: str | None = None) -> str:
 
 def model_summary(agent_slug: str, provider: str | None = None) -> str:
     """Human-readable model line for dispatch comments."""
-    provider = provider or resolve_provider()
+    mode = resolve_dispatch_mode(agent_slug)
+    if mode == "actions":
+        model = resolve_model(agent_slug, "huggingface")
+        return f"GitHub Actions coding agent · HF `{model}`"
+    provider = provider or resolve_provider_for_agent(agent_slug)
     if provider == "copilot":
-        return "Copilot custom agent (no model ID — uses GitHub Copilot coding agent)"
+        return "Copilot custom agent (legacy — GitHub Copilot coding agent)"
     model = resolve_model(agent_slug, provider)
     return f"`{model}`"

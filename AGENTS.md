@@ -10,4 +10,4 @@ Before any task, read [.agents/squad-orchestrator.md](.agents/squad-orchestrator
 
 **Infrastructure & credentials** (Director setup before first job): [.agents/infrastructure-prerequisites.md](.agents/infrastructure-prerequisites.md) — copy [.env.example](.env.example), run `./scripts/verify-prerequisites.sh`.
 
-**Cloud agents (autonomous, no local machine):** [.agents/agent-runtime-strategy.md](.agents/agent-runtime-strategy.md) — GitHub Copilot custom agents in [.github/agents/](.github/agents/).
+**Cloud agents (autonomous, no local machine):** [.agents/agent-runtime-strategy.md](.agents/agent-runtime-strategy.md) — GitHub Actions + Hugging Face ([docs/agent-ai-providers.md](docs/agent-ai-providers.md)); Copilot is legacy optional.

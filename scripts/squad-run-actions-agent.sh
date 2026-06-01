@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Squad coding agent on GitHub Actions: clone target repo, HF tool loop, push PR.
+# Usage: squad-run-actions-agent.sh <queue_repo> <issue> <agent> <target_repo> <instructions_file>
+set -euo pipefail
+
+QUEUE_REPO="${1:?queue repo required}"
+ISSUE="${2:?issue required}"
+AGENT="${3:?agent required}"
+TARGET_REPO="${4:?target repo required}"
+INSTRUCTIONS_FILE="${5:?instructions file required}"
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+export DISPATCH_LABEL="${DISPATCH_LABEL:-$AGENT}"
+
+SUMMARY_FILE="${RUNNER_TEMP:-/tmp}/squad-actions-summary-${ISSUE}.txt"
+export SQUAD_ACTIONS_SUMMARY_FILE="$SUMMARY_FILE"
+
+# In orchestrator job, spawn dedicated workflow unless inline mode requested.
+if [[ -n "${GITHUB_ACTIONS:-}" && "${SQUAD_ACTIONS_INLINE:-}" != "1" ]]; then
+  REPO_FOR_WF="${GITHUB_REPOSITORY:-$QUEUE_REPO}"
+  if gh workflow run squad-actions-agent.yml \
+    --repo "$REPO_FOR_WF" \
+    -f queue_repo="$QUEUE_REPO" \
+    -f issue_number="$ISSUE" \
+    -f agent="$AGENT" \
+    -f target_repo="$TARGET_REPO" 2>/dev/null; then
+    echo "Triggered squad-actions-agent workflow for $AGENT on $QUEUE_REPO#$ISSUE"
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+      echo "dispatched=true" >> "$GITHUB_OUTPUT"
+      echo "agent=$AGENT" >> "$GITHUB_OUTPUT"
+      echo "provider=actions" >> "$GITHUB_OUTPUT"
+    fi
+    exit 0
+  fi
+  echo "workflow dispatch failed — running inline (SQUAD_ACTIONS_INLINE fallback)" >&2
+fi
+
+WORKDIR="${RUNNER_TEMP:-/tmp}/squad-target-${ISSUE}-$$"
+rm -rf "$WORKDIR"
+git clone --depth 1 "https://github.com/${TARGET_REPO}.git" "$WORKDIR"
+
+cd "$WORKDIR"
+BRANCH="squad/${AGENT}-issue-${ISSUE}-$(date +%Y%m%d%H%M%S)"
+git checkout -b "$BRANCH"
+
+python3 -m ai_alpha_squad.actions_agent run \
+  "$QUEUE_REPO" "$ISSUE" "$AGENT" "$TARGET_REPO" "$WORKDIR" "$INSTRUCTIONS_FILE"
+
+PR_URL=""
+if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
+  git add -A
+  git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
+    commit -m "feat(squad): ${AGENT} work for ${QUEUE_REPO}#${ISSUE}" || true
+  git push -u origin "$BRANCH"
+  PARENT_LINE=""
+  if [[ "$ISSUE" != "" ]]; then
+    PARENT_LINE="Squad queue: ${QUEUE_REPO}#${ISSUE}"
+  fi
+  PR_URL="$(gh pr create --repo "$TARGET_REPO" \
+    --title "[Squad ${AGENT}] Issue #${ISSUE}" \
+    --body "${PARENT_LINE}
+
+Automated PR from Squad Actions agent (\`${AGENT}\`)." \
+    --head "$BRANCH" 2>/dev/null || true)"
+fi
+
+python3 -m ai_alpha_squad.actions_agent finalize \
+  "$QUEUE_REPO" "$ISSUE" "$AGENT" "$SUMMARY_FILE" "${PR_URL:-}"
+
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "dispatched=true" >> "$GITHUB_OUTPUT"
+  echo "agent=$AGENT" >> "$GITHUB_OUTPUT"
+  echo "provider=actions" >> "$GITHUB_OUTPUT"
+  [[ -n "$PR_URL" ]] && echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+fi
+
+echo "Actions agent complete for $AGENT on $QUEUE_REPO#$ISSUE"
+rm -rf "$WORKDIR"
+exit 0

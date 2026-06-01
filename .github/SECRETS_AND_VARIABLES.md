@@ -15,7 +15,7 @@ Setup guide: [.agents/infrastructure-prerequisites.md](../.agents/infrastructure
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp send/receive automation |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | WhatsApp webhook Worker |
 | `WHATSAPP_PHONE_NUMBER_ID` | Outbound WhatsApp from orchestrator |
-| `SQUAD_ORCHESTRATOR_TOKEN` | PAT with issues + Copilot agent assign (preferred over default `GITHUB_TOKEN`) |
+| `SQUAD_ORCHESTRATOR_TOKEN` | PAT with issues, PRs, workflow dispatch on queue + target repos (preferred over default `GITHUB_TOKEN`) |
 | `APP_STORE_CONNECT_API_KEY` | Base64 or JSON key for ASC API (prefer OIDC/env file in secure runner) |
 
 Use environment-specific secrets (`production`, `staging`) once workflows exist.
@@ -37,7 +37,8 @@ Use environment-specific secrets (`production`, `staging`) once workflows exist.
 | `SQUAD_DIRECTOR_LOGIN` | Director GitHub username — required for Director gate + orchestrator verify |
 | `SQUAD_WHATSAPP_APPROVAL_LOGIN` | Optional; PAT owner login for WhatsApp Worker approvals (defaults to Director) |
 | `WHATSAPP_DIRECTOR_PHONE` | E.164 Director number for orchestrator notify |
-| `SQUAD_AI_PROVIDER` | `copilot` (default) or `huggingface` — orchestrator agent dispatch |
+| `SQUAD_AI_PROVIDER` | `huggingface` (recommended) or `copilot` (legacy) — planning/report agents |
+| `SQUAD_CODE_RUNTIME` | `actions` (default with HF) or `copilot` — developer/devops coding |
 | `SQUAD_HF_DEFAULT_MODEL` | Default HF model when agent has no `## AI Model` override |
 | `SQUAD_HF_RUN_IN_CI` | `1` run HF inference in Actions; `0` dispatch comment only |
 
