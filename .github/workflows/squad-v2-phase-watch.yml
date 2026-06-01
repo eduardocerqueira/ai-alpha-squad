@@ -30,6 +30,13 @@ jobs:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
       SQUAD_V2: "1"
+      # HF agents (QA, and BO/dev rework) can be dispatched from the tick and run
+      # inline here, so HF credentials/provider must be present — without HF_TOKEN
+      # the QA dispatch fails ("HF_TOKEN is required").
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SQUAD_AI_PROVIDER: huggingface
+      SQUAD_CODE_RUNTIME: actions
+      SQUAD_HF_DEFAULT_MODEL: ${{ vars.SQUAD_HF_DEFAULT_MODEL }}
     steps:
       - uses: actions/checkout@v4
 
