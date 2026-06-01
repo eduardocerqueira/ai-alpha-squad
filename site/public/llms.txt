@@ -1,8 +1,8 @@
 # AI Alpha Squad
 
-> Autonomous multi-agent software delivery lab — business requests in, production-ready software out.
+> Experimental multi-agent software delivery lab — business requests in, working software out. A playground, not a product.
 
-AI Alpha Squad is an experimental delivery lab that orchestrates specialized AI agents from business analysis through architecture, implementation, validation, and release. The Director (human) retains final authority; GitHub Issues are the source of truth.
+AI Alpha Squad is an experimental delivery lab that orchestrates specialized AI agents from business analysis through architecture, implementation, validation, and release. It runs on GitHub Actions with Hugging Face Inference Providers powering the models behind every agent (GitHub Copilot is a legacy optional runtime). The Director (human) retains final authority; GitHub Issues are the source of truth.
 
 ## Canonical URLs
 
@@ -31,4 +31,4 @@ Director → GitHub Issues → Business Owner → Architect → Developer → QA
 
 ## Keywords
 
-autonomous agents, multi-agent software delivery, AI engineering lab, GitHub Issues workflow, agent orchestration, production software delivery
+autonomous agents, multi-agent software delivery, AI engineering lab, experimental AI agents, GitHub Issues workflow, agent orchestration, GitHub Actions, Hugging Face inference providers, open models
