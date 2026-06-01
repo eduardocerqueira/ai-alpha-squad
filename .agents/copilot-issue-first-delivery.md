@@ -47,6 +47,8 @@ If you already opened a draft PR by mistake: post the artifact on the issue, com
 
 [`.github/workflows/squad-copilot-pr-guard.yml`](../.github/workflows/squad-copilot-pr-guard.yml) closes Copilot planning PRs on this repo when the issue deliverable is missing or redundant. It also closes **product/extension PRs** on `ai-alpha-squad` (e.g. `package.json`, `src/extension.ts`, WIP VS Code extension titles) — implementation belongs on the **target product repo**, not the work queue.
 
+For planning PRs, the guard **polls the issue for up to ~1 minute** when the PR body also lacks the marker, **approves pending workflow runs** when possible, then **nudges** the agent on the issue thread if the marker is still missing. Product/extension PRs close **immediately** (no wait).
+
 A **scheduled scan every 10 minutes** (runs on `main`) closes matching PRs even if you never approve workflows on the Copilot branch. The `pull_request` trigger is optional for faster cleanup when workflows are already approved.
 
 Custom agents `business-owner` and `architect` use **read/search tools only** (no `edit`) to reduce spurious draft PRs on this repo.
