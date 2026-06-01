@@ -65,6 +65,27 @@ def test_in_progress_active_when_failure_before_latest_marker():
     assert run_in_progress(comments) == "developer"
 
 
+def test_in_progress_ignored_after_actions_result():
+    comments = (
+        {"body": "squad-v2-run:in_progress:developer"},
+        {
+            "body": "**Squad Actions agent result** — developer\n\nAgent loop reached max turns."
+        },
+    )
+    assert run_in_progress(comments) is None
+    act = next_action(
+        IssueView(
+            94,
+            "OPEN",
+            frozenset({"director-approved"}),
+            comments,
+            "https://github.com/org/experimental-hello-world",
+        )
+    )
+    assert act.kind == "dispatch"
+    assert act.agent == "developer"
+
+
 def test_squad_work_branch():
     from ai_alpha_squad.squad_v2 import squad_work_branch
 
