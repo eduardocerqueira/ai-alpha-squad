@@ -16,11 +16,23 @@ sync_labels() {
   local issue="$1"
   chmod +x "$SYNC" 2>/dev/null || true
   "$SYNC" "$REPO" "$issue" || true
-  # v2: after developer deliverable, move to release-candidate
-  if gh issue view "$issue" --repo "$REPO" --json labels,comments -q '.labels[].name' 2>/dev/null \
+  # v2: after developer deliverable heading on issue, move to release-candidate
+  if gh issue view "$issue" --repo "$REPO" --json labels -q '.labels[].name' 2>/dev/null \
     | grep -qx 'director-approved'; then
-    if gh issue view "$issue" --repo "$REPO" --json comments -q '.comments[].body' 2>/dev/null \
-      | grep -qi '# developer deliverable'; then
+    if python3 - "$REPO" "$issue" <<'PY'
+import json, subprocess, sys
+repo, issue = sys.argv[1], sys.argv[2]
+sys.path.insert(0, "src")
+from ai_alpha_squad.squad_v2 import DELIVERABLE_MARKERS, has_deliverable
+
+proc = subprocess.run(
+    ["gh", "issue", "view", issue, "--repo", repo, "--json", "comments"],
+    capture_output=True, text=True, check=True,
+)
+comments = tuple(json.loads(proc.stdout)["comments"])
+raise SystemExit(0 if has_deliverable(comments, "developer") else 1)
+PY
+    then
       gh issue edit "$issue" --repo "$REPO" \
         --add-label "release-candidate" --remove-label "director-approved" 2>/dev/null || true
     fi
