@@ -200,6 +200,37 @@ def assess_change_safety(diff_text: str) -> list[str]:
     return violations
 
 
+_ENUM_FILE_RE = re.compile(r"^\s*\d+\.\s")
+_BACKTICK_FILE_RE = re.compile(r"`[^`]+\.[A-Za-z0-9]{1,8}`")
+
+
+def expected_artifact_files(text: str) -> list[str]:
+    """Filenames the task explicitly enumerates (e.g. "1. C# — `hello.cs`" …).
+
+    Returns the first backticked filename on each enumerated line. Empty unless
+    there's a clear multi-file list (>= 3 such items), so single-file or
+    non-creation tasks aren't constrained. Checking these specific files exist is
+    robust across runs — an idempotent continue on a branch that already has some
+    of them is measured correctly (unlike counting this run's writes).
+    """
+    names: list[str] = []
+    for line in (text or "").splitlines():
+        if not _ENUM_FILE_RE.match(line):
+            continue
+        m = _BACKTICK_FILE_RE.search(line)
+        if m:
+            names.append(m.group(0).strip("`"))
+    seen: set[str] = set()
+    ordered = [n for n in names if not (n in seen or seen.add(n))]
+    return ordered if len(ordered) >= 3 else []
+
+
+def expected_artifact_count(text: str) -> int | None:
+    """Count of enumerated files (None when not a clear multi-file task)."""
+    files = expected_artifact_files(text)
+    return len(files) if files else None
+
+
 def _extract_json_object(text: str, start: int) -> str | None:
     depth = 0
     for i in range(start, len(text)):
@@ -364,6 +395,11 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
     # per call, so without this it cannot track which artifacts it already wrote
     # and never confidently calls finish (it churns until max turns).
     history: list[str] = []
+    # Completeness guard: if the task enumerates specific files to create, don't
+    # accept finish until they all exist on disk — models otherwise call finish
+    # early (e.g. 8 of 30) and ship a partial deliverable. Checking existence (not
+    # this run's writes) keeps an idempotent continue correct.
+    required_files = expected_artifact_files(instructions)
 
     def build_conversation(extra: str = "") -> str:
         parts = [user]
@@ -397,6 +433,21 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
         tool_name, tool_args = parsed
         print(f"[actions] turn {_turn + 1}/{MAX_TURNS}: {tool_name}", file=sys.stderr)
         if tool_name == "finish":
+            if required_files:
+                missing = [f for f in required_files if not (workdir / f).exists()]
+                if missing:
+                    print(
+                        f"[actions] finish blocked: {len(required_files) - len(missing)}"
+                        f"/{len(required_files)} required files exist",
+                        file=sys.stderr,
+                    )
+                    history.append(
+                        f"[turn {_turn + 1}] finish REJECTED — "
+                        f"{len(required_files) - len(missing)}/{len(required_files)} required "
+                        f"files exist. Do NOT finish yet; create the missing file(s): "
+                        + ", ".join(missing[:12]) + ("…" if len(missing) > 12 else "")
+                    )
+                    continue
             return _finish_summary(tool_args, content), True
         result = execute_tool(workdir, tool_name, tool_args)
         arg_hint = str(tool_args.get("path") or tool_args.get("command") or "").strip()
@@ -579,6 +630,25 @@ def main(argv: list[str] | None = None) -> int:
             for v in violations:
                 print(v)
             return 3 if violations else 0
+        elif argv[0] == "check-complete":
+            # Backstop: a partial result (e.g. agent hit max turns) must not pass as
+            # a finished deliverable. Compares new files created against the count
+            # the task enumerates.
+            workdir = Path(argv[1])
+            instructions = Path(argv[2]).read_text(encoding="utf-8")
+            required = expected_artifact_files(instructions)
+            if not required:
+                return 0
+            # Check the specific enumerated files exist on disk (committed or not),
+            # so an idempotent continue on an existing branch is measured correctly.
+            missing = [f for f in required if not (workdir / f).exists()]
+            if missing:
+                print(
+                    f"incomplete: {len(required) - len(missing)}/{len(required)} required files "
+                    "present; missing: " + ", ".join(missing[:12]) + ("…" if len(missing) > 12 else "")
+                )
+                return 4
+            return 0
         elif len(argv) >= 6:
             queue_repo, issue_s, agent, target_repo, workdir_s, instructions_path_s = argv[:6]
             instructions = Path(instructions_path_s).read_text(encoding="utf-8")
