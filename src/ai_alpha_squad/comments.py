@@ -179,6 +179,24 @@ def format_orchestrator_notice(message_md: str, *, repo: str | None = None, ref:
     return format_squad_comment(message_md, avatar="orchestrator", repo=repo, ref=ref)
 
 
+def format_v2_developer_deliverable(
+    summary: str,
+    *,
+    pr_url: str,
+    repo: str | None = None,
+    ref: str | None = None,
+    model: str = "",
+) -> str:
+    """v2 gate: heading must match DELIVERABLE_MARKERS['developer'] in squad_v2.py."""
+    model_line = f"\n\n_Model: `{model}`_" if model else ""
+    body = (
+        "# Developer Deliverable\n\n"
+        f"{summary.strip()}\n\n"
+        f"**Pull request:** {pr_url.strip()}{model_line}"
+    )
+    return format_squad_comment(body, avatar="developer", repo=repo, ref=ref)
+
+
 def _parse_repo(repo: str) -> tuple[str, str]:
     if "/" not in repo:
         raise ValueError(f"Invalid repo {repo!r}; expected owner/name")

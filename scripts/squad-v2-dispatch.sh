@@ -120,6 +120,7 @@ esac
 
 export SQUAD_AI_PROVIDER=huggingface
 export SQUAD_CODE_RUNTIME=actions
+export SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT=1
 if ! "$DISPATCH" "$REPO" "$ISSUE" "$AGENT" "$TARGET" "$INSTRUCTIONS"; then
   ERR="dispatch failed for ${AGENT}"
   FAIL="$(python3 -c "from ai_alpha_squad.squad_v2 import failed_comment; print(failed_comment('$AGENT', '''$ERR'''))")"

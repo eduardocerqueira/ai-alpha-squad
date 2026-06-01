@@ -57,6 +57,20 @@ def test_in_progress_ignored_after_failed_run():
     assert run_in_progress(comments) is None
 
 
+def test_in_progress_active_when_failure_before_latest_marker():
+    comments = (
+        {"body": "squad-v2-run:failed:developer — old"},
+        {"body": "squad-v2-run:in_progress:developer"},
+    )
+    assert run_in_progress(comments) == "developer"
+
+
+def test_squad_work_branch():
+    from ai_alpha_squad.squad_v2 import squad_work_branch
+
+    assert squad_work_branch("developer", 94) == "squad/developer-issue-94"
+
+
 def test_stale_in_progress_ignored_after_deliverable():
     comments = (
         {"body": "squad-v2-run:in_progress:business-owner"},
