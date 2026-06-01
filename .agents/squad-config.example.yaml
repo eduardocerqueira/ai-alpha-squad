@@ -5,6 +5,7 @@
 ai:
   provider: huggingface
   code_runtime: actions
+  # HF router: cheapest | fastest | preferred (env SQUAD_HF_PROVIDER_POLICY; default cheapest)
   defaults:
     huggingface: meta-llama/Meta-Llama-3.1-8B-Instruct
   agents:

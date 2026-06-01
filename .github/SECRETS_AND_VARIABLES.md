@@ -41,6 +41,7 @@ Use environment-specific secrets (`production`, `staging`) once workflows exist.
 | `SQUAD_CODE_RUNTIME` | `actions` (default with HF) or `copilot` — developer/devops coding |
 | `SQUAD_HF_DEFAULT_MODEL` | Default HF model when agent has no `## AI Model` override |
 | `SQUAD_HF_RUN_IN_CI` | `1` run HF inference in Actions; `0` dispatch comment only |
+| `SQUAD_HF_PROVIDER_POLICY` | `cheapest` (default), `fastest`, `preferred`, or `none` — HF router model suffix (`model:cheapest`) |
 
 ## Configure via CLI
 

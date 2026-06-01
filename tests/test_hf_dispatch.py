@@ -29,6 +29,47 @@ def test_hf_run_enabled_disabled(monkeypatch, value):
     assert hd.hf_run_enabled() is False
 
 
+@pytest.mark.parametrize(
+    ("model", "policy", "expected"),
+    [
+        ("deepseek-ai/DeepSeek-V4-Flash", "cheapest", "deepseek-ai/DeepSeek-V4-Flash:cheapest"),
+        ("org/model", "fastest", "org/model:fastest"),
+        ("org/model:cheapest", "cheapest", "org/model:cheapest"),
+        ("org/model:groq", "cheapest", "org/model:groq"),
+        ("org/model", "none", "org/model"),
+    ],
+)
+def test_router_model_id(monkeypatch, model, policy, expected):
+    monkeypatch.setenv("SQUAD_HF_PROVIDER_POLICY", policy)
+    assert hd.router_model_id(model) == expected
+
+
+def test_chat_completion_uses_cheapest_router_model(monkeypatch):
+    monkeypatch.setenv("SQUAD_HF_PROVIDER_POLICY", "cheapest")
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=0):
+        captured["body"] = json.loads(req.data.decode())
+        payload = {"choices": [{"message": {"content": "ok"}}]}
+        body = json.dumps(payload).encode("utf-8")
+
+        class FakeResp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return body
+
+        return FakeResp()
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        hd.chat_completion("meta-llama/Meta-Llama-3.1-8B-Instruct", system="s", user="u", token="t")
+    assert captured["body"]["model"] == "meta-llama/Meta-Llama-3.1-8B-Instruct:cheapest"
+
+
 def test_chat_completion_parses_response():
     payload = {
         "choices": [{"message": {"content": "# Business Analysis\n\nHello"}}],
