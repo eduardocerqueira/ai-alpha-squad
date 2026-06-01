@@ -6,6 +6,7 @@ The squad was designed around **GitHub Issues as source of truth**. Agents can r
 
 | Goal | Recommendation |
 | ---- | ---------------- |
+| Choose Copilot vs Hugging Face per run | Set repo variable **`SQUAD_AI_PROVIDER`** (`copilot` \| `huggingface`) — see [docs/agent-ai-providers.md](../docs/agent-ai-providers.md) |
 | Stop using your Mac for coding work | **Yes** — run implementation on **GitHub Copilot cloud agent** on **target product repos** |
 | Run Business Owner + Architect + QA as separate cloud agents | **Partial** — use **custom agents** in `.github/agents/` (this repo + product repos); orchestration between phases still needs Issues + labels (and optionally a workflow) |
 | True end-to-end autonomy (issue → release, no human) | **Not yet** — keep **Director gates**; add automation to *invoke* the next agent when labels change |
@@ -77,6 +78,7 @@ Repository agents UI: [github.com/eduardocerqueira/ai-alpha-squad/agents](https:
 | [GitHub Copilot cloud agent](https://github.com/features/copilot/agents) | Issue → branch → PR in GitHub | **Default for code** on product repos |
 | [Cursor Cloud Agents](https://cursor.com/docs/sdk) (`@cursor/sdk`, `CURSOR_API_KEY`) | API-driven runs, same prompts as IDE | Orchestrator script: label change → `Agent.prompt` with `agent-*.md` |
 | Cloudflare **Agents SDK** | Stateful webhooks, WhatsApp, queues | WhatsApp Director channel + future orchestrator DO |
+| Hugging Face **Inference** (`SQUAD_AI_PROVIDER=huggingface`) | Issue-first deliverables (BA, reports) via router API | Per-agent model in `.agents/agent-*.md` **## AI Model** |
 | Hugging Face **Jobs** | GPU training/batch | Optional per tech spec |
 | Copilot **CLI agent** | Long tasks from terminal/CI | `gh copilot` / copilot-cli in Actions |
 

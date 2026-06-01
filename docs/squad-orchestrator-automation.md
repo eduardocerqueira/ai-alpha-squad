@@ -121,6 +121,9 @@ When a squad-linked PR merges, the queue repo receives `repository_dispatch` →
 
 | Secret / var | Purpose |
 | ------------ | ------- |
+| `SQUAD_AI_PROVIDER` | `copilot` (default) or `huggingface` — see [agent-ai-providers.md](agent-ai-providers.md) |
+| `SQUAD_HF_DEFAULT_MODEL` | Default Hugging Face model when agent has no override |
+| `HF_TOKEN` | Required for `SQUAD_AI_PROVIDER=huggingface` with CI inference |
 | `SQUAD_ORCHESTRATOR_TOKEN` | PAT: issues, Copilot assign, workflow dispatch |
 | `SQUAD_DIRECTOR_LOGIN` | Director gate |
 | `SQUAD_WHATSAPP_NOTIFY` | Optional: `0` off, `1` on, unset = auto (send only if `WHATSAPP_*` configured) |

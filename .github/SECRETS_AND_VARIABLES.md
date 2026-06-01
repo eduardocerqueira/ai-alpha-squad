@@ -11,7 +11,7 @@ Setup guide: [.agents/infrastructure-prerequisites.md](../.agents/infrastructure
 | `CLOUDFLARE_API_TOKEN` | Deploying Workers / Pages |
 | `VSCE_PAT` | VS Code Marketplace publish |
 | `OPENVSX_PAT` | Open VSX publish |
-| `HF_TOKEN` | HF Jobs or model access in CI |
+| `HF_TOKEN` | HF Jobs, Inference Providers (`SQUAD_AI_PROVIDER=huggingface`), model access in CI |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp send/receive automation |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | WhatsApp webhook Worker |
 | `WHATSAPP_PHONE_NUMBER_ID` | Outbound WhatsApp from orchestrator |
@@ -37,6 +37,9 @@ Use environment-specific secrets (`production`, `staging`) once workflows exist.
 | `SQUAD_DIRECTOR_LOGIN` | Director GitHub username — required for Director gate + orchestrator verify |
 | `SQUAD_WHATSAPP_APPROVAL_LOGIN` | Optional; PAT owner login for WhatsApp Worker approvals (defaults to Director) |
 | `WHATSAPP_DIRECTOR_PHONE` | E.164 Director number for orchestrator notify |
+| `SQUAD_AI_PROVIDER` | `copilot` (default) or `huggingface` — orchestrator agent dispatch |
+| `SQUAD_HF_DEFAULT_MODEL` | Default HF model when agent has no `## AI Model` override |
+| `SQUAD_HF_RUN_IN_CI` | `1` run HF inference in Actions; `0` dispatch comment only |
 
 ## Configure via CLI
 

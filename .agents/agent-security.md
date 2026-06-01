@@ -12,6 +12,15 @@ Ensure software is secure before release.
 
 security
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `deepseek-ai/DeepSeek-V4-Flash` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [DeepSeek-V4-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash) — threat modeling, dependency/CVE review, and FIND-* security reports.
+
 ## Inputs
 
 - Source code

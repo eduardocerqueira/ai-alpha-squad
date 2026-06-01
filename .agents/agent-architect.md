@@ -12,6 +12,15 @@ Transform approved business requirements into a complete technical solution.
 
 architect
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `Qwen/Qwen3.6-27B` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B) — long-form technical specifications, FR/BR traceability, and structured architecture docs.
+
 ## Inputs
 
 - Approved Business Analysis

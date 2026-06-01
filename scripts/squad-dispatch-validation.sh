@@ -34,6 +34,7 @@ role_should_dispatch() {
 import json, os, subprocess, sys
 
 sys.path.insert(0, os.environ.get("PYTHONPATH", "src"))
+from ai_alpha_squad.agent_models import HF_DISPATCH_MARKER, HF_RESULT_MARKER
 from ai_alpha_squad.validation_dispatch import role_dispatch_marker
 
 repo, sub_issue, role = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -48,8 +49,12 @@ if data.get("state") == "CLOSED":
     raise SystemExit(1)
 
 marker = role_dispatch_marker(role).lower()
+hf_markers = (HF_DISPATCH_MARKER.lower(), HF_RESULT_MARKER.lower())
 for comment in data.get("comments") or []:
-    if marker in (comment.get("body") or "").lower():
+    body = (comment.get("body") or "").lower()
+    if marker in body:
+        raise SystemExit(1)
+    if any(m in body for m in hf_markers) and f"`{role}`" in body:
         raise SystemExit(1)
 
 assignees = [a.get("login", "").lower() for a in data.get("assignees") or []]
@@ -157,7 +162,8 @@ EOF
 
   if "$DISPATCH" "$REPO" "$sub_issue" "$role" "$TARGET_REPO" "$instructions_file"; then
     DISPATCHED=$((DISPATCHED + 1))
-    gh issue comment "$sub_issue" --repo "$REPO" --body "${marker} — Copilot ${role} assigned for parent #${PARENT}." \
+    PROVIDER="$(python3 -c 'from ai_alpha_squad.agent_models import resolve_provider; print(resolve_provider())')"
+    gh issue comment "$sub_issue" --repo "$REPO" --body "${marker} — ${PROVIDER} ${role} assigned for parent #${PARENT}." \
       || true
   else
     FAILED=$((FAILED + 1))

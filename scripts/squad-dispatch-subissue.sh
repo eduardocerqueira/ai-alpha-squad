@@ -11,8 +11,20 @@ INSTRUCTIONS_FILE="${5:-}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FORMAT_COMMENT="${ROOT}/scripts/format-squad-comment.py"
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
 export SQUAD_ICON_REPO="${SQUAD_ICON_REPO:-$REPO}"
 export SQUAD_ICON_REF="${SQUAD_ICON_REF:-main}"
+
+PROVIDER="${SQUAD_DISPATCH_PROVIDER:-}"
+if [[ -z "$PROVIDER" ]]; then
+  PROVIDER="$(python3 -c 'from ai_alpha_squad.agent_models import resolve_provider; print(resolve_provider())')"
+fi
+
+if [[ "$PROVIDER" == "huggingface" ]]; then
+  chmod +x "${ROOT}/scripts/squad-run-hf-agent.sh"
+  export DISPATCH_LABEL="${DISPATCH_LABEL:-$AGENT}"
+  exec "${ROOT}/scripts/squad-run-hf-agent.sh" "$REPO" "$ISSUE" "$AGENT" "$INSTRUCTIONS_FILE"
+fi
 
 OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
