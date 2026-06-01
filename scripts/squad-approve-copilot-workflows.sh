@@ -21,9 +21,12 @@ while IFS= read -r run_id; do
   [[ -n "$run_id" ]] || continue
   if gh api --method POST \
     -H "Accept: application/vnd.github+json" \
-    "/repos/${OWNER}/${NAME}/actions/runs/${run_id}/approve" 2>/dev/null; then
+    "/repos/${OWNER}/${NAME}/actions/runs/${run_id}/approve" >/dev/null 2>&1; then
     APPROVED=$((APPROVED + 1))
     echo "Approved workflow run ${run_id} for PR #${PR}"
+  else
+    # Some runs cannot be approved via API (e.g. not a fork approval run); ignore quietly.
+    :
   fi
 done < <(
   gh api \
