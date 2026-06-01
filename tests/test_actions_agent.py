@@ -83,3 +83,28 @@ def test_run_agent_loop_reports_max_turns(tmp_path, monkeypatch):
     )
     assert finished is False
     assert "max turns" in summary.lower()
+
+
+def test_finish_summary_uses_args_summary():
+    from ai_alpha_squad.actions_agent import _finish_summary
+    assert _finish_summary({"summary": "did the thing"}, '{"tool":"finish","args":{"summary":"did the thing"}}') == "did the thing"
+
+
+def test_finish_summary_recovers_top_level_summary():
+    # Model put summary at top level, so parsed args is empty and content is raw JSON.
+    from ai_alpha_squad.actions_agent import _finish_summary
+    raw = '{"tool": "finish", "summary": "Created Hello World in 10 languages."}'
+    assert _finish_summary({}, raw) == "Created Hello World in 10 languages."
+
+
+def test_finish_summary_recovers_from_fenced_json():
+    from ai_alpha_squad.actions_agent import _finish_summary
+    raw = '```json\n{"tool":"finish","summary":"done all files"}\n```'
+    assert _finish_summary({}, raw) == "done all files"
+
+
+def test_finish_summary_never_echoes_raw_toolcall():
+    from ai_alpha_squad.actions_agent import _finish_summary
+    raw = '{"tool":"finish","args":{}}'
+    out = _finish_summary({}, raw)
+    assert '"tool"' not in out and out
