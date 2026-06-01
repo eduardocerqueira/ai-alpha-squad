@@ -53,7 +53,7 @@ A **scheduled scan every 10 minutes** (runs on `main`) closes matching PRs even 
 
 Custom agents `business-owner` and `architect` use **read/search tools only** (no `edit`) to reduce spurious draft PRs on this repo.
 
-**PR guard recovery:** Closing a planning or product PR does **not** force-nudge Copilot. The guard prefers **open** linked issues (e.g. #57 over closed #15), skips closed issues, never re-dispatches on product/extension closes, and only re-assigns when Copilot is **not** already on the issue.
+**PR guard recovery:** Closing a planning or product PR does **not** force-nudge Copilot. The guard prefers **open** linked issues (e.g. #57 over closed #15), skips closed issues, never re-dispatches on product/extension closes, and only re-assigns when Copilot is **not** already on the issue. **Squad phase watch** runs `squad-recover-architect.sh` for `director-approved` jobs missing Copilot.
 
 **PR → issue promotion:** If the PR body contains a full `# Business Analysis` or `# Technical Specification` (not a stub with `...`), the guard **copies it onto the issue**, runs `squad-sync-planning-labels.sh`, updates the project board, and unassigns Copilot after BA (Director gate next).
 
