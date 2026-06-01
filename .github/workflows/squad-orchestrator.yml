@@ -132,14 +132,15 @@ jobs:
           chmod +x ./scripts/notify-director-lifecycle.sh
           ./scripts/notify-director-lifecycle.sh "dispatched-${{ steps.dispatch.outputs.agent }}" "$ISSUE_NUMBER" "$REPO" || true
 
-  # After BO/Architect dispatch: poll Copilot PRs, promote deliverables onto the issue, sync labels/board.
+  # After BO/Architect dispatch: run a fast reconcile pass.
+  # Retries are handled by scheduled PR guard scan + phase-watch tick, avoiding long issue-level locks.
   reconcile-planning:
     needs: orchestrate
     if: >-
       needs.orchestrate.outputs.lifecycle_label == 'new' ||
       needs.orchestrate.outputs.lifecycle_label == 'director-approved'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 12
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
@@ -163,7 +164,7 @@ jobs:
             ./scripts/squad-dispatch-copilot.sh \
             ./scripts/squad-dispatch-subissue.sh \
             ./scripts/squad-resolve-guard-issue.py
-          ./scripts/squad-reconcile-planning-deliverables.sh "$REPO" "$ISSUE_NUMBER" --wait-minutes 35 || true
+          ./scripts/squad-reconcile-planning-deliverables.sh "$REPO" "$ISSUE_NUMBER" || true
 
   # Phase 4 — parallel validation (QA, Security, DevOps, Tech Writer)
   dispatch-validation:
