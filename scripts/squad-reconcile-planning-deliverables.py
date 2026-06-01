@@ -85,7 +85,7 @@ def finalize(repo: str, issue: int, root: Path) -> None:
     project_sync = root / "scripts" / "squad_project_sync.py"
     if project_sync.is_file():
         subprocess.run(
-            ["python3", str(project_sync), "--repo", repo, "--issue", str(issue)],
+            ["python3", str(project_sync), "--repo", repo, "sync-issue", str(issue)],
             check=False,
         )
 
