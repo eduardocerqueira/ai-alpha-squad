@@ -20,6 +20,12 @@ on:
       - Squad v2 phase watch
     types: [completed]
 
+# Only one refresh at a time; a newer trigger cancels an in-flight one so the
+# LATEST data always wins the force-push (no stale run clobbering a fresh one).
+concurrency:
+  group: director-dashboard
+  cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -33,9 +39,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]" 2>/dev/null || true
+        run: python -m pip install -e . 2>/dev/null || true
 
       - name: Build dashboard JSON
         env:
