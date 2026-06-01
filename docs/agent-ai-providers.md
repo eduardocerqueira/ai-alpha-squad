@@ -1,0 +1,72 @@
+# Squad AI providers
+
+The squad uses **GitHub Actions** as the runner and **Hugging Face Inference Providers** for models. **GitHub Copilot coding agent** is legacy optional (`SQUAD_CODE_RUNTIME=copilot`).
+
+Tracked in [issue #85](https://github.com/eduardocerqueira/ai-alpha-squad/issues/85).
+
+## Configuration
+
+| Setting | Where | Values |
+| ------- | ----- | ------ |
+| `SQUAD_AI_PROVIDER` | GitHub Variable or `.env` | `huggingface` (recommended), `copilot` (legacy) |
+| `SQUAD_CODE_RUNTIME` | GitHub Variable or `.env` | `actions` (default with HF), `copilot` (legacy assign API) |
+| `HF_TOKEN` | GitHub Secret / `.env` | Required for HF planning + Actions coding loop |
+| `SQUAD_HF_DEFAULT_MODEL` | GitHub Variable or `.env` | Default HF model if agent has no override |
+| `SQUAD_HF_RUN_IN_CI` | GitHub Variable | `1` run HF inference in Actions; `0` dispatch comment only |
+| `SQUAD_HF_ARCHITECT_SUBISSUES` | Env | `1` (default) create sub-issues after Architect HF run |
+| `squad-config.yaml` → `ai:` | `.agents/squad-config.yaml` | `provider`, `code_runtime`, per-agent overrides |
+
+```bash
+gh variable set SQUAD_AI_PROVIDER --repo OWNER/ai-alpha-squad --body "huggingface"
+gh variable set SQUAD_CODE_RUNTIME --repo OWNER/ai-alpha-squad --body "actions"
+gh variable set SQUAD_HF_DEFAULT_MODEL --repo OWNER/ai-alpha-squad --body "meta-llama/Meta-Llama-3.1-8B-Instruct"
+gh secret set HF_TOKEN --repo OWNER/ai-alpha-squad
+```
+
+## Per-agent dispatch
+
+`resolve_dispatch_mode(agent)` in `agent_models.py`:
+
+| Agent roles | Mode when `SQUAD_CODE_RUNTIME=actions` |
+| ----------- | -------------------------------------- |
+| business-owner, architect, qa, security, tech-writer, release-manager | **hf** — issue comment deliverables |
+| developer, devops | **actions** — clone target repo, HF tool loop, PR |
+
+## Runtime behavior
+
+| Mode | Dispatch | Best for |
+| ---- | -------- | -------- |
+| **hf** | `hf_dispatch` → [HF router](https://router.huggingface.co/v1/chat/completions) | BA, tech spec, QA/security reports |
+| **actions** | `squad-actions-agent.yml` + tool loop | Implementation PRs on target repo |
+| **copilot** (legacy) | `copilot-swe-agent[bot]` assign | Deprecated |
+
+Architect: after HF tech spec, `ensure_architect_subissues` creates validation sub-issues (no `gh` from the model).
+
+## Scripts
+
+| Script | Role |
+| ------ | ---- |
+| `scripts/squad-dispatch-agent.sh` | Lifecycle dispatch entry |
+| `scripts/squad-dispatch-subissue.sh` | Per-agent router (hf / actions / copilot) |
+| `scripts/squad-run-hf-agent.sh` | HF inference + issue comments |
+| `scripts/squad-run-actions-agent.sh` | Coding agent + PR |
+| `scripts/squad-build-actions-instructions.sh` | Developer/DevOps instructions |
+| `scripts/test-hf-integration.sh` | HF smoke tests |
+| `scripts/test-actions-agent-integration.sh` | Actions routing smoke tests |
+
+Workflows: [squad-orchestrator.yml](../.github/workflows/squad-orchestrator.yml), [squad-actions-agent.yml](../.github/workflows/squad-actions-agent.yml).
+
+### Local checks
+
+```bash
+set -a && source .env && set +a
+./scripts/verify-prerequisites.sh
+./scripts/test-hf-integration.sh
+./scripts/test-actions-agent-integration.sh
+```
+
+## Related
+
+- [agent-runtime-strategy.md](../.agents/agent-runtime-strategy.md)
+- [infrastructure-prerequisites.md](../.agents/infrastructure-prerequisites.md)
+- [SECRETS_AND_VARIABLES.md](../.github/SECRETS_AND_VARIABLES.md)

@@ -11,6 +11,7 @@ sequenceDiagram
     autonumber
     actor Director
     participant GH as GitHub Issues<br/>(work queue)
+    participant WF as Squad orchestrator<br/>(GitHub Actions)
     participant BO as Business Owner
     participant ARC as Architect
     participant DEV as Developer
@@ -19,13 +20,16 @@ sequenceDiagram
     participant TR as Target repo
 
     Director->>GH: Create business request (new)
-    GH->>BO: Analyze request
+    GH->>WF: Label new
+    WF->>BO: HF inference (planning)
     BO->>GH: Business Analysis + awaiting-approval
     BO->>Director: Approval request (issue / WhatsApp)
-    Director->>GH: approved
-    GH->>ARC: Design solution
-    ARC->>GH: Tech spec, sub-issues, designed
-    GH->>DEV: Implement (e.g. Copilot cloud)
+    Director->>GH: director-approved
+    GH->>WF: Dispatch architect
+    WF->>ARC: HF tech spec + sub-issues
+    ARC->>GH: designed
+    GH->>WF: Label designed
+    WF->>DEV: Actions agent + HF (code loop)
     DEV->>TR: Branch, commits, pull request
     DEV->>GH: implemented
     par Validation

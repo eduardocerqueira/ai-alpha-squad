@@ -12,6 +12,15 @@ Provide reliable build, deployment, and operational automation.
 
 devops
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `Qwen/Qwen2.5-Coder-32B-Instruct` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [Qwen2.5-Coder-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct) — GitHub Actions, YAML, and infrastructure-as-code edits (prefer Copilot for PR-based pipeline work).
+
 ## Inputs
 
 - Technical specification

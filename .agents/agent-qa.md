@@ -12,6 +12,15 @@ Validate software quality and prevent regressions.
 
 qa
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `deepseek-ai/DeepSeek-V4-Flash` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [DeepSeek-V4-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash) — test planning, acceptance validation, and QA report synthesis.
+
 ## Inputs
 
 - Source code

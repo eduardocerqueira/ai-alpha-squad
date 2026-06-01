@@ -1,17 +1,18 @@
 # Agent Runtime Strategy — Local vs Cloud
 
-The squad was designed around **GitHub Issues as source of truth**. Agents can run on your laptop (Cursor) or in the cloud (GitHub Copilot coding agent, Cursor Cloud, Workers). **Full autonomy does not require your machine**, but no single product replaces the entire multi-agent workflow today.
+The squad was designed around **GitHub Issues as source of truth**. Cloud delivery uses **GitHub Actions** workflows plus **Hugging Face** models — not GitHub Copilot coding agent (legacy optional). Local **Cursor** remains available for the Director.
 
 ## Short answer
 
 | Goal | Recommendation |
 | ---- | ---------------- |
-| Stop using your Mac for coding work | **Yes** — run implementation on **GitHub Copilot cloud agent** on **target product repos** |
-| Run Business Owner + Architect + QA as separate cloud agents | **Partial** — use **custom agents** in `.github/agents/` (this repo + product repos); orchestration between phases still needs Issues + labels (and optionally a workflow) |
-| True end-to-end autonomy (issue → release, no human) | **Not yet** — keep **Director gates**; add automation to *invoke* the next agent when labels change |
-| WhatsApp approvals | **Cloud Worker** (Cloudflare) for webhooks; not GitHub Copilot |
+| Default cloud runtime | **`SQUAD_AI_PROVIDER=huggingface`** + **`SQUAD_CODE_RUNTIME=actions`** — see [docs/agent-ai-providers.md](../docs/agent-ai-providers.md) |
+| Stop using your Mac for coding work | **Yes** — **Squad Actions agent** clones the target repo, runs an HF tool loop, opens a PR |
+| Planning (BA, architect, reports) | **HF inference** → issue comments; architect sub-issues via script |
+| Copilot | **Legacy** — set `SQUAD_CODE_RUNTIME=copilot` only if you still use assign API |
+| Director gates | Unchanged — WhatsApp/GitHub approval |
 
-Repository agents UI: [github.com/eduardocerqueira/ai-alpha-squad/agents](https://github.com/eduardocerqueira/ai-alpha-squad/agents) (Copilot sessions for this repo).
+Implementation: [issue #85](https://github.com/eduardocerqueira/ai-alpha-squad/issues/85).
 
 ---
 
@@ -60,7 +61,7 @@ Repository agents UI: [github.com/eduardocerqueira/ai-alpha-squad/agents](https:
 | ----------- | --------------- | -------------- |
 | Business Owner | **Cursor** (local/cloud) **preferred**; Copilot `business-owner` only if it posts `# Business Analysis` on the issue via `gh issue comment` | Issue `new` → BA comment; `awaiting-approval` — **not** a planning PR on queue repo |
 | Architect | Copilot `architect` (read/edit docs) **or** Cursor | Issue `director-approved` → tech spec + sub-issues on queue repo |
-| Developer | **Copilot cloud on target repo** | Sub-issue on product repo → assign Copilot `developer` |
+| Developer | **Squad Actions agent** on target repo | Sub-issue → `squad-actions-agent.yml` (HF + git + PR) |
 | QA | Copilot `qa` on target repo | Sub-issue after PR exists |
 | Security | Cursor / manual + tools | Review PR; security-report on issue |
 | DevOps | Actions + Copilot `devops` stub | First job: pipelines; Worker for WhatsApp |
@@ -77,6 +78,7 @@ Repository agents UI: [github.com/eduardocerqueira/ai-alpha-squad/agents](https:
 | [GitHub Copilot cloud agent](https://github.com/features/copilot/agents) | Issue → branch → PR in GitHub | **Default for code** on product repos |
 | [Cursor Cloud Agents](https://cursor.com/docs/sdk) (`@cursor/sdk`, `CURSOR_API_KEY`) | API-driven runs, same prompts as IDE | Orchestrator script: label change → `Agent.prompt` with `agent-*.md` |
 | Cloudflare **Agents SDK** | Stateful webhooks, WhatsApp, queues | WhatsApp Director channel + future orchestrator DO |
+| Hugging Face **Inference** (`SQUAD_AI_PROVIDER=huggingface`) | Issue-first deliverables (BA, reports) via router API | Per-agent model in `.agents/agent-*.md` **## AI Model** |
 | Hugging Face **Jobs** | GPU training/batch | Optional per tech spec |
 | Copilot **CLI agent** | Long tasks from terminal/CI | `gh copilot` / copilot-cli in Actions |
 

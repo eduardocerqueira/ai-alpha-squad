@@ -61,10 +61,10 @@ Env: `SQUAD_AUTONOMOUS_PLANNING=1` (default), `SQUAD_MAX_PLANNING_NUDGES=2`. Dir
 
 | Label added | Auto action | Copilot agent |
 | ----------- | ----------- | ------------- |
-| `new` | Dispatch | `business-owner` |
+| `new` | Dispatch | `business-owner` (HF) |
 | `awaiting-approval` | Optional WhatsApp notify (GitHub comment `APPROVE` always works) | — |
-| `director-approved` | Dispatch (Director gate) | `architect` |
-| `designed` | Dispatch Developer sub-issue | `developer` on target repo |
+| `director-approved` | Dispatch (Director gate) | `architect` (HF + sub-issues script) |
+| `designed` | Dispatch Developer sub-issue | `developer` via **Squad Actions agent** (HF tool loop + PR) |
 | `implemented` | **Parallel** dispatch (matrix job) on validation sub-issues | `qa`, `security`, `devops`, `tech-writer` (4 concurrent workflow jobs) |
 | `validation` | Dispatch | `release-manager` |
 | `release-candidate` | Optional WhatsApp notify | — |
@@ -121,6 +121,9 @@ When a squad-linked PR merges, the queue repo receives `repository_dispatch` →
 
 | Secret / var | Purpose |
 | ------------ | ------- |
+| `SQUAD_AI_PROVIDER` | `copilot` (default) or `huggingface` — see [agent-ai-providers.md](agent-ai-providers.md) |
+| `SQUAD_HF_DEFAULT_MODEL` | Default Hugging Face model when agent has no override |
+| `HF_TOKEN` | Required for `SQUAD_AI_PROVIDER=huggingface` with CI inference |
 | `SQUAD_ORCHESTRATOR_TOKEN` | PAT: issues, Copilot assign, workflow dispatch |
 | `SQUAD_DIRECTOR_LOGIN` | Director gate |
 | `SQUAD_WHATSAPP_NOTIFY` | Optional: `0` off, `1` on, unset = auto (send only if `WHATSAPP_*` configured) |

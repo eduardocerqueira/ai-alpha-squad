@@ -12,6 +12,15 @@ Implement approved technical specifications using production-quality code.
 
 developer
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `Qwen/Qwen2.5-Coder-32B-Instruct` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [Qwen2.5-Coder-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct) — code generation via **Squad Actions agent** (`SQUAD_CODE_RUNTIME=actions`) on target repos.
+
 ## Inputs
 
 - Technical Specification

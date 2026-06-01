@@ -12,6 +12,15 @@ Create and maintain project documentation.
 
 tech-writer
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `meta-llama/Meta-Llama-3.3-70B-Instruct` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [Meta-Llama-3.3-70B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.3-70B-Instruct) — clear user-facing docs, README updates, and release notes.
+
 ## Inputs
 
 - Technical specification

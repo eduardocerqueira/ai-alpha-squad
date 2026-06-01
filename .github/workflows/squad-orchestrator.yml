@@ -111,18 +111,29 @@ jobs:
             gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$BODY"
           fi
 
-      - name: Dispatch Copilot agent
+      - name: Dispatch squad agent
         id: dispatch
         if: >-
           steps.label.outputs.name == 'new' ||
           steps.label.outputs.name == 'designed' ||
           steps.label.outputs.name == 'validation' ||
           (steps.label.outputs.name == 'director-approved' && steps.director_ok.outputs.ok == 'true')
+        env:
+          SQUAD_AI_PROVIDER: ${{ vars.SQUAD_AI_PROVIDER }}
+          SQUAD_CODE_RUNTIME: ${{ vars.SQUAD_CODE_RUNTIME }}
+          SQUAD_HF_DEFAULT_MODEL: ${{ vars.SQUAD_HF_DEFAULT_MODEL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SQUAD_HF_RUN_IN_CI: ${{ vars.SQUAD_HF_RUN_IN_CI }}
         run: |
-          chmod +x ./scripts/squad-dispatch-copilot.sh \
+          chmod +x ./scripts/squad-dispatch-agent.sh \
+            ./scripts/squad-dispatch-copilot.sh \
+            ./scripts/squad-dispatch-huggingface.sh \
+            ./scripts/squad-run-hf-agent.sh \
+            ./scripts/squad-run-actions-agent.sh \
+            ./scripts/squad-build-actions-instructions.sh \
             ./scripts/squad-dispatch-subissue.sh \
             ./scripts/squad-find-subissues.py
-          ./scripts/squad-dispatch-copilot.sh "$REPO" "$ISSUE_NUMBER" "${{ steps.label.outputs.name }}"
+          ./scripts/squad-dispatch-agent.sh "$REPO" "$ISSUE_NUMBER" "${{ steps.label.outputs.name }}"
 
       - name: Notify Director (agent dispatched)
         if: steps.dispatch.outputs.dispatched == 'true'
@@ -207,8 +218,20 @@ jobs:
 
       - name: Dispatch validation agent (${{ matrix.role }})
         id: dispatch
+        env:
+          SQUAD_AI_PROVIDER: ${{ vars.SQUAD_AI_PROVIDER }}
+          SQUAD_CODE_RUNTIME: ${{ vars.SQUAD_CODE_RUNTIME }}
+          SQUAD_HF_DEFAULT_MODEL: ${{ vars.SQUAD_HF_DEFAULT_MODEL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SQUAD_HF_RUN_IN_CI: ${{ vars.SQUAD_HF_RUN_IN_CI }}
         run: |
           chmod +x ./scripts/squad-dispatch-validation.sh \
+            ./scripts/squad-dispatch-agent.sh \
+            ./scripts/squad-dispatch-copilot.sh \
+            ./scripts/squad-dispatch-huggingface.sh \
+            ./scripts/squad-run-hf-agent.sh \
+            ./scripts/squad-run-actions-agent.sh \
+            ./scripts/squad-build-actions-instructions.sh \
             ./scripts/squad-dispatch-subissue.sh \
             ./scripts/squad-find-subissues.py
           ./scripts/squad-dispatch-validation.sh "$REPO" "$ISSUE_NUMBER" "${{ matrix.role }}"

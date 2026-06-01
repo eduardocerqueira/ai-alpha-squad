@@ -1,0 +1,62 @@
+# Squad coding agent — HF tool loop on Actions (no Copilot).
+# See https://github.com/eduardocerqueira/ai-alpha-squad/issues/85
+name: Squad Actions agent
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      queue_repo:
+        description: Queue repo (owner/name)
+        required: true
+      issue_number:
+        description: Issue number on queue repo
+        required: true
+      agent:
+        description: Agent slug (developer, devops)
+        required: true
+      target_repo:
+        description: Target product repo (owner/name)
+        required: true
+concurrency:
+  group: squad-actions-${{ inputs.queue_repo }}-${{ inputs.issue_number }}-${{ inputs.agent }}
+  cancel-in-progress: false
+
+jobs:
+  code:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SQUAD_AI_PROVIDER: ${{ vars.SQUAD_AI_PROVIDER }}
+      SQUAD_CODE_RUNTIME: ${{ vars.SQUAD_CODE_RUNTIME }}
+      SQUAD_HF_DEFAULT_MODEL: ${{ vars.SQUAD_HF_DEFAULT_MODEL }}
+      SQUAD_ACTIONS_INLINE: "1"
+      DISPATCH_LABEL: ${{ inputs.agent }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Squad Actions agent
+        run: |
+          chmod +x ./scripts/squad-run-actions-agent.sh \
+            ./scripts/squad-build-actions-instructions.sh
+          INSTR="$(./scripts/squad-build-actions-instructions.sh \
+            "${{ inputs.queue_repo }}" \
+            "${{ inputs.issue_number }}" \
+            "${{ inputs.agent }}" \
+            "${{ inputs.target_repo }}")"
+          ./scripts/squad-run-actions-agent.sh \
+            "${{ inputs.queue_repo }}" \
+            "${{ inputs.issue_number }}" \
+            "${{ inputs.agent }}" \
+            "${{ inputs.target_repo }}" \
+            "$INSTR"

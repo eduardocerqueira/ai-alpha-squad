@@ -155,6 +155,10 @@ if [[ -n "${SQUAD_NUDGE_REASON:-}" && -n "$INSTRUCTIONS_FILE" ]]; then
 fi
 
 export DISPATCH_LABEL="$LABEL"
-chmod +x "$DISPATCH"
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+chmod +x "$DISPATCH" \
+  "${ROOT}/scripts/squad-run-hf-agent.sh" \
+  "${ROOT}/scripts/squad-run-actions-agent.sh"
 "$DISPATCH" "$REPO" "$DISPATCH_ISSUE" "$AGENT" "$TARGET_REPO" "$INSTRUCTIONS_FILE"
 rm -f "$INSTRUCTIONS_FILE"

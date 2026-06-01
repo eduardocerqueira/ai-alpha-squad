@@ -12,6 +12,18 @@ ok() { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}!${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; }
 
+check_env() {
+  local name=$1
+  local required=${2:-optional}
+  if [[ -n "${!name:-}" ]]; then
+    ok "$name is set"
+  elif [[ "$required" == "required" ]]; then
+    fail "$name is not set (required)"
+  else
+    warn "$name is not set (optional)"
+  fi
+}
+
 echo "AI Alpha Squad — prerequisite check"
 echo "Repo: $ROOT"
 echo
@@ -62,27 +74,27 @@ fi
 
 if command -v hf >/dev/null 2>&1; then
   if hf auth whoami >/dev/null 2>&1; then
-    ok "Hugging Face CLI authenticated"
+    ok "Hugging Face CLI (hf) authenticated"
   else
     warn "hf installed but not logged in — hf auth login or HF_TOKEN"
   fi
+elif command -v huggingface-cli >/dev/null 2>&1; then
+  if [[ -n "${HF_TOKEN:-}" ]] || huggingface-cli whoami >/dev/null 2>&1; then
+    ok "Hugging Face CLI (huggingface-cli) — HF_TOKEN or logged in"
+  else
+    warn "huggingface-cli present — set HF_TOKEN or: hf auth login / huggingface-cli login"
+  fi
+elif [[ -n "${HF_TOKEN:-}" ]]; then
+  ok "HF_TOKEN set (squad HF dispatch uses router API — hf CLI not required)"
 else
-  warn "hf not installed (optional until HF work)"
+  warn "No hf / huggingface-cli — optional; set HF_TOKEN for SQUAD_AI_PROVIDER=huggingface"
+fi
+
+if [[ "${SQUAD_AI_PROVIDER:-}" == "huggingface" ]]; then
+  check_env HF_TOKEN required
 fi
 
 # --- Env vars (presence only) ---
-check_env() {
-  local name=$1
-  local required=${2:-optional}
-  if [[ -n "${!name:-}" ]]; then
-    ok "$name is set"
-  elif [[ "$required" == "required" ]]; then
-    fail "$name is not set (required)"
-  else
-    warn "$name is not set (optional)"
-  fi
-}
-
 echo
 echo "Environment variables (from .env if loaded):"
 

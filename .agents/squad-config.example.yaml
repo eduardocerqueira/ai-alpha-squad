@@ -1,6 +1,30 @@
 # Non-secret squad defaults. Copy to squad-config.yaml (gitignored) or set in GitHub Variables.
 # Secrets stay in .env / GitHub Secrets — see infrastructure-prerequisites.md
 
+# AI runtime — override with env SQUAD_AI_PROVIDER (copilot | huggingface)
+ai:
+  provider: huggingface
+  code_runtime: actions
+  defaults:
+    huggingface: meta-llama/Meta-Llama-3.1-8B-Instruct
+  agents:
+    business-owner:
+      huggingface: deepseek-ai/DeepSeek-V4-Flash
+    architect:
+      huggingface: Qwen/Qwen3.6-27B
+    developer:
+      huggingface: Qwen/Qwen2.5-Coder-32B-Instruct
+    qa:
+      huggingface: deepseek-ai/DeepSeek-V4-Flash
+    security:
+      huggingface: deepseek-ai/DeepSeek-V4-Flash
+    devops:
+      huggingface: Qwen/Qwen2.5-Coder-32B-Instruct
+    tech-writer:
+      huggingface: meta-llama/Meta-Llama-3.3-70B-Instruct
+    release-manager:
+      huggingface: deepseek-ai/DeepSeek-V4-Flash
+
 github:
   owner: eduardocerqueira
   work_queue_repo: ai-alpha-squad

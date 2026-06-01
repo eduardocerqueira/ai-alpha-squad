@@ -17,6 +17,15 @@ You DO NOT write code.
 
 business-owner
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `deepseek-ai/DeepSeek-V4-Flash` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [DeepSeek-V4-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash) — strong reasoning for business analysis, requirements, and acceptance criteria.
+
 ## Inputs
 
 - GitHub Issue created by Director

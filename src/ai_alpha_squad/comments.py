@@ -91,8 +91,18 @@ def format_squad_comment(
     )
 
 
-def format_dispatch_comment(agent: str, label: str, *, repo: str | None = None, ref: str | None = None) -> str:
-    """Orchestrator assigned Copilot agent — orchestrator avatar + inline target agent icon."""
+def format_dispatch_comment(
+    agent: str,
+    label: str,
+    *,
+    repo: str | None = None,
+    ref: str | None = None,
+    provider: str = "copilot",
+) -> str:
+    """Orchestrator assigned agent — orchestrator avatar + inline target agent icon."""
+    if provider == "huggingface":
+        return format_hf_dispatch_comment(agent, label, repo=repo, ref=ref)
+
     agent_slug = normalize_agent_slug(agent)
     icon = agent_icon_img(agent_slug, repo=repo, ref=ref)
     message = (
@@ -100,6 +110,51 @@ def format_dispatch_comment(agent: str, label: str, *, repo: str | None = None, 
         f"for label `{label}`."
     )
     return format_squad_comment(message, avatar="orchestrator", repo=repo, ref=ref)
+
+
+def format_hf_dispatch_comment(
+    agent: str,
+    label: str,
+    *,
+    repo: str | None = None,
+    ref: str | None = None,
+    model_summary: str | None = None,
+    run_in_ci: bool = True,
+) -> str:
+    from ai_alpha_squad.agent_models import HF_DISPATCH_MARKER
+
+    agent_slug = normalize_agent_slug(agent)
+    icon = agent_icon_img(agent_slug, repo=repo, ref=ref)
+    model_line = model_summary or "see agent `.agents/agent-*.md` ## AI Model"
+    run_note = (
+        "Running inference in this workflow (`SQUAD_HF_RUN_IN_CI=1`)."
+        if run_in_ci
+        else "Set `SQUAD_HF_RUN_IN_CI=1` and `HF_TOKEN` to run inference in CI."
+    )
+    message = (
+        f"**Squad orchestrator** — {HF_DISPATCH_MARKER}\n\n"
+        f"Provider: **Hugging Face** · Agent {icon} `{agent_slug}` · label `{label}`\n\n"
+        f"Model: {model_line}\n\n"
+        f"{run_note}"
+    )
+    return format_squad_comment(message, avatar="orchestrator", repo=repo, ref=ref)
+
+
+def format_hf_result_comment(
+    agent: str,
+    content_md: str,
+    *,
+    repo: str | None = None,
+    ref: str | None = None,
+    model: str = "",
+) -> str:
+    from ai_alpha_squad.agent_models import HF_RESULT_MARKER
+
+    agent_slug = normalize_agent_slug(agent)
+    icon = agent_icon_img(agent_slug, repo=repo, ref=ref)
+    model_line = f" · model `{model}`" if model else ""
+    header = f"**{HF_RESULT_MARKER}** — {icon} `{agent_slug}`{model_line}\n\n"
+    return format_squad_comment(header + content_md.strip(), avatar=agent_slug, repo=repo, ref=ref)
 
 
 def format_dispatch_fallback_comment(

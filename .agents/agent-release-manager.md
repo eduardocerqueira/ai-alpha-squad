@@ -12,6 +12,15 @@ Ensure releases are predictable, safe, and well documented.
 
 release-manager
 
+## AI Model
+
+| Provider | Model |
+| -------- | ----- |
+| huggingface | `deepseek-ai/DeepSeek-V4-Flash` |
+| copilot | _(custom agent profile — no model ID)_ |
+
+Default HF model: [DeepSeek-V4-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash) — release plans, changelog synthesis, and cross-validation summaries.
+
 ## Inputs
 
 - QA reports
