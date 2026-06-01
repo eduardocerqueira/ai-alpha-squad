@@ -108,9 +108,12 @@ fi
 
 PR_VIEW="$(gh pr view "$PR" --repo "$REPO" --json body,title -q '[.title,.body]|join("\n")' 2>/dev/null || true)"
 PR_TITLE="$(gh pr view "$PR" --repo "$REPO" --json title -q .title 2>/dev/null || true)"
-mapfile -t PR_FILES < <(gh pr diff "$PR" --repo "$REPO" --name-only 2>/dev/null || true)
+PR_FILES=""
+while IFS= read -r path; do
+  [[ -n "$path" ]] && PR_FILES+="${path}"$'\n'
+done < <(gh pr diff "$PR" --repo "$REPO" --name-only 2>/dev/null || true)
 export PR_VIEW
-export PR_FILES="$(printf '%s\n' "${PR_FILES[@]}")"
+export PR_FILES
 
 PRODUCT_DECISION="$(python3 - "$REPO" "$PR_TITLE" <<'PY'
 import json, os, sys
@@ -202,7 +205,14 @@ if [[ "$has_marker" == false && "$PR_HAS_MARKER" == false ]]; then
     fi
   done
 elif [[ "$has_marker" == false && "$PR_HAS_MARKER" == true ]]; then
-  echo "PR body contains ${marker} but issue does not — closing planning PR (issue-first policy)."
+  echo "PR body contains ${marker} but issue does not — promoting to issue #${ISSUE}."
+  chmod +x "${ROOT}/scripts/squad-promote-pr-deliverable.py"
+  if python3 "${ROOT}/scripts/squad-promote-pr-deliverable.py" "$REPO" "$ISSUE" "$PR" --phase "$phase"; then
+    has_marker=true
+    PR_HAS_MARKER=false
+  else
+    echo "Promotion failed (stub or incomplete PR body) — will close PR without label advance."
+  fi
 fi
 
 if [[ "$has_marker" == false ]]; then
@@ -216,8 +226,18 @@ fi
 close_copilot_pr "$phase" "$ISSUE" "$REASON" "$NEXT"
 if [[ "$has_marker" == true ]]; then
   "${ROOT}/scripts/squad-sync-planning-labels.sh" "$REPO" "$ISSUE" || true
+  if [[ -x "${ROOT}/scripts/squad_project_sync.py" ]]; then
+    python3 "${ROOT}/scripts/squad_project_sync.py" sync-issue "$ISSUE" || true
+  fi
+  if [[ "$phase" == "business-owner" ]] && copilot_assigned_on_issue "$ISSUE"; then
+    gh issue edit "$ISSUE" --repo "$REPO" --remove-assignee Copilot 2>/dev/null \
+      || gh api --method DELETE "/repos/${REPO%%/*}/${REPO#*/}/issues/${ISSUE}/assignees" \
+        -f 'assignees[]=Copilot' 2>/dev/null || true
+    echo "Unassigned Copilot on #$ISSUE — BA on issue; awaiting Director approval."
+  fi
 elif [[ "$PR_HAS_MARKER" == true ]]; then
-  echo "Deliverable only on PR — skip redispatch; Copilot must post ${marker} on issue #${ISSUE}."
+  echo "Deliverable only on PR (could not promote) — skip redispatch."
+  maybe_guard_redispatch "$ISSUE" "$phase" "$REASON"
 else
   maybe_guard_redispatch "$ISSUE" "$phase" "$REASON"
 fi

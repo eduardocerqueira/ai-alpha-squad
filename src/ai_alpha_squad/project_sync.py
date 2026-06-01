@@ -28,6 +28,9 @@ AGENT_LABELS = frozenset(
     }
 )
 
+# Shown on the project board when lifecycle label advanced but deliverable is still missing.
+AGENT_PENDING_ON_ISSUE = "blocked — post on issue"
+
 PHASE_TO_AGENT: dict[str, str] = {
     "new": "business-owner",
     "awaiting-approval": "Director",
@@ -48,6 +51,14 @@ PARALLEL_VALIDATION_AGENT = "validation (parallel)"
 
 
 @dataclass(frozen=True)
+class PlanningDeliverables:
+    """Whether required issue comments exist (not merely Copilot PR stubs)."""
+
+    has_business_analysis: bool = False
+    has_technical_spec: bool = False
+
+
+@dataclass(frozen=True)
 class Derived:
     lifecycle: str | None
     active_agent: str
@@ -63,13 +74,26 @@ def current_lifecycle(labels: set[str]) -> str | None:
 
 def format_active_agent(base_agent: str, *, copilot_sessions: int = 1) -> str:
     """Append Copilot session count for project board visibility."""
+    if base_agent == AGENT_PENDING_ON_ISSUE:
+        return base_agent
     if copilot_sessions <= 1:
         return base_agent
     return f"{base_agent}{COPILOT_SESSION_SUFFIX.format(count=copilot_sessions)}"
 
 
-def base_active_agent(labels: set[str], lifecycle: str | None) -> str:
+def base_active_agent(
+    labels: set[str],
+    lifecycle: str | None,
+    *,
+    planning: PlanningDeliverables | None = None,
+) -> str:
     agents_on_issue = sorted(labels & AGENT_LABELS)
+    deliverables = planning or PlanningDeliverables()
+
+    if lifecycle == "new" and not deliverables.has_business_analysis:
+        return AGENT_PENDING_ON_ISSUE
+    if lifecycle == "director-approved" and not deliverables.has_technical_spec:
+        return AGENT_PENDING_ON_ISSUE
 
     if lifecycle is None:
         return agents_on_issue[0] if agents_on_issue else "Unassigned"
@@ -86,9 +110,14 @@ def base_active_agent(labels: set[str], lifecycle: str | None) -> str:
     return agents_on_issue[0] if agents_on_issue else "Unassigned"
 
 
-def derive_state(labels: set[str], *, copilot_sessions: int = 1) -> Derived:
+def derive_state(
+    labels: set[str],
+    *,
+    copilot_sessions: int = 1,
+    planning: PlanningDeliverables | None = None,
+) -> Derived:
     lifecycle = current_lifecycle(labels)
-    base = base_active_agent(labels, lifecycle)
+    base = base_active_agent(labels, lifecycle, planning=planning)
     if base == PARALLEL_VALIDATION_AGENT:
         active_agent = base
     else:

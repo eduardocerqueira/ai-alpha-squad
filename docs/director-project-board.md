@@ -35,6 +35,8 @@ Mapping rules (see `scripts/squad_project_sync.py`):
 | Lifecycle | Active agent | Needs Director |
 | --------- | ------------ | -------------- |
 | `new` | business-owner | No |
+| `new` (no `# Business Analysis` on issue yet) | **blocked — post on issue** | No |
+| `director-approved` (no tech spec on issue yet) | **blocked — post on issue** | No |
 | `awaiting-approval` | **Director** | **Yes** |
 | `director-approved` | architect | No |
 | `designed` | developer | No |

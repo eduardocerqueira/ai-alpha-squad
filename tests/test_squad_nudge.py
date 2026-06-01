@@ -6,7 +6,9 @@ from datetime import datetime, timezone
 from ai_alpha_squad.nudge import (
     NUDGE_MARKER,
     architect_subissues_complete,
+    extract_deliverable_section,
     has_heading_marker,
+    is_substantive_deliverable,
     issue_has_deliverable,
     last_nudge_minutes_ago,
     should_nudge_phase,
@@ -58,6 +60,33 @@ def test_last_nudge_minutes_ago_uses_latest() -> None:
         {"body": f"**{NUDGE_MARKER}:** retry", "createdAt": "2026-05-31T11:30:00Z"},
     ]
     assert last_nudge_minutes_ago(comments, now=now) == 30.0
+
+
+def test_extract_deliverable_rejects_stub() -> None:
+    stub = "# Business Analysis\n\nSee BR-001 ... and US-002 ... done."
+    assert extract_deliverable_section(stub, "# Business Analysis") is None
+
+
+def test_extract_deliverable_from_pr_style_body() -> None:
+    body = """## Summary
+Handoff PR.
+
+```markdown
+# Business Analysis
+
+## Metadata
+| Field | Value |
+| Job | Squad Director |
+
+## Goals
+Build the extension.
+
+## Requirements Register
+| BR-001 | Queue view | Must |
+""" + "x" * 500
+    section = extract_deliverable_section(body, "# Business Analysis")
+    assert section is not None
+    assert is_substantive_deliverable(section, "# Business Analysis")
 
 
 def test_architect_subissues_complete() -> None:

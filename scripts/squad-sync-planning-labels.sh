@@ -45,7 +45,8 @@ PY
     return 0
   fi
 
-  gh issue edit "$ISSUE" --repo "$REPO" --add-label "awaiting-approval" --remove-label "new"
+  gh issue edit "$ISSUE" --repo "$REPO" \
+    --add-label "awaiting-approval" --add-label "business-owner" --remove-label "new"
   BODY="$(python3 "$FORMAT" notice \
     --message "**Squad orchestrator:** \`# Business Analysis\` detected on issue — applied \`awaiting-approval\`. Director review follows." \
     --repo "$REPO")"

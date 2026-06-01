@@ -1,9 +1,28 @@
 """Unit tests for squad project lifecycle/agent derivation."""
 from ai_alpha_squad.project_sync import (
+    AGENT_PENDING_ON_ISSUE,
     PARALLEL_VALIDATION_AGENT,
+    PlanningDeliverables,
     derive_state,
     format_active_agent,
 )
+
+
+def test_new_without_ba_shows_blocked_on_issue() -> None:
+    derived = derive_state(
+        {"new", "medium"},
+        planning=PlanningDeliverables(has_business_analysis=False),
+    )
+    assert derived.lifecycle == "new"
+    assert derived.active_agent == AGENT_PENDING_ON_ISSUE
+
+
+def test_new_with_ba_shows_business_owner() -> None:
+    derived = derive_state(
+        {"new", "medium"},
+        planning=PlanningDeliverables(has_business_analysis=True),
+    )
+    assert derived.active_agent == "business-owner"
 
 
 def test_awaiting_approval_shows_director():
@@ -32,7 +51,11 @@ def test_implemented_parallel_validation_agents():
 
 
 def test_architect_copilot_session_suffix():
-    derived = derive_state({"director-approved", "business-owner"}, copilot_sessions=2)
+    derived = derive_state(
+        {"director-approved", "business-owner"},
+        copilot_sessions=2,
+        planning=PlanningDeliverables(has_technical_spec=True),
+    )
     assert derived.active_agent == "architect (Copilot x2)"
 
 
