@@ -209,3 +209,61 @@ def test_edit_file_errors_on_missing_file(tmp_path):
 def test_edit_file_rejects_path_escape(tmp_path):
     res = execute_tool(tmp_path, "edit_file", {"path": "../../etc/passwd", "old_string": "a", "new_string": "b"})
     assert res.startswith("error:")
+
+
+# --- completeness guardrail (block premature finish on enumerated multi-file tasks) ---
+
+_TASK_30 = "\n".join(
+    [f"{i}. Lang{i} — `hello.x{i}`" for i in range(1, 31)]
+) + "\nAdd these files and update the README."
+
+
+def test_expected_artifact_count_counts_enumerated_files():
+    from ai_alpha_squad.actions_agent import expected_artifact_count
+    assert expected_artifact_count(_TASK_30) == 30
+
+
+def test_expected_artifact_count_none_for_non_list_task():
+    from ai_alpha_squad.actions_agent import expected_artifact_count
+    assert expected_artifact_count("Fix the UnicodeDecodeError in purge().") is None
+    # A short numbered step list (no filenames) must not trigger.
+    assert expected_artifact_count("1. clone\n2. edit\n3. push") is None
+
+
+def test_loop_blocks_finish_until_all_files_created(tmp_path, monkeypatch):
+    """Agent that tries to finish after 2 of 3 files must be forced to continue."""
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 30)
+    task = "1. A — `a.py`\n2. B — `b.py`\n3. C — `c.py`"
+    calls = {"n": 0}
+
+    def fake_chat(model, *, system, user, token):
+        calls["n"] += 1
+        # Try to finish immediately; only actually finishes once 3 files exist.
+        for name, fn in (("a.py", "a"), ("b.py", "b"), ("c.py", "c")):
+            if f"ok: wrote {name}" not in user:
+                # Premature finish attempt before all files exist on first chance:
+                if calls["n"] == 1:
+                    return '{"tool":"finish","args":{"summary":"done early"}}'
+                return '{"tool":"write_file","args":{"path":"%s","content":"x"}}' % name
+        return '{"tool":"finish","args":{"summary":"all three created"}}'
+
+    monkeypatch.setattr(actions_agent, "chat_completion", fake_chat)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions=task, issue_context="c", token="t"
+    )
+    assert finished is True
+    # The early finish was rejected, so all three files got created.
+    assert (tmp_path / "a.py").exists() and (tmp_path / "b.py").exists() and (tmp_path / "c.py").exists()
+    assert "all three" in summary
+
+
+def test_loop_allows_finish_when_no_required_count(tmp_path, monkeypatch):
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 5)
+    monkeypatch.setattr(actions_agent, "chat_completion",
+                        lambda *a, **k: '{"tool":"finish","args":{"summary":"fixed the bug"}}')
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions="Fix the bug in util.py", issue_context="c", token="t"
+    )
+    assert finished is True and "fixed" in summary

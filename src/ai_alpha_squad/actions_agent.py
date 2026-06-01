@@ -200,6 +200,24 @@ def assess_change_safety(diff_text: str) -> list[str]:
     return violations
 
 
+_ENUM_FILE_RE = re.compile(r"^\s*\d+\.\s")
+_BACKTICK_FILE_RE = re.compile(r"`[^`]+\.[A-Za-z0-9]{1,8}`")
+
+
+def expected_artifact_count(text: str) -> int | None:
+    """How many new files the task explicitly enumerates (e.g. a "1. C# — `hello.cs`"
+    … "30. …" list). Used to block premature finish / partial deliverables.
+
+    Returns None unless there's a clear multi-file list (>= 3 enumerated items that
+    each name a file), so single-file or non-creation tasks aren't constrained.
+    """
+    count = 0
+    for line in (text or "").splitlines():
+        if _ENUM_FILE_RE.match(line) and _BACKTICK_FILE_RE.search(line):
+            count += 1
+    return count if count >= 3 else None
+
+
 def _extract_json_object(text: str, start: int) -> str | None:
     depth = 0
     for i in range(start, len(text)):
@@ -364,6 +382,11 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
     # per call, so without this it cannot track which artifacts it already wrote
     # and never confidently calls finish (it churns until max turns).
     history: list[str] = []
+    # Completeness guard: if the task enumerates N files to create, don't accept
+    # finish until N files have been written — models otherwise call finish early
+    # (e.g. 8 of 30) and ship a partial deliverable.
+    required_files = expected_artifact_count(instructions)
+    created: set[str] = set()
 
     def build_conversation(extra: str = "") -> str:
         parts = [user]
@@ -397,9 +420,23 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
         tool_name, tool_args = parsed
         print(f"[actions] turn {_turn + 1}/{MAX_TURNS}: {tool_name}", file=sys.stderr)
         if tool_name == "finish":
+            if required_files and len(created) < required_files:
+                missing = required_files - len(created)
+                print(
+                    f"[actions] finish blocked: {len(created)}/{required_files} files created",
+                    file=sys.stderr,
+                )
+                history.append(
+                    f"[turn {_turn + 1}] finish REJECTED — only {len(created)}/{required_files} "
+                    f"required files created. Do NOT finish yet: create the {missing} remaining "
+                    "file(s) from the task list (use write_file), then finish."
+                )
+                continue
             return _finish_summary(tool_args, content), True
         result = execute_tool(workdir, tool_name, tool_args)
         arg_hint = str(tool_args.get("path") or tool_args.get("command") or "").strip()
+        if tool_name == "write_file" and result.startswith("ok:") and arg_hint:
+            created.add(arg_hint)
         result_brief = result if len(result) <= 400 else result[:400] + "…(truncated)"
         history.append(
             f"[turn {_turn + 1}] {tool_name} {arg_hint}".rstrip() + f" -> {result_brief}"
@@ -579,6 +616,27 @@ def main(argv: list[str] | None = None) -> int:
             for v in violations:
                 print(v)
             return 3 if violations else 0
+        elif argv[0] == "check-complete":
+            # Backstop: a partial result (e.g. agent hit max turns) must not pass as
+            # a finished deliverable. Compares new files created against the count
+            # the task enumerates.
+            workdir = Path(argv[1])
+            instructions = Path(argv[2]).read_text(encoding="utf-8")
+            required = expected_artifact_count(instructions)
+            if not required:
+                return 0
+            status = subprocess.run(
+                ["git", "status", "--porcelain"], cwd=workdir, capture_output=True, text=True
+            ).stdout
+            # New files = untracked ("??") + added ("A").
+            new_files = sum(
+                1 for line in status.splitlines()
+                if line[:2].strip() in ("??", "A") and not line.endswith("/")
+            )
+            if new_files < required:
+                print(f"incomplete: {new_files}/{required} required new files created")
+                return 4
+            return 0
         elif len(argv) >= 6:
             queue_repo, issue_s, agent, target_repo, workdir_s, instructions_path_s = argv[:6]
             instructions = Path(instructions_path_s).read_text(encoding="utf-8")
