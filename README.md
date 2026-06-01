@@ -4,7 +4,7 @@ Autonomous multi-agent software delivery squad. All documentation is under [.age
 
 ## End-to-end cycle
 
-Work is tracked on **GitHub Issues** (`ai-alpha-squad`); code ships from the **target repository**. Label flow: `new` → `awaiting-approval` → `director-approved` → `designed` → `implemented` → `validation` → `release-candidate` → `released`. Director-only approval: [director gate](docs/director-gate.md). **Director dashboard:** [single job view](docs/director-dashboard.md) (`./scripts/squad-director-dashboard.py --serve` → http://127.0.0.1:8788/). Legacy: [GitHub Project board](docs/director-project-board.md). Details: [issue lifecycle](.agents/issue-lifecycle.md).
+Work is tracked on **GitHub Issues** (`ai-alpha-squad`); code ships from the **target repository**. Label flow: `new` → `awaiting-approval` → `director-approved` → `designed` → `implemented` → `validation` → `release-candidate` → `released`. Director-only approval: [director gate](docs/director-gate.md). **Director:** `./scripts/squad-director-now.sh` — approvals + stuck jobs. Optional [web snapshot](docs/director-dashboard.md). Job 1 retrospective: [docs/retrospectives/job-1-2026-06-01.md](docs/retrospectives/job-1-2026-06-01.md). Legacy: [GitHub Project board](docs/director-project-board.md). Details: [issue lifecycle](.agents/issue-lifecycle.md).
 
 ```mermaid
 sequenceDiagram

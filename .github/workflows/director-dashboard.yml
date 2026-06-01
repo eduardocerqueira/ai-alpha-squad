@@ -11,6 +11,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "*/15 * * * *"
+  workflow_run:
+    workflows: [Squad orchestrator, Squad phase watch]
+    types: [completed]
 
 jobs:
   publish:

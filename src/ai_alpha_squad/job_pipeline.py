@@ -6,8 +6,10 @@ import json
 import os
 import re
 import subprocess
-from dataclasses import dataclass
+from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from ai_alpha_squad.hf_dispatch import parse_parent_issue_number
 from ai_alpha_squad.nudge import ARCHITECT_SUBISSUE_ROLES, PHASE_MARKERS, issue_has_deliverable
@@ -31,6 +33,87 @@ PR_URL_RE = re.compile(
 PLANNING_ROLES = ("business-owner", "architect")
 CODING_ROLES = ("developer",)
 ALL_TRACKED_ROLES = ("business-owner", "architect", *ARCHITECT_SUBISSUE_ROLES, "release-manager")
+SUBISSUE_ROLES = ("developer", *VALIDATION_ROLES)
+
+
+@dataclass
+class SquadIssueIndex:
+    """In-memory index from a few ``gh issue list`` calls (avoids per-role/per-issue API spam)."""
+
+    by_number: dict[int, dict[str, Any]]
+    subs_by_parent: dict[int, dict[str, int]]
+    pr_merged_cache: dict[str, bool] = field(default_factory=dict)
+
+    @classmethod
+    def from_repo(cls, repo: str, *, include_closed: int = 15) -> SquadIssueIndex:
+        rows: list[dict[str, Any]] = list(
+            _gh_json(
+                [
+                    "issue",
+                    "list",
+                    "--repo",
+                    repo,
+                    "--state",
+                    "open",
+                    "--json",
+                    "number,title,body,state,labels,updatedAt,comments",
+                    "--limit",
+                    "100",
+                ]
+            )
+        )
+        if include_closed > 0:
+            rows.extend(
+                _gh_json(
+                    [
+                        "issue",
+                        "list",
+                        "--repo",
+                        repo,
+                        "--state",
+                        "closed",
+                        "--json",
+                        "number,title,body,state,labels,updatedAt,comments",
+                        "--limit",
+                        str(include_closed),
+                    ]
+                )
+            )
+        by_number: dict[int, dict[str, Any]] = {}
+        subs: dict[int, dict[str, int]] = defaultdict(dict)
+        for row in rows:
+            num = int(row["number"])
+            by_number[num] = row
+            body = str(row.get("body") or "")
+            parent = parse_parent_issue_number(body)
+            if not parent:
+                continue
+            label_names = {item["name"] for item in row.get("labels") or []}
+            for role in SUBISSUE_ROLES:
+                if role in label_names:
+                    subs[parent][role] = num
+        return cls(by_number=by_number, subs_by_parent=dict(subs))
+
+    def subissue_number(self, parent: int, role: str) -> int | None:
+        return self.subs_by_parent.get(parent, {}).get(role)
+
+    def issue_comments(self, issue_number: int | None) -> list[dict]:
+        if issue_number is None:
+            return []
+        row = self.by_number.get(issue_number) or {}
+        return list(row.get("comments") or [])
+
+    def issue_body(self, issue_number: int | None) -> str:
+        if issue_number is None:
+            return ""
+        row = self.by_number.get(issue_number) or {}
+        return str(row.get("body") or "")
+
+    def issue_state(self, issue_number: int | None) -> str:
+        if issue_number is None:
+            return ""
+        row = self.by_number.get(issue_number) or {}
+        return str(row.get("state") or "")
 
 
 @dataclass(frozen=True)
@@ -66,7 +149,15 @@ def _gh_json(args: list[str]) -> dict | list:
     return json.loads(proc.stdout)
 
 
-def _subissue_number(repo: str, parent: int, role: str) -> int | None:
+def _subissue_number(
+    repo: str,
+    parent: int,
+    role: str,
+    *,
+    index: SquadIssueIndex | None = None,
+) -> int | None:
+    if index is not None:
+        return index.subissue_number(parent, role)
     root = Path(os.environ.get("SQUAD_REPO_ROOT", _repo_root()))
     script = root / "scripts" / "squad-find-subissues.py"
     proc = subprocess.run(
@@ -91,9 +182,11 @@ def effective_lifecycle_from_labels(labels: set[str]) -> str | None:
     return None
 
 
-def _pr_merged(pr_url: str | None) -> bool:
+def _pr_merged(pr_url: str | None, *, index: SquadIssueIndex | None = None) -> bool:
     if not pr_url:
         return False
+    if index is not None and pr_url in index.pr_merged_cache:
+        return index.pr_merged_cache[pr_url]
     match = PR_URL_RE.match(pr_url.strip())
     if not match:
         return False
@@ -102,34 +195,47 @@ def _pr_merged(pr_url: str | None) -> bool:
         data = _gh_json(
             ["pr", "view", num, "--repo", repo, "--json", "state,mergedAt"]
         )
-        if data.get("mergedAt"):
-            return True
-        return str(data.get("state", "")).upper() == "MERGED"
+        merged = bool(data.get("mergedAt")) or str(data.get("state", "")).upper() == "MERGED"
     except subprocess.CalledProcessError:
-        return False
+        merged = False
+    if index is not None:
+        index.pr_merged_cache[pr_url] = merged
+    return merged
 
 
-def _find_dev_pr(repo: str, parent: int, comments: list[dict], body: str) -> str | None:
-    dev = _subissue_number(repo, parent, "developer")
+def _find_dev_pr(
+    repo: str,
+    parent: int,
+    comments: list[dict],
+    body: str,
+    *,
+    index: SquadIssueIndex | None = None,
+) -> str | None:
+    dev = _subissue_number(repo, parent, "developer", index=index)
     texts = [body or ""]
     if dev:
-        try:
-            sub = _gh_json(
-                [
-                    "issue",
-                    "view",
-                    str(dev),
-                    "--repo",
-                    repo,
-                    "--json",
-                    "body,comments",
-                ]
-            )
-            texts.append(sub.get("body") or "")
-            for c in sub.get("comments") or []:
+        if index is not None:
+            texts.append(index.issue_body(dev))
+            for c in index.issue_comments(dev):
                 texts.append(c.get("body") or "")
-        except subprocess.CalledProcessError:
-            pass
+        else:
+            try:
+                sub = _gh_json(
+                    [
+                        "issue",
+                        "view",
+                        str(dev),
+                        "--repo",
+                        repo,
+                        "--json",
+                        "body,comments",
+                    ]
+                )
+                texts.append(sub.get("body") or "")
+                for c in sub.get("comments") or []:
+                    texts.append(c.get("body") or "")
+            except subprocess.CalledProcessError:
+                pass
     for c in comments:
         texts.append(c.get("body") or "")
     for text in reversed(texts):
@@ -174,6 +280,7 @@ def build_agent_roster(
     lifecycle: str | None,
     pr_url: str | None,
     pr_merged: bool,
+    index: SquadIssueIndex | None = None,
 ) -> tuple[AgentStatus, ...]:
     roster: list[AgentStatus] = []
     lc = lifecycle or ""
@@ -205,7 +312,7 @@ def build_agent_roster(
         )
 
     # Architect
-    has_dev_sub = _subissue_number(repo, parent, "developer") is not None
+    has_dev_sub = _subissue_number(repo, parent, "developer", index=index) is not None
     if has_spec and has_dev_sub:
         roster.append(
             AgentStatus(
@@ -248,7 +355,7 @@ def build_agent_roster(
         )
 
     # Developer
-    dev_num = _subissue_number(repo, parent, "developer")
+    dev_num = _subissue_number(repo, parent, "developer", index=index)
     dev_url = f"https://github.com/{repo}/issues/{dev_num}" if dev_num else None
     if pr_merged:
         roster.append(
@@ -296,27 +403,32 @@ def build_agent_roster(
     # Validation roles
     validation_started = parent_has_validation_dispatch(comments)
     for role in VALIDATION_ROLES:
-        num = _subissue_number(repo, parent, role)
+        num = _subissue_number(repo, parent, role, index=index)
         url = f"https://github.com/{repo}/issues/{num}" if num else None
         role_marker_on_parent = parent_has_validation_dispatch(comments, role=role)
         if num:
             try:
-                sub = _gh_json(
-                    [
-                        "issue",
-                        "view",
-                        str(num),
-                        "--repo",
-                        repo,
-                        "--json",
-                        "state,comments",
-                    ]
-                )
-                sub_comments = sub.get("comments") or []
+                if index is not None:
+                    sub_comments = index.issue_comments(num)
+                    sub_state = index.issue_state(num)
+                else:
+                    sub = _gh_json(
+                        [
+                            "issue",
+                            "view",
+                            str(num),
+                            "--repo",
+                            repo,
+                            "--json",
+                            "state,comments",
+                        ]
+                    )
+                    sub_comments = sub.get("comments") or []
+                    sub_state = str(sub.get("state") or "")
                 has_report = issue_has_deliverable(
                     sub_comments, _validation_marker(role)
                 )
-                if has_report or str(sub.get("state")).upper() == "CLOSED":
+                if has_report or str(sub_state).upper() == "CLOSED":
                     roster.append(
                         AgentStatus(role, "done", num, url, "Deliverable posted")
                     )
@@ -450,10 +562,11 @@ def analyze_job(
     labels: set[str],
     comments: list[dict],
     body: str,
+    index: SquadIssueIndex | None = None,
 ) -> PipelineHealth:
     lifecycle = effective_lifecycle_from_labels(labels)
-    pr_url = _find_dev_pr(repo, parent, comments, body)
-    pr_merged = _pr_merged(pr_url)
+    pr_url = _find_dev_pr(repo, parent, comments, body, index=index)
+    pr_merged = _pr_merged(pr_url, index=index)
     agents = build_agent_roster(
         repo,
         parent,
@@ -462,6 +575,7 @@ def analyze_job(
         lifecycle=lifecycle,
         pr_url=pr_url,
         pr_merged=pr_merged,
+        index=index,
     )
     stuck_reasons = detect_stuck_reasons(
         labels=labels,

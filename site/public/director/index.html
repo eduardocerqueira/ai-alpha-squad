@@ -3,64 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Director Dashboard — AI Alpha Squad</title>
+  <title>Director — AI Alpha Squad</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/director/dashboard.css">
 </head>
-<body class="page-centered director-page">
-  <header class="director-header">
-    <div class="director-header-inner">
-      <h1 class="director-title">Director Dashboard</h1>
-      <p class="director-subtitle">All squad jobs — one screen. No issue hunting.</p>
-      <div class="director-toolbar">
-        <button type="button" id="btn-refresh" class="btn-primary">Refresh</button>
-        <span id="generated-at" class="director-meta"></span>
-      </div>
-    </div>
-  </header>
+<body class="director-page">
+  <main class="director-shell">
+    <header class="director-top">
+      <h1>Director</h1>
+      <p class="director-lead" id="lead">Loading…</p>
+    </header>
 
-  <main class="director-main" id="dashboard-root">
-    <p class="director-loading" id="loading">Loading jobs…</p>
-    <div class="director-error hidden" id="error"></div>
+    <p class="director-error hidden" id="error"></p>
 
-    <div class="director-stats hidden" id="stats"></div>
+    <section class="director-section" id="section-move" hidden>
+      <h2>Your move</h2>
+      <ul class="director-list" id="list-move"></ul>
+    </section>
 
-    <div class="director-columns hidden" id="columns">
-      <section class="director-column director-column--needs" aria-labelledby="col-needs">
-        <h2 id="col-needs">Needs your action</h2>
-        <p class="column-hint">Approvals and gates only you can clear</p>
-        <ul class="job-list" id="list-needs"></ul>
-      </section>
-      <section class="director-column director-column--progress" aria-labelledby="col-progress">
-        <h2 id="col-progress">In progress</h2>
-        <p class="column-hint">Squad is working — nothing required from you now</p>
-        <ul class="job-list" id="list-progress"></ul>
-      </section>
-      <section class="director-column director-column--stuck" aria-labelledby="col-stuck">
-        <h2 id="col-stuck">Stuck</h2>
-        <p class="column-hint">Blocked, missing deliverables, or needs intervention</p>
-        <ul class="job-list" id="list-stuck"></ul>
-      </section>
-      <section class="director-column director-column--done" aria-labelledby="col-done">
-        <h2 id="col-done">Completed</h2>
-        <p class="column-hint">Released or closed jobs</p>
-        <ul class="job-list" id="list-done"></ul>
-      </section>
-    </div>
+    <section class="director-section" id="section-attention" hidden>
+      <h2>Attention</h2>
+      <p class="section-note">Squad should be advancing these — if idle for hours, the pipeline is stuck.</p>
+      <ul class="director-list" id="list-attention"></ul>
+    </section>
+
+    <p class="director-hint">
+      Terminal: <code>./scripts/squad-director-now.sh</code>
+    </p>
   </main>
-
-  <footer class="director-footer">
-    <a href="/">AI Alpha Squad</a>
-    ·
-    <a href="https://github.com/eduardocerqueira/ai-alpha-squad">GitHub</a>
-    ·
-  Local live data: <code>./scripts/squad-director-dashboard.py --serve</code>
-  </footer>
 
   <script src="/director/dashboard.js" defer></script>
 </body>
