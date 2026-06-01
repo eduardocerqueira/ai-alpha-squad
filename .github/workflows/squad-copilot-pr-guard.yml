@@ -40,6 +40,8 @@ jobs:
         if: github.event_name == 'pull_request' || inputs.pr_number != ''
         run: |
           chmod +x ./scripts/squad-copilot-pr-guard.sh \
+            ./scripts/squad-promote-pr-deliverable.py \
+            ./scripts/squad-resolve-guard-issue.py \
             ./scripts/squad-nudge-stuck.sh \
             ./scripts/squad-sync-planning-labels.sh \
             ./scripts/squad-dispatch-copilot.sh \

@@ -12,7 +12,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from ai_alpha_squad.project_sync import Derived, derive_state  # noqa: E402
+from ai_alpha_squad.nudge import PHASE_MARKERS, issue_has_deliverable  # noqa: E402
+from ai_alpha_squad.project_sync import (  # noqa: E402
+    AGENT_PENDING_ON_ISSUE,
+    Derived,
+    PlanningDeliverables,
+    derive_state,
+)
 
 DEFAULT_OWNER = "eduardocerqueira"
 DEFAULT_PROJECT_NUMBER = 6
@@ -53,6 +59,7 @@ ACTIVE_AGENT_OPTIONS = (
     "release-manager",
     "Done",
     "Blocked",
+    "blocked — post on issue",
     "Unassigned",
 )
 
@@ -139,7 +146,10 @@ def resolve_agent_option(agent_field: dict, active_agent: str) -> tuple[str, str
     try:
         return option_id(agent_field, active_agent), active_agent
     except KeyError:
-        fallback = active_agent.split(" (Copilot")[0]
+        if active_agent == AGENT_PENDING_ON_ISSUE:
+            fallback = "Blocked"
+        else:
+            fallback = active_agent.split(" (Copilot")[0]
         if fallback != active_agent:
             print(
                 f"Active agent option {active_agent!r} not on project — "
@@ -147,6 +157,27 @@ def resolve_agent_option(agent_field: dict, active_agent: str) -> tuple[str, str
                 f"Using {fallback!r} for this sync."
             )
         return option_id(agent_field, fallback), fallback
+
+
+def load_planning_deliverables(repo: str, issue_number: int) -> PlanningDeliverables:
+    data = gh_json(
+        [
+            "issue",
+            "view",
+            str(issue_number),
+            "--repo",
+            repo,
+            "--json",
+            "comments",
+        ]
+    )
+    comments = data.get("comments") or []
+    return PlanningDeliverables(
+        has_business_analysis=issue_has_deliverable(
+            comments, PHASE_MARKERS["business-owner"]
+        ),
+        has_technical_spec=issue_has_deliverable(comments, PHASE_MARKERS["architect"]),
+    )
 
 
 def load_issue(repo: str, issue_number: int) -> IssueState:
@@ -326,9 +357,14 @@ def sync_issue(
     ensure_project_item: bool = True,
 ) -> Derived:
     issue = load_issue(repo, issue_number)
+    planning = load_planning_deliverables(repo, issue_number)
     copilot_sessions = count_copilot_sessions(repo, issue_number, issue.assignees)
     session_count = max(copilot_sessions, 1)
-    derived = derive_state(set(issue.labels), copilot_sessions=session_count)
+    derived = derive_state(
+        set(issue.labels),
+        copilot_sessions=session_count,
+        planning=planning,
+    )
     project = ensure_fields(owner, project_number)
     project_id = project["id"]
 

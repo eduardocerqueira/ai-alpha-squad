@@ -35,10 +35,15 @@ Read first: .agents/copilot-issue-first-delivery.md (issue-first — no planning
 5. Comment on the issue: Squad deliverable complete on this issue.
 6. **Do NOT open a pull request, branch, or commit** on ai-alpha-squad. No files in this repo — issue comment + labels only.
 7. If you already opened a draft PR, close it immediately after steps 3–5.
+8. **Never** use \`gh pr create\` on ai-alpha-squad. A PR is not a valid BA handoff; the squad PR guard will close it.
 
 You have read/search tools only on this repo. Use \`gh issue comment\` and \`gh issue edit\` from the shell.
 
-GitHub Copilot coding agent often cannot post issue comments — if blocked, output the full BA in your final message and stop; do not claim the issue was updated.
+Example (required pattern):
+  gh issue comment ${ISSUE} --repo ${REPO} --body-file ba.md
+  gh issue edit ${ISSUE} --repo ${REPO} --add-label awaiting-approval --add-label business-owner --remove-label new
+
+If you cannot post issue comments, output the full BA in your final message and stop — do not claim the issue was updated and do not open a PR.
 EOF
     ;;
   director-approved|approved)

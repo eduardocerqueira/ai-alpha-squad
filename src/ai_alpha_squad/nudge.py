@@ -7,6 +7,11 @@ from typing import Any
 
 NUDGE_MARKER = "Squad orchestrator nudge"
 GUARD_MARKER = "Squad PR guard"
+PROMOTE_MARKER = "Squad deliverable promoted from PR"
+
+# Copilot often leaves "..." placeholders in PR summaries — not a real deliverable.
+_STUB_PLACEHOLDER_RE = re.compile(r"\.{3}")
+_MIN_DELIVERABLE_CHARS = 400
 
 PHASE_MARKERS: dict[str, str] = {
     "business-owner": "# Business Analysis",
@@ -41,9 +46,57 @@ def issue_has_deliverable(comments: list[dict[str, Any]], marker: str) -> bool:
         body = comment_body(comment)
         if is_orchestrator_noise(body):
             continue
+        if PROMOTE_MARKER in body:
+            continue
         if has_heading_marker(body, marker):
             return True
     return False
+
+
+def _section_from_marker(text: str, marker: str) -> str | None:
+    """Extract deliverable body starting at marker heading."""
+    pattern = re.compile(rf"(?m)^{re.escape(marker)}\s*[\s\S]*")
+    match = pattern.search(text)
+    if not match:
+        return None
+    section = match.group(0).strip()
+    for heading in (
+        r"(?m)^##\s+Related Work\b",
+        r"(?m)^##\s+Testing Evidence\b",
+        r"(?m)^##\s+Risks\b",
+        r"(?m)^##\s+Summary\b",
+    ):
+        m = re.search(heading, section)
+        if m:
+            section = section[: m.start()].strip()
+    return section if is_substantive_deliverable(section, marker) else None
+
+
+def is_substantive_deliverable(section: str, marker: str) -> bool:
+    """Reject PR summary stubs that mention the marker but omit real content."""
+    if not has_heading_marker(section, marker):
+        return False
+    body = section
+    if marker in body:
+        body = body.split(marker, 1)[-1]
+    body = body.strip()
+    if len(body) < _MIN_DELIVERABLE_CHARS:
+        return False
+    if len(_STUB_PLACEHOLDER_RE.findall(body)) >= 3:
+        return False
+    return True
+
+
+def extract_deliverable_section(text: str, marker: str) -> str | None:
+    """Pull a planning deliverable section from PR title/body for issue promotion."""
+    if not text.strip():
+        return None
+    if section := _section_from_marker(text, marker):
+        return section
+    for block in re.finditer(r"```(?:markdown)?\s*\n([\s\S]*?)```", text, re.IGNORECASE):
+        if section := _section_from_marker(block.group(1), marker):
+            return section
+    return None
 
 
 def minutes_since(timestamp: str | None, *, now: datetime | None = None) -> float | None:
