@@ -107,7 +107,8 @@ python3 -m ai_alpha_squad.actions_agent run \
 PR_URL=""
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
   git add -A
-  git -c user.name="github-actions[bot]" -c user.email "github-actions[bot]@users.noreply.github.com" \
+  git -c 'user.name=github-actions[bot]' \
+    -c 'user.email=github-actions[bot]@users.noreply.github.com' \
     commit -m "feat(squad): ${AGENT} work for ${QUEUE_REPO}#${ISSUE}" || true
   if ! git push -u origin "$BRANCH"; then
     echo "error: git push failed for ${TARGET_REPO} branch ${BRANCH}" >&2
