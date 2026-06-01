@@ -102,6 +102,17 @@ PY
     return 0
   }
 
+  # After repeated Copilot failures, complete planning from job pack instead of re-dispatch loop.
+  if [[ "$phase" == "business-owner" || "$phase" == "architect" ]]; then
+    export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+    if python3 "${ROOT}/scripts/squad-autonomous-planning-fallback.py" "$REPO" "$issue" --phase "$phase"; then
+      chmod +x "${ROOT}/scripts/squad-sync-planning-labels.sh"
+      "${ROOT}/scripts/squad-sync-planning-labels.sh" "$REPO" "$issue" || true
+      echo "Autonomous planning fallback applied on #$issue ($phase)"
+      return 0
+    fi
+  fi
+
   local lifecycle_label=""
   case "$phase" in
     business-owner) lifecycle_label="new" ;;

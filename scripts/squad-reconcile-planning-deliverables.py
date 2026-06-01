@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from ai_alpha_squad.nudge import PHASE_MARKERS, issue_has_deliverable  # noqa: E402
+from ai_alpha_squad.autonomous_planning import try_autonomous_planning_fallback  # noqa: E402
 from ai_alpha_squad.planning_delivery import (  # noqa: E402
     copilot_prs_for_issue,
     phase_for_labels,
@@ -105,6 +106,12 @@ def main() -> int:
 
     if args.wait_minutes <= 0:
         ok = reconcile_once(args.repo, args.issue, root)
+        if not ok:
+            phase = phase_for_labels(issue_labels(args.repo, args.issue))
+            if phase and try_autonomous_planning_fallback(
+                args.repo, args.issue, phase, root
+            ):
+                ok = True
         finalize(args.repo, args.issue, root)
         return 0 if ok else 1
 

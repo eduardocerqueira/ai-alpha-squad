@@ -14,6 +14,7 @@ SYNC="${ROOT}/scripts/squad-sync-planning-labels.sh"
 VALIDATION="${ROOT}/scripts/squad-dispatch-validation.sh"
 RECOVER_ARCH="${ROOT}/scripts/squad-recover-architect.sh"
 RECONCILE="${ROOT}/scripts/squad-reconcile-planning-deliverables.sh"
+AUTONOMOUS="${ROOT}/scripts/squad-autonomous-planning-fallback.py"
 
 dispatch_missing_validation() {
   local parent="$1"
@@ -40,7 +41,7 @@ tick_parent() {
 }
 
 run_planning_reconcile_and_scan() {
-  chmod +x "$RECONCILE" "${ROOT}/scripts/squad-scan-planning-prs.sh" \
+  chmod +x "$RECONCILE" "$AUTONOMOUS" "${ROOT}/scripts/squad-scan-planning-prs.sh" \
     "${ROOT}/scripts/squad-copilot-pr-guard.sh" \
     "${ROOT}/scripts/squad-approve-copilot-workflows.sh" \
     "${ROOT}/scripts/squad-promote-pr-deliverable.py" 2>/dev/null || true
