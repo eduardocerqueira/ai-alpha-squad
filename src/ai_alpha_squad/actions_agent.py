@@ -15,7 +15,7 @@ from ai_alpha_squad.agent_models import (
     model_summary,
     resolve_model,
 )
-from ai_alpha_squad.comments import format_squad_comment
+from ai_alpha_squad.comments import format_squad_comment, format_v2_developer_deliverable
 from ai_alpha_squad.actions_scaffold import (
     apply_vscode_squad_director_scaffold,
     is_greenfield_repo,
@@ -235,7 +235,8 @@ Tools:
 - run_command: {{"command": "npm install"}}  (allowlisted: npm, pnpm, yarn, npx, node, python, make, cargo, go, git status/diff/add/commit)
 - finish: {{"summary": "what you did"}}
 
-Start with list_dir on "." then write_file for each needed file. Call finish when done.
+Start with list_dir on "." then implement all required files before finish.
+If the task lists multiple languages, create every language before calling finish.
 Output only the JSON object."""
 
     user = (
@@ -276,6 +277,10 @@ Output only the JSON object."""
     return "Agent loop reached max turns without finish.", False
 
 
+def _v2_enabled() -> bool:
+    return os.environ.get("SQUAD_V2", "").strip() in ("1", "true", "yes")
+
+
 def post_dispatch(
     queue_repo: str,
     issue: int,
@@ -284,6 +289,12 @@ def post_dispatch(
     target_repo: str,
     label: str = "",
 ) -> None:
+    if _v2_enabled() or os.environ.get("SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return
     label = label or agent
     dispatch_body = format_actions_dispatch_comment(
         agent, label, repo=queue_repo, target_repo=target_repo
@@ -350,9 +361,14 @@ def post_result(
     pr_url: str = "",
 ) -> None:
     model = resolve_model(agent, "huggingface")
-    result_body = format_actions_result_comment(
-        agent, summary, repo=queue_repo, pr_url=pr_url, model=model
-    )
+    if _v2_enabled() and agent == "developer" and pr_url:
+        result_body = format_v2_developer_deliverable(
+            summary, pr_url=pr_url, repo=queue_repo, model=model
+        )
+    else:
+        result_body = format_actions_result_comment(
+            agent, summary, repo=queue_repo, pr_url=pr_url, model=model
+        )
     post_issue_comment(queue_repo, issue, result_body)
 
 

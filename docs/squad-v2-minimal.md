@@ -71,7 +71,7 @@ Unchanged intent: **Your move** = gates; **Attention** = open jobs in active pha
 1. Director opens issue with `new` + target repo in body.
 2. BO runs → `# Business Analysis` → `awaiting-approval`.
 3. Director `APPROVE` → `director-approved`.
-4. Developer runs → PR on target repo + comment on issue → `release-candidate`.
+4. Developer runs → **one PR** on target repo (branch `squad/developer-issue-<n>`) + `# Developer Deliverable` on issue → `release-candidate`.
 5. Director release approval → `released`.
 
 ## Implementation checklist

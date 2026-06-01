@@ -19,7 +19,7 @@ on:
 
 concurrency:
   group: squad-v2-watch-${{ github.event.issue.number || 'scan' }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   tick:
@@ -37,7 +37,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Skip squad-internal comments
+        if: github.event_name == 'issue_comment'
+        id: comment_gate
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          python3 -c "
+          import os, sys
+          from ai_alpha_squad.squad_v2 import is_squad_internal_comment
+          body = os.environ.get('COMMENT_BODY', '')
+          sys.exit(0 if is_squad_internal_comment(body) else 1)
+          " && echo "run=false" >> "$GITHUB_OUTPUT" || echo "run=true" >> "$GITHUB_OUTPUT"
+
       - name: Run v2 tick
+        if: github.event_name != 'issue_comment' || steps.comment_gate.outputs.run == 'true'
         run: |
           chmod +x ./scripts/squad-v2-tick.sh ./scripts/squad-v2-dispatch.sh \
             ./scripts/squad-sync-planning-labels.sh

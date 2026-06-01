@@ -77,17 +77,38 @@ def has_deliverable(comments: tuple[dict, ...], agent: str) -> bool:
     return issue_has_deliverable(list(comments), marker)
 
 
+def squad_work_branch(agent: str, issue: int) -> str:
+    """One stable branch (and PR) per queue issue + agent."""
+    slug = agent.strip().lower().replace(" ", "-")
+    return f"squad/{slug}-issue-{issue}"
+
+
+def _failure_after_in_progress(comments: tuple[dict, ...], agent: str) -> bool:
+    """True if a failed marker appears after the latest in_progress marker for this agent."""
+    in_progress_idx: int | None = None
+    failure_idx: int | None = None
+    needle_prog = f"{RUN_IN_PROGRESS_MARKER}{agent}"
+    needle_fail = f"{RUN_FAILED_MARKER}{agent}"
+    for idx, comment in enumerate(comments):
+        body = (comment.get("body") or "").lower()
+        if needle_prog in body:
+            in_progress_idx = idx
+        if needle_fail in body:
+            failure_idx = idx
+    if in_progress_idx is None or failure_idx is None:
+        return False
+    return failure_idx > in_progress_idx
+
+
 def run_in_progress(comments: tuple[dict, ...]) -> str | None:
     for comment in reversed(comments):
         body = (comment.get("body") or "").lower()
         for agent in AGENTS_V2:
             if f"{RUN_IN_PROGRESS_MARKER}{agent}" not in body:
                 continue
-            # Stale marker left after a successful deliverable (common when label sync races).
             if has_deliverable(comments, agent):
                 continue
-            # Failed run finished — allow re-dispatch (in_progress comment may remain).
-            if run_failures(comments, agent) > 0:
+            if _failure_after_in_progress(comments, agent):
                 continue
             return agent
     return None
@@ -157,6 +178,20 @@ def next_action(view: IssueView) -> NextAction:
         return NextAction("gate", reason="Director release approval")
 
     return NextAction("idle", reason=f"Unhandled phase {lc}")
+
+
+def is_squad_internal_comment(body: str) -> bool:
+    """Comments that must not re-trigger phase watch (avoids feedback loops on #94)."""
+    text = (body or "").lower()
+    if RUN_IN_PROGRESS_MARKER in text or RUN_FAILED_MARKER in text:
+        return True
+    if "squad hf agent" in text or "squad actions agent" in text:
+        return True
+    if "squad orchestrator" in text and "<table>" in text:
+        return True
+    from ai_alpha_squad.nudge import is_orchestrator_noise
+
+    return is_orchestrator_noise(body)
 
 
 def in_progress_comment(agent: str) -> str:

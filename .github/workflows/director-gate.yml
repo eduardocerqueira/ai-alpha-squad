@@ -19,7 +19,13 @@ jobs:
   gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event.issue.state == 'open'
+    if: >-
+      github.event.issue.state == 'open' &&
+      (github.event_name != 'issue_comment' ||
+        (!contains(github.event.comment.body, 'squad-v2-run:in_progress:') &&
+         !contains(github.event.comment.body, 'Squad HF agent') &&
+         !contains(github.event.comment.body, 'Squad Actions agent') &&
+         !contains(github.event.comment.body, 'Squad orchestrator')))
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
       SQUAD_V2: ${{ vars.SQUAD_V2 }}

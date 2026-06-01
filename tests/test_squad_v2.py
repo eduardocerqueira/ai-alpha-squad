@@ -3,6 +3,7 @@
 from ai_alpha_squad.squad_v2 import (
     IssueView,
     has_deliverable,
+    is_squad_internal_comment,
     next_action,
     run_in_progress,
 )
@@ -56,6 +57,20 @@ def test_in_progress_ignored_after_failed_run():
     assert run_in_progress(comments) is None
 
 
+def test_in_progress_active_when_failure_before_latest_marker():
+    comments = (
+        {"body": "squad-v2-run:failed:developer — old"},
+        {"body": "squad-v2-run:in_progress:developer"},
+    )
+    assert run_in_progress(comments) == "developer"
+
+
+def test_squad_work_branch():
+    from ai_alpha_squad.squad_v2 import squad_work_branch
+
+    assert squad_work_branch("developer", 94) == "squad/developer-issue-94"
+
+
 def test_stale_in_progress_ignored_after_deliverable():
     comments = (
         {"body": "squad-v2-run:in_progress:business-owner"},
@@ -66,6 +81,12 @@ def test_stale_in_progress_ignored_after_deliverable():
 
 def test_ba_detected():
     assert has_deliverable(({"body": "# Business Analysis\n\nx" * 50},), "business-owner")
+
+
+def test_internal_comment_detection():
+    assert is_squad_internal_comment("squad-v2-run:in_progress:developer")
+    assert is_squad_internal_comment("**Squad HF agent result** — foo")
+    assert not is_squad_internal_comment("approve")
 
 
 def test_developer_deliverable_requires_heading_not_inline_mention():

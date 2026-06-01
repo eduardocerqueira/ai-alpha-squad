@@ -39,9 +39,10 @@ Target repo: ${TARGET_REPO}
 Read the parent issue body and \`# Business Analysis\` comment. Implement exactly what the Director requested on the target repo (not the queue repo).
 Use one folder or file per language when applicable. Keep changes minimal.
 
-1. list_dir on the target repo, then write_file / run_command as needed
-2. Open a PR on ${TARGET_REPO}; the orchestrator posts \`# Developer Deliverable\` on the parent issue
-3. Use the finish tool when the PR is ready
+1. list_dir on the target repo, then write_file / run_command for **every** language or file required
+2. Push to the stable branch; one PR per job (updates reuse the same PR)
+3. Use the finish tool only after all required languages/files exist and run instructions are in README
+4. The workflow posts \`# Developer Deliverable\` on the parent issue when the PR is ready
 4. Do NOT modify ${QUEUE_REPO} except via the separate deliverable comment step
 5. Do NOT merge to main on the target repo
 
