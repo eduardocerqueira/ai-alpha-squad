@@ -1,31 +1,33 @@
 {
-  "generated_at": "2026-06-01T22:19:03Z",
+  "generated_at": "2026-06-01T23:42:12Z",
   "repo": "eduardocerqueira/ai-alpha-squad",
   "counts": {
-    "needs_you": 1,
+    "needs_you": 0,
     "in_progress": 0,
     "stuck": 0,
-    "completed": 7
+    "completed": 8
   },
-  "needs_you": [
+  "needs_you": [],
+  "in_progress": [],
+  "stuck": [],
+  "completed": [
     {
-      "number": 120,
-      "title": "[Request]: Add 30 more hello world languages + fix README count (experimental-hello-world)",
-      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
-      "lifecycle": "awaiting-approval",
-      "active_agent": "Director",
-      "bucket": "needs_you",
+      "number": 128,
+      "title": "[Request]: 4 languages with custom greeting (QA-gate test)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/128",
+      "lifecycle": "released",
+      "active_agent": "Done",
+      "bucket": "completed",
       "blocked": false,
-      "updated_at": "2026-06-01T22:14:24Z",
+      "updated_at": "2026-06-01T23:38:36Z",
       "target_repo": "eduardocerqueira/experimental-hello-world",
-      "target_pr_url": null,
-      "target_pr_merged": false,
-      "summary": "Director approval required",
-      "headline": "Approve the Business Analysis.",
-      "director_action": "Open the issue and reply APPROVE (or REQUEST CHANGES).",
+      "target_pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/9",
+      "target_pr_merged": true,
+      "summary": "Job finished",
+      "headline": "This job is done.",
+      "director_action": "",
       "labels": [
-        "business-owner",
-        "awaiting-approval"
+        "released"
       ],
       "stuck_reasons": [],
       "suggested_action": "",
@@ -33,58 +35,58 @@
         {
           "role": "business-owner",
           "status": "done",
-          "issue_number": 120,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+          "issue_number": 128,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/128",
           "detail": "BA on parent issue"
         },
         {
           "role": "architect",
-          "status": "waiting",
-          "issue_number": 120,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
-          "detail": "Not started"
+          "status": "done",
+          "issue_number": 128,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/128",
+          "detail": "Complete"
         },
         {
           "role": "developer",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "Starts at designed phase"
+          "detail": "PR merged \u2014 https://github.com/eduardocerqueira/experimental-hello-world/pull/9"
         },
         {
           "role": "qa",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "security",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "devops",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "tech-writer",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "release-manager",
-          "status": "waiting",
-          "issue_number": null,
-          "issue_url": null,
-          "detail": "After validation completes"
+          "status": "done",
+          "issue_number": 128,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/128",
+          "detail": "Phase `released`"
         }
       ],
       "events": [
@@ -99,62 +101,192 @@
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
-          "status": "director",
-          "detail": "Open the issue and reply APPROVE (or REQUEST CHANGES).",
-          "action": {
-            "label": "Open issue & respond",
-            "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
-            "message": "Open the issue and reply APPROVE (or REQUEST CHANGES)."
-          }
+          "status": "done",
+          "detail": ""
         },
         {
           "key": "director-approved",
           "title": "Approved \u2014 architecture & planning",
           "owner": "architect",
-          "status": "pending",
+          "status": "done",
           "detail": ""
         },
         {
           "key": "designed",
           "title": "Technical spec ready \u2014 development",
           "owner": "developer",
-          "status": "pending",
+          "status": "done",
           "detail": ""
         },
         {
           "key": "implemented",
           "title": "Code complete \u2014 pull request",
           "owner": "developer",
-          "status": "pending",
-          "detail": ""
+          "status": "done",
+          "detail": "PR merged",
+          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/9"
         },
         {
           "key": "validation",
           "title": "Validation (QA, Security, DevOps, Docs)",
           "owner": "release-manager",
-          "status": "pending",
+          "status": "done",
           "detail": ""
         },
         {
           "key": "release-candidate",
           "title": "Release candidate",
           "owner": "Director",
-          "status": "pending",
+          "status": "done",
           "detail": ""
         },
         {
           "key": "released",
           "title": "Released",
           "owner": "Done",
-          "status": "pending",
+          "status": "done",
           "detail": ""
         }
       ]
-    }
-  ],
-  "in_progress": [],
-  "stuck": [],
-  "completed": [
+    },
+    {
+      "number": 120,
+      "title": "[Request]: Add 30 more hello world languages + fix README count (experimental-hello-world)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+      "lifecycle": "released",
+      "active_agent": "Done",
+      "bucket": "completed",
+      "blocked": false,
+      "updated_at": "2026-06-01T23:30:06Z",
+      "target_repo": "eduardocerqueira/experimental-hello-world",
+      "target_pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/8",
+      "target_pr_merged": true,
+      "summary": "Job finished",
+      "headline": "This job is done.",
+      "director_action": "",
+      "labels": [
+        "released"
+      ],
+      "stuck_reasons": [],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 120,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+          "detail": "BA on parent issue"
+        },
+        {
+          "role": "architect",
+          "status": "done",
+          "issue_number": 120,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+          "detail": "Complete"
+        },
+        {
+          "role": "developer",
+          "status": "done",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "PR merged \u2014 https://github.com/eduardocerqueira/experimental-hello-world/pull/8"
+        },
+        {
+          "role": "qa",
+          "status": "done",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "Validated"
+        },
+        {
+          "role": "security",
+          "status": "done",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "Validated"
+        },
+        {
+          "role": "devops",
+          "status": "done",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "Validated"
+        },
+        {
+          "role": "tech-writer",
+          "status": "done",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "Validated"
+        },
+        {
+          "role": "release-manager",
+          "status": "done",
+          "issue_number": 120,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/120",
+          "detail": "Phase `released`"
+        }
+      ],
+      "events": [
+        {
+          "key": "new",
+          "title": "Request triaged",
+          "owner": "business-owner",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "awaiting-approval",
+          "title": "Business analysis ready",
+          "owner": "Director",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "director-approved",
+          "title": "Approved \u2014 architecture & planning",
+          "owner": "architect",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "designed",
+          "title": "Technical spec ready \u2014 development",
+          "owner": "developer",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "implemented",
+          "title": "Code complete \u2014 pull request",
+          "owner": "developer",
+          "status": "done",
+          "detail": "PR merged",
+          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/8"
+        },
+        {
+          "key": "validation",
+          "title": "Validation (QA, Security, DevOps, Docs)",
+          "owner": "release-manager",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "release-candidate",
+          "title": "Release candidate",
+          "owner": "Director",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "released",
+          "title": "Released",
+          "owner": "Done",
+          "status": "done",
+          "detail": ""
+        }
+      ]
+    },
     {
       "number": 111,
       "title": "[Request]: Fix seeker pipeline \u2014 UnicodeDecodeError in purge() (experimental)",
@@ -199,31 +331,31 @@
         },
         {
           "role": "qa",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "security",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "devops",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "tech-writer",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "release-manager",
@@ -337,31 +469,31 @@
         },
         {
           "role": "qa",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "security",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "devops",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "tech-writer",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "release-manager",
@@ -475,31 +607,31 @@
         },
         {
           "role": "qa",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "security",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "devops",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "tech-writer",
-          "status": "waiting",
+          "status": "done",
           "issue_number": null,
           "issue_url": null,
-          "detail": "After developer PR merges"
+          "detail": "Validated"
         },
         {
           "role": "release-manager",
@@ -946,145 +1078,6 @@
           "title": "Approved \u2014 architecture & planning",
           "owner": "architect",
           "status": "done",
-          "detail": ""
-        },
-        {
-          "key": "designed",
-          "title": "Technical spec ready \u2014 development",
-          "owner": "developer",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "implemented",
-          "title": "Code complete \u2014 pull request",
-          "owner": "developer",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "validation",
-          "title": "Validation (QA, Security, DevOps, Docs)",
-          "owner": "release-manager",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "release-candidate",
-          "title": "Release candidate",
-          "owner": "Director",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "released",
-          "title": "Released",
-          "owner": "Done",
-          "status": "pending",
-          "detail": ""
-        }
-      ]
-    },
-    {
-      "number": 15,
-      "title": "[Job 1] VS Code extension: Squad Status Bar (Marketplace + Open VSX)",
-      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/15",
-      "lifecycle": "new",
-      "active_agent": "business-owner",
-      "bucket": "completed",
-      "blocked": false,
-      "updated_at": "2026-06-01T01:23:48Z",
-      "target_repo": null,
-      "target_pr_url": null,
-      "target_pr_merged": false,
-      "summary": "Job finished",
-      "headline": "This job is done.",
-      "director_action": "",
-      "labels": [
-        "business-owner",
-        "new",
-        "medium"
-      ],
-      "stuck_reasons": [],
-      "suggested_action": "",
-      "agents": [
-        {
-          "role": "business-owner",
-          "status": "active",
-          "issue_number": 15,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/15",
-          "detail": "Writing Business Analysis"
-        },
-        {
-          "role": "architect",
-          "status": "waiting",
-          "issue_number": 15,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/15",
-          "detail": "Waiting for director-approved"
-        },
-        {
-          "role": "developer",
-          "status": "waiting",
-          "issue_number": null,
-          "issue_url": null,
-          "detail": "Starts at designed phase"
-        },
-        {
-          "role": "qa",
-          "status": "waiting",
-          "issue_number": null,
-          "issue_url": null,
-          "detail": "After developer PR merges"
-        },
-        {
-          "role": "security",
-          "status": "waiting",
-          "issue_number": null,
-          "issue_url": null,
-          "detail": "After developer PR merges"
-        },
-        {
-          "role": "devops",
-          "status": "waiting",
-          "issue_number": null,
-          "issue_url": null,
-          "detail": "After developer PR merges"
-        },
-        {
-          "role": "tech-writer",
-          "status": "waiting",
-          "issue_number": null,
-          "issue_url": null,
-          "detail": "After developer PR merges"
-        },
-        {
-          "role": "release-manager",
-          "status": "waiting",
-          "issue_number": null,
-          "issue_url": null,
-          "detail": "After validation completes"
-        }
-      ],
-      "events": [
-        {
-          "key": "new",
-          "title": "Request triaged",
-          "owner": "business-owner",
-          "status": "done",
-          "detail": ""
-        },
-        {
-          "key": "awaiting-approval",
-          "title": "Business analysis ready",
-          "owner": "Director",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "director-approved",
-          "title": "Approved \u2014 architecture & planning",
-          "owner": "architect",
-          "status": "pending",
           "detail": ""
         },
         {

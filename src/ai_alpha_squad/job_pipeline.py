@@ -447,7 +447,12 @@ def build_agent_roster(
             except subprocess.CalledProcessError:
                 pass
 
-        if lc not in ("implemented", "validation") and not validation_started:
+        if lc in ("release-candidate", "released"):
+            # Validation has cleared (the job reached the release gate). v2 may
+            # not create per-role sub-issues, so reflect completion rather than
+            # leaving validation agents stuck on "waiting".
+            roster.append(AgentStatus(role, "done", num, url, "Validated"))
+        elif lc not in ("implemented", "validation") and not validation_started:
             roster.append(
                 AgentStatus(role, "waiting", num, url, "After developer PR merges")
             )

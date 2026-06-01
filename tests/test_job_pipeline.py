@@ -16,6 +16,23 @@ def test_effective_lifecycle_prefers_implemented_over_designed():
     assert effective_lifecycle_from_labels({"designed", "implemented"}) == "implemented"
 
 
+def test_released_marks_validation_agents_done():
+    # A released job (v2 may not create per-role sub-issues) must not leave
+    # validation agents stuck on "waiting".
+    agents = build_agent_roster(
+        "org/repo",
+        128,
+        labels={"released"},
+        comments=[],
+        lifecycle="released",
+        pr_url="https://github.com/org/target/pull/9",
+        pr_merged=True,
+    )
+    for role in ("qa", "security", "devops", "tech-writer"):
+        a = next(x for x in agents if x.role == role)
+        assert a.status == "done", f"{role} should be done on a released job, got {a.status}"
+
+
 def test_stuck_when_pr_merged_validation_not_dispatched():
     agents = build_agent_roster(
         "org/repo",
