@@ -171,6 +171,38 @@ def parse_tool_call(content: str) -> tuple[str, dict] | None:
     return None
 
 
+def _finish_summary(tool_args: dict, raw: str) -> str:
+    """Extract a clean finish summary.
+
+    Models sometimes emit ``{"tool":"finish","summary":"..."}`` with the summary
+    at the top level instead of inside ``args`` — leaving ``args`` empty. Recover
+    it from the raw content rather than echoing the whole tool-call JSON into the
+    Developer Deliverable comment.
+    """
+    summary = tool_args.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        return summary.strip()
+
+    text = raw.strip()
+    fenced = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
+    candidate = fenced.group(1) if fenced else text
+    blob = _extract_json_object(candidate, candidate.find("{")) if "{" in candidate else None
+    if blob:
+        try:
+            data = json.loads(blob)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            for value in (data.get("summary"), (data.get("args") or {}).get("summary")):
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+    # Last resort: never echo a raw tool-call object as the summary.
+    if text.startswith("{") and '"tool"' in text:
+        return "Agent finished (no summary provided)."
+    return text
+
+
 def format_actions_dispatch_comment(agent: str, label: str, *, repo: str, target_repo: str) -> str:
     from ai_alpha_squad.comments import agent_icon_img, normalize_agent_slug
 
@@ -284,7 +316,7 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
         tool_name, tool_args = parsed
         print(f"[actions] turn {_turn + 1}/{MAX_TURNS}: {tool_name}", file=sys.stderr)
         if tool_name == "finish":
-            return str(tool_args.get("summary", content)), True
+            return _finish_summary(tool_args, content), True
         result = execute_tool(workdir, tool_name, tool_args)
         arg_hint = str(tool_args.get("path") or tool_args.get("command") or "").strip()
         result_brief = result if len(result) <= 400 else result[:400] + "…(truncated)"
