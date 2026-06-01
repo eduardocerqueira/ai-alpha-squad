@@ -104,15 +104,6 @@ export default function App() {
     setData(null);
   }
 
-  if (authEmail === null) {
-    return (
-      <div className="grid min-h-[60vh] place-items-center text-muted">
-        <RefreshCw className="h-5 w-5 animate-spin" />
-      </div>
-    );
-  }
-  if (authEmail === "") return <Login />;
-
   const tabs: TabDef[] = useMemo(
     () =>
       GROUPS.map((g) => ({
@@ -150,6 +141,16 @@ export default function App() {
     () => GROUPS.reduce((n, g) => n + jobsInGroup(data, g.key).length, 0),
     [data],
   );
+
+  // Conditional rendering only AFTER all hooks have run (rules of hooks).
+  if (authEmail === null) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center text-muted">
+        <RefreshCw className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+  if (authEmail === "") return <Login />;
 
   return (
     <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-5 px-5 py-6 lg:px-8">
