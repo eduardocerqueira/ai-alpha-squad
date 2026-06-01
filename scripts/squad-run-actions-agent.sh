@@ -16,6 +16,20 @@ export DISPATCH_LABEL="${DISPATCH_LABEL:-$AGENT}"
 SUMMARY_FILE="${RUNNER_TEMP:-/tmp}/squad-actions-summary-${ISSUE}.txt"
 export SQUAD_ACTIONS_SUMMARY_FILE="$SUMMARY_FILE"
 
+# Push/PR to target repo needs a token with contents + pull-requests on TARGET_REPO.
+if [[ -z "${GH_TOKEN:-}" ]]; then
+  GH_TOKEN="${GITHUB_TOKEN:-}"
+  export GH_TOKEN
+fi
+
+configure_git_auth() {
+  if [[ -z "${GH_TOKEN:-}" ]]; then
+    echo "error: set GH_TOKEN or SQUAD_ORCHESTRATOR_TOKEN (PAT with write on ${TARGET_REPO})" >&2
+    exit 1
+  fi
+  gh auth setup-git
+}
+
 # In orchestrator job, spawn dedicated workflow unless inline mode requested.
 if [[ -n "${GITHUB_ACTIONS:-}" && "${SQUAD_ACTIONS_INLINE:-}" != "1" ]]; then
   REPO_FOR_WF="${GITHUB_REPOSITORY:-$QUEUE_REPO}"
@@ -38,9 +52,13 @@ fi
 
 WORKDIR="${RUNNER_TEMP:-/tmp}/squad-target-${ISSUE}-$$"
 rm -rf "$WORKDIR"
+configure_git_auth
 git clone --depth 1 "https://github.com/${TARGET_REPO}.git" "$WORKDIR"
 
 cd "$WORKDIR"
+# Ensure push uses the same token as gh (GITHUB_TOKEN alone cannot push to other repos).
+git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git"
+
 BRANCH="squad/${AGENT}-issue-${ISSUE}-$(date +%Y%m%d%H%M%S)"
 git checkout -b "$BRANCH"
 
@@ -52,7 +70,11 @@ if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --po
   git add -A
   git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
     commit -m "feat(squad): ${AGENT} work for ${QUEUE_REPO}#${ISSUE}" || true
-  git push -u origin "$BRANCH"
+  if ! git push -u origin "$BRANCH"; then
+    echo "error: git push failed for ${TARGET_REPO} branch ${BRANCH}" >&2
+    echo "Ensure SQUAD_ORCHESTRATOR_TOKEN has repo scope + contents:write on ${TARGET_REPO}." >&2
+    exit 128
+  fi
   PARENT_LINE=""
   if [[ "$ISSUE" != "" ]]; then
     PARENT_LINE="Squad queue: ${QUEUE_REPO}#${ISSUE}"
