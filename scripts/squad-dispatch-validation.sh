@@ -65,7 +65,11 @@ for comment in data.get("comments") or []:
     body = (comment.get("body") or "").lower()
     if marker in body and not force:
         raise SystemExit(1)
-    if any(m in body for m in squad_markers) and f"`{role}`" in body:
+    if (
+        not force
+        and any(m in body for m in squad_markers)
+        and f"`{role}`" in body
+    ):
         raise SystemExit(1)
 
 assignees = [a.get("login", "").lower() for a in data.get("assignees") or []]

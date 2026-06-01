@@ -16,10 +16,10 @@ tech-writer
 
 | Provider | Model |
 | -------- | ----- |
-| huggingface | `meta-llama/Meta-Llama-3.3-70B-Instruct` |
+| huggingface | `deepseek-ai/DeepSeek-V4-Flash` |
 | copilot | _(custom agent profile — no model ID)_ |
 
-Default HF model: [Meta-Llama-3.3-70B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.3-70B-Instruct) — clear user-facing docs, README updates, and release notes.
+Default HF model: [DeepSeek-V4-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash) — clear user-facing docs, README updates, and release notes.
 
 ## Inputs
 

@@ -57,8 +57,11 @@ fi
 gh issue close "$DEV_ISSUE" --repo "$REPO" --comment "Developer deliverable merged: $PR_URL" 2>/dev/null || true
 
 # Validation must dispatch even when implemented was set earlier (orchestrator only fires on label add).
-chmod +x "${ROOT}/scripts/squad-phase-tick.sh" "${ROOT}/scripts/squad-dispatch-validation.sh"
+# Do not call squad-phase-tick here — it invokes this script again and loops forever.
+chmod +x "${ROOT}/scripts/squad-dispatch-validation.sh"
 export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
-"${ROOT}/scripts/squad-phase-tick.sh" "$REPO" "$PARENT" || true
+for role in qa security devops tech-writer; do
+  "${ROOT}/scripts/squad-dispatch-validation.sh" "$REPO" "$PARENT" "$role" || true
+done
 
-echo "Advanced parent #$PARENT to implemented (PR $PR_URL merged); phase tick ran for validation"
+echo "Advanced parent #$PARENT to implemented (PR $PR_URL merged); validation dispatch attempted"

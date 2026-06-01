@@ -67,7 +67,7 @@ EXPECTED_AGENT_HF_MODELS = {
     "qa": "deepseek-ai/DeepSeek-V4-Flash",
     "security": "deepseek-ai/DeepSeek-V4-Flash",
     "devops": "Qwen/Qwen2.5-Coder-32B-Instruct",
-    "tech-writer": "meta-llama/Meta-Llama-3.3-70B-Instruct",
+    "tech-writer": "deepseek-ai/DeepSeek-V4-Flash",
     "release-manager": "deepseek-ai/DeepSeek-V4-Flash",
 }
 
