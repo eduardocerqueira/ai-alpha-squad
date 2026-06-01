@@ -44,6 +44,21 @@ def _gh_json(args: list[str]) -> dict:
     return json.loads(proc.stdout)
 
 
+def parse_parent_issue_number(issue_body: str) -> int | None:
+    """Extract parent issue number from sub-issue body (e.g. Parent Issue | #64)."""
+    import re
+
+    for pattern in (
+        r"Parent\s+Issue\s*\|\s*#(\d+)",
+        r"Parent\s+issue:\s*#(\d+)",
+        r"issues/(\d+)",
+    ):
+        match = re.search(pattern, issue_body or "", re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
 def fetch_issue_context(repo: str, issue: int) -> str:
     data = _gh_json(
         [
@@ -66,6 +81,29 @@ def fetch_issue_context(repo: str, issue: int) -> str:
     if len(text) > MAX_ISSUE_CHARS:
         text = text[:MAX_ISSUE_CHARS] + "\n\n…(truncated for HF context limit)"
     return text
+
+
+def fetch_issue_context_with_parent(repo: str, issue: int) -> str:
+    """Issue thread plus parent issue body/comments when this is a sub-issue."""
+    data = _gh_json(
+        [
+            "issue",
+            "view",
+            str(issue),
+            "--repo",
+            repo,
+            "--json",
+            "title,body,comments",
+        ]
+    )
+    parent = parse_parent_issue_number(data.get("body") or "")
+    parts = [fetch_issue_context(repo, issue)]
+    if parent and parent != issue:
+        parts.append(
+            f"\n\n---\n\n# Parent issue #{parent} (Technical Specification + BA)\n\n"
+            f"{fetch_issue_context(repo, parent)}"
+        )
+    return "\n".join(parts)
 
 
 def chat_completion(

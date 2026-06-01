@@ -33,14 +33,15 @@ You are the ${AGENT} agent for AI Alpha Squad — implementation runs on the tar
 Queue repo issue: https://github.com/${QUEUE_REPO}/issues/${ISSUE}
 Parent (if sub-issue): https://github.com/${QUEUE_REPO}/issues/${PARENT_ISSUE}
 
-Read Technical Specification on the parent issue (heading "# Technical Specification").
-Target repo: ${TARGET_REPO}
+Parent issue #${PARENT_ISSUE} contains the Technical Specification and Business Analysis (included in agent context).
+Target repo: ${TARGET_REPO} — may only have README.md; scaffold the VS Code extension from scratch.
 
-1. Implement per the tech spec on branch \`main\`
-2. Add or extend tests; run test/lint commands when available
-3. Use the finish tool when implementation is ready for PR
-4. Do NOT modify the ai-alpha-squad queue repo
-5. Do NOT merge to main
+1. list_dir first, then write_file for package.json, tsconfig.json, src/extension.ts, etc.
+2. Implement per the tech spec on branch \`main\`
+3. Add or extend tests; run test/lint commands when available
+4. Use the finish tool when implementation is ready for PR
+5. Do NOT modify the ai-alpha-squad queue repo
+6. Do NOT merge to main
 
 Agent profile: .agents/agent-${AGENT}.md on the queue repo.
 EOF

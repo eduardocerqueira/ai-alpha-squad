@@ -12,6 +12,18 @@ def test_parse_tool_call_finish():
     assert parsed == ("finish", {"summary": "done"})
 
 
+def test_parse_tool_call_markdown_fence():
+    raw = 'Here is the call:\n```json\n{"tool": "list_dir", "args": {"path": "."}}\n```'
+    assert parse_tool_call(raw) == ("list_dir", {"path": "."})
+
+
+def test_parse_tool_call_nested_args():
+    raw = '{"tool": "write_file", "args": {"path": "pkg.json", "content": "{\\"name\\": \\"x\\"}"}}'
+    name, args = parse_tool_call(raw)  # type: ignore[misc]
+    assert name == "write_file"
+    assert args["path"] == "pkg.json"
+
+
 def test_write_and_read_file(tmp_path):
     result = execute_tool(tmp_path, "write_file", {"path": "a.txt", "content": "hello"})
     assert "ok:" in result
