@@ -21,7 +21,7 @@ ai:
     devops:
       huggingface: Qwen/Qwen2.5-Coder-32B-Instruct
     tech-writer:
-      huggingface: meta-llama/Meta-Llama-3.3-70B-Instruct
+      huggingface: deepseek-ai/DeepSeek-V4-Flash
     release-manager:
       huggingface: deepseek-ai/DeepSeek-V4-Flash
 

@@ -10,14 +10,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIND="${ROOT}/scripts/squad-find-subissues.py"
 FORMAT_COMMENT="${ROOT}/scripts/format-squad-comment.py"
 
-DEV_ISSUE="$("$FIND" "$REPO" "$PARENT" developer)" || {
-  echo "No open developer sub-issue for parent #$PARENT"
+DEV_ISSUE="$("$FIND" --state all "$REPO" "$PARENT" developer 2>/dev/null)" || {
+  echo "No developer sub-issue for parent #$PARENT"
   exit 0
 }
 
+ALREADY_IMPLEMENTED=0
 if gh issue view "$PARENT" --repo "$REPO" --json labels -q '.labels[].name' | grep -qx 'implemented'; then
-  echo "Parent #$PARENT already has implemented label"
-  exit 0
+  ALREADY_IMPLEMENTED=1
+  echo "Parent #$PARENT already has implemented label — checking validation dispatch and labels"
 fi
 
 TARGET_REPO="$("$FIND" "$REPO" "$PARENT" --target-repo)" || TARGET_REPO=""
@@ -36,18 +37,31 @@ PR_REPO="${PR_URL#https://github.com/}"
 PR_REPO="${PR_REPO%/pull/*}"
 PR_NUM="${PR_URL##*/pull/}"
 
-MERGED="$(gh pr view "$PR_NUM" --repo "$PR_REPO" --json merged,state -q '.merged')" || exit 0
-if [[ "$MERGED" != "true" ]]; then
-  echo "PR $PR_URL not merged yet (state check)"
+PR_STATE="$(gh pr view "$PR_NUM" --repo "$PR_REPO" --json state,mergedAt -q '.state')" || exit 0
+PR_MERGED_AT="$(gh pr view "$PR_NUM" --repo "$PR_REPO" --json state,mergedAt -q '.mergedAt')" || true
+if [[ "$PR_STATE" != "MERGED" ]] && [[ -z "$PR_MERGED_AT" || "$PR_MERGED_AT" == "null" ]]; then
+  echo "PR $PR_URL not merged yet (state=$PR_STATE)"
   exit 0
 fi
 
-gh issue edit "$PARENT" --repo "$REPO" --add-label "implemented" --remove-label "designed" || true
-gh issue close "$DEV_ISSUE" --repo "$REPO" --comment "Developer deliverable merged: $PR_URL" || true
+if [[ "$ALREADY_IMPLEMENTED" -eq 0 ]]; then
+  gh issue edit "$PARENT" --repo "$REPO" --add-label "implemented" --remove-label "designed" || true
+  BODY="$(python3 "$FORMAT_COMMENT" notice \
+    --message "**Squad orchestrator:** Developer PR merged ($PR_URL). Parent advanced to \`implemented\` — validation agents dispatching." \
+    --repo "$REPO")"
+  gh issue comment "$PARENT" --repo "$REPO" --body "$BODY"
+else
+  gh issue edit "$PARENT" --repo "$REPO" --remove-label "designed" 2>/dev/null || true
+fi
 
-BODY="$(python3 "$FORMAT_COMMENT" notice \
-  --message "**Squad orchestrator:** Developer PR merged ($PR_URL). Parent advanced to \`implemented\` — validation agents dispatching." \
-  --repo "$REPO")"
-gh issue comment "$PARENT" --repo "$REPO" --body "$BODY"
+gh issue close "$DEV_ISSUE" --repo "$REPO" --comment "Developer deliverable merged: $PR_URL" 2>/dev/null || true
 
-echo "Advanced parent #$PARENT to implemented (PR $PR_URL merged)"
+# Validation must dispatch even when implemented was set earlier (orchestrator only fires on label add).
+# Do not call squad-phase-tick here — it invokes this script again and loops forever.
+chmod +x "${ROOT}/scripts/squad-dispatch-validation.sh"
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+for role in qa security devops tech-writer; do
+  "${ROOT}/scripts/squad-dispatch-validation.sh" "$REPO" "$PARENT" "$role" || true
+done
+
+echo "Advanced parent #$PARENT to implemented (PR $PR_URL merged); validation dispatch attempted"

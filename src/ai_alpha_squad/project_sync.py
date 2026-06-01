@@ -106,6 +106,7 @@ def base_active_agent(
             return validation_on_parent[0]
         if len(agents_on_issue) == 1:
             return agents_on_issue[0]
+        return PHASE_TO_AGENT["implemented"]
     if lifecycle in PHASE_TO_AGENT:
         if sub_issue and len(agents_on_issue) == 1:
             return agents_on_issue[0]

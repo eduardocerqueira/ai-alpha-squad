@@ -1,0 +1,332 @@
+{
+  "generated_at": "2026-06-01T16:10:06Z",
+  "repo": "eduardocerqueira/ai-alpha-squad",
+  "counts": {
+    "needs_you": 0,
+    "in_progress": 0,
+    "stuck": 2,
+    "completed": 2
+  },
+  "needs_you": [],
+  "in_progress": [],
+  "stuck": [
+    {
+      "number": 64,
+      "title": "[Job 1] VS Code extension: Squad Director (GitHub queue + approval gates)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
+      "lifecycle": "implemented",
+      "active_agent": "developer",
+      "bucket": "stuck",
+      "updated_at": "2026-06-01T15:59:43Z",
+      "target_repo": null,
+      "target_pr_url": "https://github.com/eduardocerqueira/vscode-squad-director/pull/1",
+      "target_pr_merged": true,
+      "summary": "PR merged and `implemented`, but validation not started: qa, security, devops, tech-writer",
+      "labels": [
+        "implemented",
+        "medium"
+      ],
+      "stuck_reasons": [
+        "PR merged and `implemented`, but validation not started: qa, security, devops, tech-writer",
+        "Validation agents stalled after dispatch: tech-writer (re-run with SQUAD_FORCE_NUDGE=1)"
+      ],
+      "suggested_action": "Unblock: `./scripts/squad-phase-tick.sh eduardocerqueira/ai-alpha-squad 64`",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 64,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
+          "detail": "BA on parent issue"
+        },
+        {
+          "role": "architect",
+          "status": "done",
+          "issue_number": 64,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
+          "detail": "Tech spec + sub-issues created"
+        },
+        {
+          "role": "developer",
+          "status": "done",
+          "issue_number": 79,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/79",
+          "detail": "PR merged \u2014 https://github.com/eduardocerqueira/vscode-squad-director/pull/1"
+        },
+        {
+          "role": "qa",
+          "status": "stuck",
+          "issue_number": 80,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/80",
+          "detail": "Not dispatched \u2014 run phase tick"
+        },
+        {
+          "role": "security",
+          "status": "stuck",
+          "issue_number": 81,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/81",
+          "detail": "Not dispatched \u2014 run phase tick"
+        },
+        {
+          "role": "devops",
+          "status": "stuck",
+          "issue_number": 83,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/83",
+          "detail": "Not dispatched \u2014 run phase tick"
+        },
+        {
+          "role": "tech-writer",
+          "status": "stuck",
+          "issue_number": 84,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/84",
+          "detail": "Dispatch logged but no report \u2014 re-run validation dispatch"
+        },
+        {
+          "role": "release-manager",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After validation completes"
+        }
+      ]
+    },
+    {
+      "number": 1,
+      "title": "[Request]: Review and modernize seeker (eduardocerqueira/seeker)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/1",
+      "lifecycle": "implemented",
+      "active_agent": "developer",
+      "bucket": "stuck",
+      "updated_at": "2026-05-31T21:36:14Z",
+      "target_repo": ".github/workflows",
+      "target_pr_url": "https://github.com/eduardocerqueira/seeker/pull/13",
+      "target_pr_merged": true,
+      "summary": "Parent has `implemented` but validation agents were never dispatched",
+      "labels": [
+        "business-owner",
+        "architect",
+        "implemented",
+        "medium"
+      ],
+      "stuck_reasons": [
+        "Parent has `implemented` but validation agents were never dispatched"
+      ],
+      "suggested_action": "Unblock: `./scripts/squad-phase-tick.sh eduardocerqueira/ai-alpha-squad 1`",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 1,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/1",
+          "detail": "BA on parent issue"
+        },
+        {
+          "role": "architect",
+          "status": "done",
+          "issue_number": 1,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/1",
+          "detail": "Tech spec + sub-issues created"
+        },
+        {
+          "role": "developer",
+          "status": "done",
+          "issue_number": 6,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/6",
+          "detail": "PR merged \u2014 https://github.com/eduardocerqueira/seeker/pull/13"
+        },
+        {
+          "role": "qa",
+          "status": "done",
+          "issue_number": 7,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/7",
+          "detail": "Deliverable posted"
+        },
+        {
+          "role": "security",
+          "status": "done",
+          "issue_number": 8,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/8",
+          "detail": "Deliverable posted"
+        },
+        {
+          "role": "devops",
+          "status": "done",
+          "issue_number": 9,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/9",
+          "detail": "Deliverable posted"
+        },
+        {
+          "role": "tech-writer",
+          "status": "done",
+          "issue_number": 10,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/10",
+          "detail": "Deliverable posted"
+        },
+        {
+          "role": "release-manager",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After validation completes"
+        }
+      ]
+    }
+  ],
+  "completed": [
+    {
+      "number": 17,
+      "title": "[Job 1] VS Code extension: Squad Director (GitHub queue + approval gates)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/17",
+      "lifecycle": "director-approved",
+      "active_agent": "blocked \u2014 post on issue",
+      "bucket": "completed",
+      "updated_at": "2026-06-01T02:00:55Z",
+      "target_repo": null,
+      "target_pr_url": null,
+      "target_pr_merged": false,
+      "summary": "Job finished",
+      "labels": [
+        "medium",
+        "director-approved"
+      ],
+      "stuck_reasons": [],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 17,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/17",
+          "detail": "BA on parent issue"
+        },
+        {
+          "role": "architect",
+          "status": "active",
+          "issue_number": 17,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/17",
+          "detail": "Tech spec in progress"
+        },
+        {
+          "role": "developer",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "Starts at designed phase"
+        },
+        {
+          "role": "qa",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "security",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "devops",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "tech-writer",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "release-manager",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After validation completes"
+        }
+      ]
+    },
+    {
+      "number": 15,
+      "title": "[Job 1] VS Code extension: Squad Status Bar (Marketplace + Open VSX)",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/15",
+      "lifecycle": "new",
+      "active_agent": "blocked \u2014 post on issue",
+      "bucket": "completed",
+      "updated_at": "2026-06-01T01:23:48Z",
+      "target_repo": null,
+      "target_pr_url": null,
+      "target_pr_merged": false,
+      "summary": "Job finished",
+      "labels": [
+        "business-owner",
+        "new",
+        "medium"
+      ],
+      "stuck_reasons": [],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "active",
+          "issue_number": 15,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/15",
+          "detail": "Writing Business Analysis"
+        },
+        {
+          "role": "architect",
+          "status": "waiting",
+          "issue_number": 15,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/15",
+          "detail": "Waiting for director-approved"
+        },
+        {
+          "role": "developer",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "Starts at designed phase"
+        },
+        {
+          "role": "qa",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "security",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "devops",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "tech-writer",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After developer PR merges"
+        },
+        {
+          "role": "release-manager",
+          "status": "waiting",
+          "issue_number": null,
+          "issue_url": null,
+          "detail": "After validation completes"
+        }
+      ]
+    }
+  ]
+}

@@ -54,7 +54,7 @@ def _subissue_number(repo: str, parent: int, role: str) -> int | None:
     root = Path(os.environ.get("SQUAD_REPO_ROOT", _repo_root()))
     script = root / "scripts" / "squad-find-subissues.py"
     proc = subprocess.run(
-        ["python3", str(script), "--repo", repo, str(parent), role],
+        ["python3", str(script), "--state", "all", repo, str(parent), role],
         capture_output=True,
         text=True,
         cwd=root,
