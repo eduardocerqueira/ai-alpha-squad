@@ -42,6 +42,15 @@ def test_run_command_blocked(tmp_path):
     assert result.startswith("error:")
 
 
+@pytest.mark.parametrize("cmd", ["mvn -q compile", "gradle build", "mvnw test", "pytest -q"])
+def test_run_command_allows_build_tools(tmp_path, cmd):
+    """Build/compile tools must be allowlisted so the dev can verify it compiles."""
+    result = execute_tool(tmp_path, "run_command", {"command": cmd})
+    # The command itself likely isn't installed in the test env, but it must NOT be
+    # rejected by the allowlist prefix check.
+    assert not result.startswith("error: command prefix not allowed")
+
+
 def test_run_agent_loop_sees_prior_actions(tmp_path, monkeypatch):
     """The loop must feed prior tool results back so the model can track progress
     and call finish — otherwise it churns until max turns (the #107 failure)."""

@@ -52,6 +52,12 @@ _ALLOWED_CMD_PREFIXES = (
     "make ",
     "cargo ",
     "go ",
+    "mvn ",
+    "mvnw ",
+    "gradle ",
+    "gradlew ",
+    "pytest ",
+    "pip ",
     "git status",
     "git diff",
     "git add",
@@ -473,6 +479,10 @@ prior read_file — do NOT rewrite the whole file with write_file (you will drop
 the change will be rejected). Use write_file only to create NEW files.
 For new files, prefer write_file for each artifact; if the task lists multiple languages,
 create every language, then call finish immediately.
+VERIFY YOUR WORK before finishing: if the repo has a build/compile/test command
+(e.g. mvn -q compile, ./gradlew compileJava, npm run build, make, pytest) and it runs
+quickly, use run_command to confirm your changes build — then FIX any error it reports.
+A change that does not compile will be rejected. If no build tool is available, skip this.
 The "Progress so far" list below shows the tools you have ALREADY run this session —
 do not repeat completed work, and once every required artifact exists call finish.
 Output only the JSON object."""
