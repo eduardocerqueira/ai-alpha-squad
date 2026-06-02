@@ -168,16 +168,24 @@ export default function App() {
 
   const [retrying, setRetrying] = useState(false);
   const [retryNote, setRetryNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [modelLadder, setModelLadder] = useState<string[]>([]);
+  const [chosenModel, setChosenModel] = useState("");
   useEffect(() => setRetryNote(null), [selected]);
+  useEffect(() => {
+    fetch("/api/config", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((c: { modelLadder?: string[] }) => setModelLadder(c.modelLadder ?? []))
+      .catch(() => {});
+  }, []);
 
-  async function retryJob(n: number) {
+  async function retryJob(n: number, model?: string) {
     setRetrying(true);
     setRetryNote(null);
     try {
       const res = await fetch("/api/director/retry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ number: n }),
+        body: JSON.stringify({ number: n, ...(model ? { model } : {}) }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(body.error || "Could not start the re-run.");
@@ -339,6 +347,22 @@ export default function App() {
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {(job.bucket === "stuck" || job.blocked || job.bucket === "completed") && modelLadder.length > 0 && (
+                  <select
+                    value={chosenModel}
+                    onChange={(e) => setChosenModel(e.target.value)}
+                    disabled={retrying}
+                    title="Developer model for the re-run (default keeps the current/escalation model)"
+                    className="h-8 max-w-[12rem] rounded-md border border-border bg-surface px-2 text-xs text-text"
+                  >
+                    <option value="">Model: default</option>
+                    {modelLadder.map((m) => (
+                      <option key={m} value={m}>
+                        {m.includes("/") ? m.split("/").pop() : m}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {(job.bucket === "stuck" || job.blocked || job.bucket === "completed") && (
                   <Button
                     variant="outline"
@@ -351,7 +375,7 @@ export default function App() {
                         )
                       )
                         return;
-                      retryJob(job.number);
+                      retryJob(job.number, chosenModel || undefined);
                     }}
                     disabled={retrying}
                     title={

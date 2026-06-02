@@ -13,7 +13,10 @@
     "TURNSTILE_SITE_KEY": "0x4AAAAAADbgiy2bBXlEoAKP",
     // Director dashboard allowlist (comma-separated). AUTH_SECRET is a secret:
     //   cd site && wrangler secret put AUTH_SECRET
-    "DIRECTOR_ALLOWED_EMAILS": "eduardomcerqueira@gmail.com"
+    "DIRECTOR_ALLOWED_EMAILS": "eduardomcerqueira@gmail.com",
+    // Models offered in the dashboard "re-run with model" dropdown (comma-separated).
+    // Keep in sync with the SQUAD_DEV_MODEL_LADDER Actions variable.
+    "SQUAD_DEV_MODEL_LADDER": "deepseek-ai/DeepSeek-V4-Flash, Qwen/Qwen2.5-Coder-32B-Instruct, meta-llama/Llama-3.3-70B-Instruct"
   },
   "assets": {
     "directory": "./public",
