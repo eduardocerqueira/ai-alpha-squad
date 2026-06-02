@@ -14,7 +14,7 @@ import { Login } from "@/components/Login";
 // when served without the Worker (plain static host).
 const JOBS_URL = "/api/director/jobs";
 const JOBS_FALLBACK_URL = "/director/jobs.json";
-const REFRESH_MS = 60_000;
+const REFRESH_MS = 30_000;
 
 class UnauthorizedError extends Error {}
 
