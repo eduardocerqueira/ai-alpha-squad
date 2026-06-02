@@ -3,12 +3,14 @@ import type { AgentStatus } from "@/types";
 // Honest role-states derived from issue artifacts (not live run state):
 //  done · review (PR open, awaiting merge) · progress (its turn / in flight) ·
 //  idle (waiting for an earlier phase) · blocked.
-export type NormStatus = "done" | "review" | "progress" | "idle" | "blocked";
+export type NormStatus = "done" | "running" | "review" | "progress" | "idle" | "blocked";
 
 export function normalizeAgentStatus(status: AgentStatus | string, detail = ""): NormStatus {
   switch (status) {
     case "done":
       return "done";
+    case "running":
+      return "running";
     case "active":
     case "working":
       return /pr open|merge when ready|review/i.test(detail) ? "review" : "progress";
@@ -22,6 +24,7 @@ export function normalizeAgentStatus(status: AgentStatus | string, detail = ""):
 
 const COLORS: Record<NormStatus, string> = {
   done: "var(--green)",
+  running: "var(--green)",
   review: "var(--amber)",
   progress: "var(--amber)",
   idle: "var(--muted)",
@@ -42,6 +45,22 @@ export function AgentStatusIcon({ status }: { status: NormStatus }) {
         <g>
           <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="2" opacity="0.35" />
           <circle cx="12" cy="12" r="3.5" fill={color} />
+        </g>
+      )}
+
+      {status === "running" && (
+        <g>
+          <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="2" opacity="0.25" />
+          <path d="M12 4 a8 8 0 0 1 8 8" stroke={color} strokeWidth="2" strokeLinecap="round" fill="none">
+            <animateTransform
+              attributeName="transform"
+              type="rotate"
+              from="0 12 12"
+              to="360 12 12"
+              dur="1s"
+              repeatCount="indefinite"
+            />
+          </path>
         </g>
       )}
 

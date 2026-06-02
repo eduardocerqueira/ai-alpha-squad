@@ -259,7 +259,22 @@ function buildAgents(
   else if (devIdx !== null) qa = ["active", "Reviewing the deliverable"];
   else qa = ["waiting", "After the developer delivers"];
 
-  return [row("business-owner", bo[0], bo[1]), row("developer", dev[0], dev[1]), row("qa", qa[0], qa[1])];
+  const rows = [
+    row("business-owner", bo[0], bo[1]),
+    row("developer", dev[0], dev[1]),
+    row("qa", qa[0], qa[1]),
+  ];
+  // A live run marker (no terminal yet) means this agent is executing *now* —
+  // surface it as "running" so the squad column lights up via the webhook.
+  const active = runInProgress(comments);
+  if (active) {
+    const r = rows.find((x) => x.role === active);
+    if (r) {
+      r.status = "running";
+      r.detail = `Running now — ${r.detail}`;
+    }
+  }
+  return rows;
 }
 
 function buildEvents(

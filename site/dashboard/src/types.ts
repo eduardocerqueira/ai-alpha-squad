@@ -11,7 +11,15 @@ export type AgentRole =
   | "tech-writer"
   | "release-manager";
 
-export type AgentStatus = "done" | "active" | "working" | "waiting" | "idle" | "stuck" | "blocked";
+export type AgentStatus =
+  | "done"
+  | "active"
+  | "working"
+  | "running"
+  | "waiting"
+  | "idle"
+  | "stuck"
+  | "blocked";
 
 export interface Agent {
   role: string;
