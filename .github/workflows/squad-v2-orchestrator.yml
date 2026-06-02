@@ -17,6 +17,9 @@ on:
       lifecycle_label:
         description: Lifecycle label (new or director-approved)
         required: true
+      developer_model:
+        description: HF model for the developer this run (optional; Director override)
+        required: false
 
 concurrency:
   # Do NOT cancel in-progress: the developer agent runs inline for up to 90m,
@@ -41,6 +44,11 @@ jobs:
       SQUAD_ACTIONS_MAX_TURNS: "500"
       SQUAD_AI_PROVIDER: huggingface
       SQUAD_CODE_RUNTIME: actions
+      # Developer model-escalation ladder (comma-separated). After MAX_QA_ROUNDS
+      # rejections the developer escalates to the next rung; exhausting it blocks.
+      SQUAD_DEV_MODEL_LADDER: ${{ vars.SQUAD_DEV_MODEL_LADDER }}
+      # Director-chosen model for this run (from the dashboard dropdown); wins.
+      SQUAD_DEV_MODEL_INPUT: ${{ inputs.developer_model }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - uses: actions/checkout@v4

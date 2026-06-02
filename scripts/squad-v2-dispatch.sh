@@ -209,6 +209,44 @@ EOF
       ;;
   esac
 
+  # Developer model selection: a Director-chosen model (SQUAD_DEV_MODEL_INPUT) wins;
+  # otherwise escalate up SQUAD_DEV_MODEL_LADDER after MAX_QA_ROUNDS rejections. The
+  # chosen model is applied via SQUAD_AGENT_MODEL_OVERRIDE; an escalation records a
+  # squad-v2-model marker (which resets the per-model QA-round counter).
+  unset SQUAD_AGENT_MODEL_OVERRIDE
+  if [[ "$AGENT" == "developer" ]]; then
+    DEV_MODEL_OUT="$(python3 -c "
+import os, json, subprocess, sys
+from ai_alpha_squad.squad_v2 import (
+    dev_model_ladder, current_dev_model, next_dev_model,
+    qa_fails_since_escalation, MAX_QA_ROUNDS, model_marker_comment)
+repo, issue = sys.argv[1], int(sys.argv[2])
+data = json.loads(subprocess.check_output(
+    ['gh','issue','view',str(issue),'--repo',repo,'--json','comments'], text=True))
+comments = tuple(data.get('comments') or ())
+ladder = dev_model_ladder(os.environ.get('SQUAD_DEV_MODEL_LADDER'))
+forced = os.environ.get('SQUAD_DEV_MODEL_INPUT','').strip()
+cur = current_dev_model(comments, ladder)
+escalate_to = None
+if forced and forced != cur:
+    escalate_to = forced
+elif qa_fails_since_escalation(comments) >= MAX_QA_ROUNDS:
+    escalate_to = next_dev_model(comments, ladder)
+model = escalate_to or cur or ''
+print(model)
+print(model_marker_comment(escalate_to) if escalate_to else '')
+" "$REPO" "$ISSUE")"
+    MODEL_LINE="$(echo "$DEV_MODEL_OUT" | sed -n '1p')"
+    ESC_MARKER="$(echo "$DEV_MODEL_OUT" | sed -n '2,$p' | head -1)"
+    if [[ -n "$ESC_MARKER" ]]; then
+      gh issue comment "$ISSUE" --repo "$REPO" --body "$ESC_MARKER"
+    fi
+    if [[ -n "$MODEL_LINE" ]]; then
+      export SQUAD_AGENT_MODEL_OVERRIDE="$MODEL_LINE"
+      echo "developer model: $MODEL_LINE"
+    fi
+  fi
+
   if ! "$DISPATCH" "$REPO" "$ISSUE" "$AGENT" "$TARGET" "$INSTRUCTIONS"; then
     ERR="dispatch failed for ${AGENT}"
     FAIL="$(python3 -c "from ai_alpha_squad.squad_v2 import failed_comment; print(failed_comment('$AGENT', '''$ERR'''))")"

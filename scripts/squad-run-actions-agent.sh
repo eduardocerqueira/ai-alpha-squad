@@ -78,7 +78,8 @@ if [[ -n "${GITHUB_ACTIONS:-}" && "${SQUAD_ACTIONS_INLINE:-}" != "1" ]]; then
     -f queue_repo="$QUEUE_REPO" \
     -f issue_number="$ISSUE" \
     -f agent="$AGENT" \
-    -f target_repo="$TARGET_REPO" 2>/dev/null; then
+    -f target_repo="$TARGET_REPO" \
+    -f model="${SQUAD_AGENT_MODEL_OVERRIDE:-}" 2>/dev/null; then
     echo "Triggered squad-actions-agent workflow for $AGENT on $QUEUE_REPO#$ISSUE"
     if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
       echo "dispatched=true" >> "$GITHUB_OUTPUT"
