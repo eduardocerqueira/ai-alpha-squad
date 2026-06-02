@@ -25,5 +25,8 @@
   "durable_objects": {
     "bindings": [{ "name": "DASHBOARD_HUB", "class_name": "DashboardHub" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DashboardHub"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DashboardHub"] }],
+  "kv_namespaces": [
+    { "binding": "DASHBOARD_KV", "id": "9b00a12b7da546f0a94289d2ed436806" }
+  ]
 }
