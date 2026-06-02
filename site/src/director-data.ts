@@ -117,6 +117,40 @@ function currentLifecycle(labels: Set<string>): string | null {
   return null;
 }
 
+const RUN_IN_PROGRESS = "squad-v2-run:in_progress:";
+
+function latestMarkerIndex(comments: RawComment[], needle: string): number | null {
+  let idx: number | null = null;
+  comments.forEach((c, i) => {
+    if ((c.body || "").toLowerCase().includes(needle)) idx = i;
+  });
+  return idx;
+}
+
+/** Agent with a live run: an in_progress marker not followed by a deliverable,
+ *  a failure, or a result comment. Mirrors squad_v2.run_in_progress. */
+function runInProgress(comments: RawComment[]): string | null {
+  for (const agent of AGENTS_V2) {
+    const progIdx = latestMarkerIndex(comments, `${RUN_IN_PROGRESS}${agent}`);
+    if (progIdx === null) continue;
+    if (hasDeliverable(comments, agent)) continue;
+    const failIdx = latestMarkerIndex(comments, `${RUN_FAILED}${agent}`);
+    if (failIdx !== null && failIdx > progIdx) continue;
+    const slug = agent.replace(/-/g, " ");
+    let completed = false;
+    for (let i = progIdx + 1; i < comments.length; i++) {
+      const b = (comments[i].body || "").toLowerCase();
+      if ((b.includes("squad actions agent result") || b.includes("squad hf agent result")) && b.includes(slug)) {
+        completed = true;
+        break;
+      }
+    }
+    if (completed) continue;
+    return agent;
+  }
+  return null;
+}
+
 function parentRef(body: string): boolean {
   return /Parent\s+Issue\s*\|\s*#\d+|Parent\s+issue:\s*#\d+|issues\/\d+/i.test(body);
 }
@@ -308,10 +342,12 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
     qaFailRounds(comments) >= MAX_QA_ROUNDS ||
     AGENTS_V2.some((a) => runFailures(comments, a) >= MAX_RUN_ATTEMPTS);
 
-  // `blocked` outranks closed: a blocked job stays surfaced (Blocked tab) even
-  // if the issue was closed, so it isn't hidden under Done. `released` is done.
+  // Priority: released is done; an active agent run shows In progress even if the
+  // issue is closed; `blocked` outranks closed (Blocked tab); then closed → Done.
+  const activeRun = runInProgress(comments) !== null;
   let bucket: string;
   if (lc === "released") bucket = "completed";
+  else if (activeRun && !blocked) bucket = "in_progress";
   else if (blocked) bucket = "stuck";
   else if (state === "CLOSED") bucket = "completed";
   else if (lc && GATE_LABELS.has(lc)) bucket = "needs_you";
