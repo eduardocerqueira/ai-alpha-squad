@@ -1,3 +1,9 @@
 node_modules/
 dist/
 *.local
+
+# The repo-root .gitignore is Python-oriented and its `lib/` rule also matches
+# this dashboard's source dir `src/lib/`. Re-include it so the TS source
+# (utils.ts, jobs.ts) is tracked — the dashboard can't build without it.
+!src/lib/
+!src/lib/**
