@@ -27,6 +27,7 @@ export interface Agent {
   issue_number: number | null;
   issue_url: string | null;
   detail: string;
+  model?: string | null;
 }
 
 export type EventStatus = "done" | "current" | "director" | "blocked" | "pending";
