@@ -9,6 +9,11 @@ permissions:
 on:
   issues:
     types: [labeled, opened, closed, reopened]
+  # v2 runs the whole Developer⇄QA loop under one `director-approved` label, so
+  # progress shows up as comments (deliverables, QA reports). Refresh on those
+  # too — the concurrency group below coalesces bursts to the latest run.
+  issue_comment:
+    types: [created]
   workflow_dispatch:
   schedule:
     - cron: "*/15 * * * *"
