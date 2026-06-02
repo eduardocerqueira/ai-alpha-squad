@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -24,6 +25,16 @@ HF_ROUTER_URL = os.environ.get(
 )
 MAX_ISSUE_CHARS = int(os.environ.get("SQUAD_HF_MAX_ISSUE_CHARS", "12000"))
 MAX_OUTPUT_TOKENS = int(os.environ.get("SQUAD_HF_MAX_OUTPUT_TOKENS", "4096"))
+
+class HFCreditsDepletedError(RuntimeError):
+    """Raised on HTTP 402 — the account is out of Inference-Providers credits.
+
+    Distinct from a generic failure so callers can fail *cleanly* with an
+    actionable message (add credits / use a free model) instead of crashing the
+    whole run with a raw error page, and so escalation can stop rather than walk
+    into the next paid model that will also 402.
+    """
+
 
 # Transient HF failures (rate limit / upstream outage) should be retried with
 # backoff rather than failing the whole agent run on a single blip.
@@ -147,6 +158,22 @@ def fetch_issue_context_with_parent(repo: str, issue: int) -> str:
     return "\n".join(parts)
 
 
+def _extract_hf_error(body: str) -> str:
+    """Pull a human message out of an HF error body (JSON {"error": ...} or HTML)."""
+    try:
+        data = json.loads(body)
+        err = data.get("error") if isinstance(data, dict) else None
+        if isinstance(err, dict):
+            err = err.get("message")
+        if err:
+            return str(err).strip()
+    except (json.JSONDecodeError, AttributeError):
+        pass
+    text = re.sub(r"<[^>]+>", " ", body)  # drop HTML tags
+    snippet = " ".join(text.split())  # collapse whitespace
+    return snippet[:300] if snippet else "no detail"
+
+
 def _hf_post_with_retry(req: "urllib.request.Request") -> dict:
     """POST to HF, retrying transient 5xx/429 with exponential backoff.
 
@@ -160,6 +187,12 @@ def _hf_post_with_retry(req: "urllib.request.Request") -> dict:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             last_detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code == 402:
+                # Billing, not transient: this model routes through a paid
+                # Inference Provider and the account's credits are gone. Retrying
+                # or escalating to another paid model won't help — surface it
+                # cleanly so the run blocks with an actionable message.
+                raise HFCreditsDepletedError(_extract_hf_error(last_detail)) from exc
             retryable = exc.code in HF_RETRYABLE_STATUS
             if not retryable or attempt == HF_MAX_ATTEMPTS - 1:
                 raise RuntimeError(f"HF inference HTTP {exc.code}: {last_detail[:2000]}") from exc

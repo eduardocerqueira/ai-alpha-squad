@@ -21,6 +21,7 @@ from ai_alpha_squad.actions_scaffold import (
     is_greenfield_repo,
 )
 from ai_alpha_squad.hf_dispatch import (
+    HFCreditsDepletedError,
     chat_completion,
     fetch_issue_context_with_parent,
     post_issue_comment,
@@ -519,12 +520,26 @@ Output only the JSON object."""
                 "\n\nURGENT: " + str(remaining) + " turn(s) left. Call "
                 '{"tool": "finish", "args": {"summary": "..."}} now with what you completed.'
             )
-        content = chat_completion(
-            model,
-            system=system,
-            user=build_conversation(urgency),
-            token=token,
-        )
+        try:
+            content = chat_completion(
+                model,
+                system=system,
+                user=build_conversation(urgency),
+                token=token,
+            )
+        except HFCreditsDepletedError as exc:
+            # Billing, not capability: fail cleanly with an actionable message
+            # instead of crashing the workflow with a raw HF error page.
+            print(
+                f"[actions] ABORT: HF Inference credits depleted for {model}: {exc}",
+                file=sys.stderr,
+            )
+            return (
+                f"Blocked: Hugging Face Inference credits are depleted for model "
+                f"'{model}' (HTTP 402: {exc}). Add pre-paid credits at "
+                f"huggingface.co billing, or switch this issue to a free-tier model.",
+                False,
+            )
         parsed = parse_tool_call(content)
         if not parsed:
             consecutive_unparsed += 1
