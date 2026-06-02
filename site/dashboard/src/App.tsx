@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ExternalLink, GitPullRequest, LogOut, RefreshCw } from "lucide-react";
+import { AlertCircle, ExternalLink, GitPullRequest, LogOut, RefreshCw, RotateCcw } from "lucide-react";
 import type { Bucket, Dashboard, JobCard } from "@/types";
 import { cn, prNumber, relativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -165,6 +165,29 @@ export default function App() {
     setData(null);
   }
 
+  const [retrying, setRetrying] = useState(false);
+  const [retryNote, setRetryNote] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => setRetryNote(null), [selected]);
+
+  async function retryJob(n: number) {
+    setRetrying(true);
+    setRetryNote(null);
+    try {
+      const res = await fetch("/api/director/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: n }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(body.error || "Could not start the re-run.");
+      setRetryNote({ ok: true, text: "Re-run started — the squad is picking it up." });
+    } catch (e) {
+      setRetryNote({ ok: false, text: e instanceof Error ? e.message : "Retry failed." });
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   const tabs: TabDef[] = useMemo(
     () =>
       GROUPS.map((g) => ({
@@ -308,25 +331,42 @@ export default function App() {
                     <span><code className="font-mono">blocked</code> label set on the issue — clear it if the squad has moved on.</span>
                   </p>
                 )}
+                {retryNote && (
+                  <p className={cn("mt-2 text-xs", retryNote.ok ? "text-green" : "text-danger")}>{retryNote.text}</p>
+                )}
               </div>
-              {job.target_pr_url && (
-                <a
-                  href={job.target_pr_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={job.target_pr_url}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                    job.target_pr_merged
-                      ? "border-[var(--green-dim)] bg-[color:rgba(34,197,94,0.12)] text-green hover:border-green"
-                      : "border-border bg-surface text-text hover:border-green hover:text-green",
-                  )}
-                >
-                  <GitPullRequest className="h-3.5 w-3.5" />
-                  PR{prNumber(job.target_pr_url)} {job.target_pr_merged ? "merged" : "open"}
-                  <ExternalLink className="h-3 w-3 opacity-70" />
-                </a>
-              )}
+              <div className="flex shrink-0 items-center gap-2">
+                {(job.bucket === "stuck" || job.blocked) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => retryJob(job.number)}
+                    disabled={retrying}
+                    title="Re-run the orchestrator (clears the failure count + removes the blocked label)"
+                  >
+                    <RotateCcw className={retrying ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+                    {retrying ? "Retrying…" : "Retry job"}
+                  </Button>
+                )}
+                {job.target_pr_url && (
+                  <a
+                    href={job.target_pr_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={job.target_pr_url}
+                    className={cn(
+                      "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                      job.target_pr_merged
+                        ? "border-[var(--green-dim)] bg-[color:rgba(34,197,94,0.12)] text-green hover:border-green"
+                        : "border-border bg-surface text-text hover:border-green hover:text-green",
+                    )}
+                  >
+                    <GitPullRequest className="h-3.5 w-3.5" />
+                    PR{prNumber(job.target_pr_url)} {job.target_pr_merged ? "merged" : "open"}
+                    <ExternalLink className="h-3 w-3 opacity-70" />
+                  </a>
+                )}
+              </div>
             </div>
             <Timeline events={job.events} />
           </section>
