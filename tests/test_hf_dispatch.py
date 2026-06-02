@@ -111,6 +111,34 @@ def test_chat_completion_http_error():
             hd.chat_completion("m", system="s", user="u", token="bad")
 
 
+def test_chat_completion_402_raises_credits_depleted(monkeypatch):
+    """A 402 is billing, not transient: raise the typed error immediately (no retry)."""
+    import urllib.error
+
+    monkeypatch.setattr(hd.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    def fake_urlopen(req, timeout=0):
+        calls["n"] += 1
+        raise urllib.error.HTTPError(
+            url="https://router.huggingface.co/v1/chat/completions",
+            code=402, msg="Payment Required", hdrs=None,
+            fp=BytesIO(b'{"error":"You have depleted your monthly included credits."}'),
+        )
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        with pytest.raises(hd.HFCreditsDepletedError, match="depleted your monthly"):
+            hd.chat_completion("m", system="s", user="u", token="t")
+    assert calls["n"] == 1  # not retried
+
+
+def test_extract_hf_error_json_and_html():
+    assert hd._extract_hf_error('{"error":"boom"}') == "boom"
+    assert hd._extract_hf_error('{"error":{"message":"nested boom"}}') == "nested boom"
+    out = hd._extract_hf_error("<!doctype html><html><body>Hugging Face</body></html>")
+    assert "Hugging Face" in out and "<" not in out
+
+
 def test_dispatch_comment_only(monkeypatch):
     monkeypatch.setenv("SQUAD_AI_PROVIDER", "huggingface")
     monkeypatch.setenv("SQUAD_HF_RUN_IN_CI", "0")

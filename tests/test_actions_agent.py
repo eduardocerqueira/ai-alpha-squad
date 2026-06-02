@@ -161,6 +161,24 @@ def test_run_agent_loop_no_progress_resets_on_edit(tmp_path, monkeypatch):
     assert (tmp_path / "out.txt").read_text() == "hi"
 
 
+def test_run_agent_loop_blocks_cleanly_on_credits_depleted(tmp_path, monkeypatch):
+    """A 402 must fail the run cleanly with an actionable message, not crash it."""
+    from ai_alpha_squad.hf_dispatch import HFCreditsDepletedError
+
+    def boom(*a, **k):
+        raise HFCreditsDepletedError("You have depleted your monthly included credits.")
+
+    monkeypatch.setattr(actions_agent, "chat_completion", boom)
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 50)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions="x", issue_context="c", token="t"
+    )
+    assert finished is False
+    assert "credits" in summary.lower()
+    assert "402" in summary
+
+
 def test_finish_summary_uses_args_summary():
     from ai_alpha_squad.actions_agent import _finish_summary
     assert _finish_summary({"summary": "did the thing"}, '{"tool":"finish","args":{"summary":"did the thing"}}') == "did the thing"
