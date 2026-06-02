@@ -1,6 +1,9 @@
 # Squad coding agent — HF tool loop on Actions (no Copilot).
 # See https://github.com/eduardocerqueira/ai-alpha-squad/issues/85
 name: Squad Actions agent
+# Issue number in the run-name lets the Director dashboard's Stop button find
+# and cancel this run (worker matches "#<issue_number>").
+run-name: Squad Actions agent · ${{ inputs.agent }} · issue #${{ inputs.issue_number }}
 
 permissions:
   contents: write

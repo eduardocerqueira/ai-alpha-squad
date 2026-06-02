@@ -15,12 +15,12 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const STATUS_TEXT: Record<NormStatus, string> = {
-  done: "text-green",
-  running: "text-green",
-  review: "text-amber",
-  progress: "text-amber",
-  blocked: "text-danger",
-  idle: "text-muted",
+  done: "text-brand-green",
+  running: "text-brand-green",
+  review: "text-brand-amber",
+  progress: "text-brand-amber",
+  blocked: "text-brand-danger",
+  idle: "text-muted-foreground",
 };
 
 const STATUS_LABEL: Record<NormStatus, string> = {
@@ -37,7 +37,7 @@ function AgentDetail({ detail }: { detail: string }) {
   const match = detail.match(/(https?:\/\/\S+)/);
   if (!match) {
     return (
-      <p className="mt-0.5 truncate text-xs text-muted" title={detail}>
+      <p className="mt-0.5 truncate text-xs text-muted-foreground" title={detail}>
         {detail}
       </p>
     );
@@ -47,13 +47,13 @@ function AgentDetail({ detail }: { detail: string }) {
   const isPr = /\/pull\/(\d+)/.test(url);
   const prNum = url.match(/\/pull\/(\d+)/);
   return (
-    <p className="mt-0.5 text-xs text-muted">
+    <p className="mt-0.5 text-xs text-muted-foreground">
       {text && <span>{text} · </span>}
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-green hover:underline"
+        className="inline-flex items-center gap-1 text-brand-green hover:underline"
       >
         <GitPullRequest className="h-3 w-3" />
         {isPr ? `PR #${prNum![1]}` : "View"}
@@ -66,29 +66,24 @@ function AgentRow({ agent }: { agent: Agent }) {
   const norm = normalizeAgentStatus(agent.status, agent.detail);
   const label = ROLE_LABELS[agent.role] ?? agent.role;
   return (
-    <li className="flex items-start gap-3 rounded-lg border border-border bg-surface px-3 py-2.5">
+    <li className="flex items-start gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
       <span className="mt-0.5 shrink-0">
         <AgentStatusIcon status={norm} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-text">{label}</span>
+          <span className="truncate text-sm font-medium text-foreground">{label}</span>
           <span className={cn("shrink-0 text-[11px] font-medium uppercase tracking-wide", STATUS_TEXT[norm])}>
             {STATUS_LABEL[norm]}
           </span>
         </div>
-        {agent.model && (
-          <p className="mt-0.5 truncate font-mono text-[11px] text-muted" title={agent.model}>
-            {agent.model.includes("/") ? agent.model.split("/").pop() : agent.model}
-          </p>
-        )}
         {agent.detail && <AgentDetail detail={agent.detail} />}
         {agent.issue_url && agent.issue_number && (
           <a
             href={agent.issue_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted hover:text-green"
+            className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-brand-green"
           >
             #{agent.issue_number}
             <ExternalLink className="h-3 w-3" />
@@ -101,20 +96,15 @@ function AgentRow({ agent }: { agent: Agent }) {
 
 export function AgentsPanel({ agents }: { agents: Agent[] }) {
   return (
-    <aside className="flex flex-col gap-3">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-        Squad ({agents.length})
-      </h2>
-      <ul className="flex flex-col gap-2">
-        {agents.map((a) => (
-          <AgentRow key={a.role} agent={a} />
-        ))}
-        {agents.length === 0 && (
-          <li className="rounded-lg border border-border bg-surface px-3 py-4 text-sm text-muted">
-            No agents assigned yet.
-          </li>
-        )}
-      </ul>
-    </aside>
+    <ul className="flex flex-col gap-2">
+      {agents.map((a) => (
+        <AgentRow key={a.role} agent={a} />
+      ))}
+      {agents.length === 0 && (
+        <li className="rounded-lg border border-border bg-card px-3 py-4 text-sm text-muted-foreground">
+          No agents assigned yet.
+        </li>
+      )}
+    </ul>
   );
 }

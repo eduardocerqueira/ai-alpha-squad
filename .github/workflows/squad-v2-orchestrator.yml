@@ -1,5 +1,8 @@
 # Minimal squad v2: Business Owner + Developer on one issue. Enable with repo variable SQUAD_V2=1.
 name: Squad v2 orchestrator
+# Issue number in the run-name lets the Director dashboard's Stop button find
+# and cancel this run (worker matches "#<issue_number>").
+run-name: Squad v2 orchestrator · issue #${{ github.event.issue.number || inputs.issue_number }}
 
 permissions:
   issues: write

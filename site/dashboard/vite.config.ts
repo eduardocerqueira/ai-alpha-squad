@@ -4,6 +4,18 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
 const JOBS_JSON = path.resolve(__dirname, "../public/director/jobs.json");
+const VERSION_FILE = path.resolve(__dirname, "../VERSION");
+
+// Same version shown in the marketing-site footer (site/VERSION, synced by
+// scripts/sync-site-version.py). Baked in at build time so the dashboard header
+// and sidebar footer always match the homepage without a runtime fetch.
+function readVersion(): string {
+  try {
+    return readFileSync(VERSION_FILE, "utf-8").trim() || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 
 // In `npm run dev` the data file lives outside the Vite project root, so the
 // dev server would 404 → SPA-fallback to index.html and the app's fetch() would
@@ -30,6 +42,17 @@ function serveJobsJson(): Plugin {
     configureServer(server) {
       server.middlewares.use("/api/director/jobs", handler);
       server.middlewares.use("/director/jobs.json", handler);
+      // Dev stub for /api/config (version + a sample model ladder for the retry UI).
+      server.middlewares.use("/api/config", (_req, res) =>
+        jsonRes(res, {
+          version: readVersion(),
+          modelLadder: [
+            "deepseek-ai/DeepSeek-V4-Flash",
+            "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+            "moonshotai/Kimi-K2-Instruct",
+          ],
+        }),
+      );
       // Dev auth stub: signed in as a local dev user so login is skipped.
       server.middlewares.use("/api/director/auth/me", (_req, res) =>
         jsonRes(res, { email: "dev@localhost" }),
@@ -38,6 +61,11 @@ function serveJobsJson(): Plugin {
         jsonRes(res, { ok: true }),
       );
       server.middlewares.use("/api/director/auth/logout", (_req, res) => jsonRes(res, { ok: true }));
+      // Dev stubs for retry/stop so the buttons can be exercised locally.
+      server.middlewares.use("/api/director/retry", (_req, res) => jsonRes(res, { ok: true }));
+      server.middlewares.use("/api/director/stop", (_req, res) =>
+        jsonRes(res, { ok: true, cancelled: 1, agent: "developer" }),
+      );
     },
   };
 }
@@ -46,6 +74,9 @@ function serveJobsJson(): Plugin {
 // (site/) serves the dashboard at /director/ with no extra routing.
 export default defineConfig({
   base: "/director/",
+  define: {
+    __APP_VERSION__: JSON.stringify(readVersion()),
+  },
   plugins: [react(), serveJobsJson()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
