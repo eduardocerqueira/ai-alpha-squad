@@ -24,6 +24,9 @@ on:
       target_repo:
         description: Target product repo (owner/name)
         required: true
+      model:
+        description: HF model override for this run (optional)
+        required: false
 concurrency:
   group: squad-actions-${{ inputs.queue_repo }}-${{ inputs.issue_number }}-${{ inputs.agent }}
   cancel-in-progress: false
@@ -43,6 +46,7 @@ jobs:
       SQUAD_ACTIONS_SCAFFOLD_GREENFIELD: ${{ vars.SQUAD_V2 == '1' && '0' || '1' }}
       SQUAD_V2: ${{ vars.SQUAD_V2 }}
       SQUAD_ACTIONS_INLINE: "1"
+      SQUAD_AGENT_MODEL_OVERRIDE: ${{ inputs.model }}
       SQUAD_PROJECT_BOARD_URL: https://github.com/users/eduardocerqueira/projects/6/views/9
       DISPATCH_LABEL: ${{ inputs.agent }}
     steps:
