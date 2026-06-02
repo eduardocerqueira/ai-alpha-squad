@@ -50,7 +50,7 @@ Removed from v2: `designed`, `implemented`, `validation`, architect, QA/Security
 |-----------|------|
 | `squad-v2-orchestrator.yml` | Dispatch on `new`, `director-approved` |
 | `squad-v2-phase-watch.yml` | Cron + manual tick; nudge; label sync |
-| `scripts/squad-v2-dispatch.sh` | Single entry: next agent for issue |
+| `scripts/squad-v2-dispatch.sh` | Next agent for issue; **chains dev→QA→rework→gate inline** (orchestrator) |
 | `scripts/squad-v2-tick.sh` | Scan open jobs; dispatch or nudge |
 | `src/ai_alpha_squad/squad_v2.py` | Phase logic, deliverables, in-progress guard |
 
