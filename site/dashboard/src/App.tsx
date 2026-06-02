@@ -339,16 +339,35 @@ export default function App() {
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {(job.bucket === "stuck" || job.blocked) && (
+                {(job.bucket === "stuck" || job.blocked || job.bucket === "completed") && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => retryJob(job.number)}
+                    onClick={() => {
+                      if (
+                        job.bucket === "completed" &&
+                        !window.confirm(
+                          `Re-open and re-run #${job.number}? It will reopen the issue, reset it to director-approved, and re-run the developer → QA flow.`,
+                        )
+                      )
+                        return;
+                      retryJob(job.number);
+                    }}
                     disabled={retrying}
-                    title="Re-run the orchestrator (clears the failure count + removes the blocked label)"
+                    title={
+                      job.bucket === "completed"
+                        ? "Reopen this issue and re-run the squad"
+                        : "Re-run the orchestrator (clears the failure count + removes the blocked label)"
+                    }
                   >
                     <RotateCcw className={retrying ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-                    {retrying ? "Retrying…" : "Retry job"}
+                    {retrying
+                      ? job.bucket === "completed"
+                        ? "Re-opening…"
+                        : "Retrying…"
+                      : job.bucket === "completed"
+                        ? "Re-open & re-run"
+                        : "Retry job"}
                   </Button>
                 )}
                 {job.target_pr_url && (

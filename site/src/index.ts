@@ -262,15 +262,27 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
     /* fall back to director-approved */
   }
 
-  // Retrying means working it again — reopen a closed issue so it isn't stuck
-  // under Done while the agent runs.
+  const issueApi = `https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`;
+
+  // Retrying / re-opening means working it again — reopen a closed issue so it
+  // isn't stuck under Done while the agent runs.
   if (closed) {
-    await fetch(`https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ state: "open" }),
-    }).catch(() => {});
+    await fetch(issueApi, { method: "PATCH", headers, body: JSON.stringify({ state: "open" }) }).catch(
+      () => {},
+    );
   }
+
+  // Clear terminal/overlay labels and ensure the resume phase is set, so the
+  // orchestrator (which reads the issue's live labels) actually re-runs it —
+  // a `released` or `blocked` label would otherwise short-circuit to "done".
+  for (const label of ["released", "blocked"]) {
+    await fetch(`${issueApi}/labels/${label}`, { method: "DELETE", headers }).catch(() => {});
+  }
+  await fetch(`${issueApi}/labels`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ labels: [lifecycleLabel] }),
+  }).catch(() => {});
 
   const dispatch = await fetch(
     `https://api.github.com/repos/${DASHBOARD_REPO}/actions/workflows/${ORCHESTRATOR_WORKFLOW}/dispatches`,
