@@ -724,17 +724,26 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
     updated_at = str(row.get("updatedAt") or "")
     comments = tuple(row.get("comments") or [])
 
-    lc = squad_v2.current_lifecycle(set(labels))
+    label_set = set(labels)
+    blocked = "blocked" in label_set
+    # `blocked` is an overlay, not a phase — derive the real phase from the
+    # other labels so the timeline/agents still reflect progress.
+    lc = squad_v2.current_lifecycle(label_set - {"blocked"} if blocked else label_set)
     view = squad_v2.IssueView(number, state, frozenset(labels), comments, body)
     action = squad_v2.next_action(view)
-    blocked = "blocked" in labels
     pr_url = _v2_dev_pr(comments)
 
-    if state.upper() == "CLOSED" or lc == "released":
+    # `blocked` outranks closed: keep blocked jobs surfaced (Blocked tab) instead
+    # of hiding them under Done. `released` is done.
+    if lc == "released":
+        bucket = "completed"
+    elif blocked:
+        bucket = "stuck"
+    elif state.upper() == "CLOSED":
         bucket = "completed"
     elif lc in _V2_DIRECTOR_GATES:
         bucket = "needs_you"
-    elif lc == "blocked" or action.kind == "failed":
+    elif action.kind == "failed":
         bucket = "stuck"
     else:
         bucket = "in_progress"

@@ -296,8 +296,11 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
   const labelSet = new Set(labels);
   const state = (issue.state || "OPEN").toUpperCase();
   const comments = issue.comments || [];
-  const lc = currentLifecycle(labelSet);
   const blocked = labelSet.has("blocked");
+  // `blocked` is an overlay, not a phase — compute the real phase from the other
+  // labels so the timeline/agents still reflect progress (Blocked tab + flag
+  // convey the blocked state).
+  const lc = currentLifecycle(blocked ? new Set([...labelSet].filter((l) => l !== "blocked")) : labelSet);
   const prUrl = devPrUrl(comments);
   const issueUrl = `https://github.com/${repo}/issues/${number}`;
 
@@ -305,10 +308,14 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
     qaFailRounds(comments) >= MAX_QA_ROUNDS ||
     AGENTS_V2.some((a) => runFailures(comments, a) >= MAX_RUN_ATTEMPTS);
 
+  // `blocked` outranks closed: a blocked job stays surfaced (Blocked tab) even
+  // if the issue was closed, so it isn't hidden under Done. `released` is done.
   let bucket: string;
-  if (state === "CLOSED" || lc === "released") bucket = "completed";
+  if (lc === "released") bucket = "completed";
+  else if (blocked) bucket = "stuck";
+  else if (state === "CLOSED") bucket = "completed";
   else if (lc && GATE_LABELS.has(lc)) bucket = "needs_you";
-  else if (lc === "blocked" || failed) bucket = "stuck";
+  else if (failed) bucket = "stuck";
   else bucket = "in_progress";
 
   const action = directorAction(bucket, lc);

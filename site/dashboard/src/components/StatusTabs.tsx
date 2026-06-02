@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export type TabKey = "open" | "in_progress" | "done";
+export type TabKey = "open" | "in_progress" | "blocked" | "done";
 
 export interface TabDef {
   key: TabKey;
