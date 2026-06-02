@@ -120,7 +120,9 @@ EOF
     PR_DIFF=""
     QA_PR="$(gh pr list --repo "$TARGET" --head "squad/developer-issue-${ISSUE}" --state open --json number -q '.[0].number' 2>/dev/null || true)"
     if [[ -n "$QA_PR" ]]; then
-      PR_DIFF="$(gh pr diff "$QA_PR" --repo "$TARGET" 2>/dev/null | head -c 12000)"
+      # Large budget so QA sees the WHOLE diff — a truncated diff makes QA think
+      # unshown files are missing and wrongly fail bulk/multi-file deliverables.
+      PR_DIFF="$(gh pr diff "$QA_PR" --repo "$TARGET" 2>/dev/null | head -c 60000)"
     fi
     cat > "$INSTRUCTIONS" <<EOF
 You are the QA engineer for AI Alpha Squad (v2). Read .agents/agent-qa.md.
