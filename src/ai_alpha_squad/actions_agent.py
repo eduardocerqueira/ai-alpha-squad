@@ -395,12 +395,17 @@ Do not repeat list_dir on the same path. Output only the JSON object."""
     # per call, so without this it cannot track which artifacts it already wrote
     # and never confidently calls finish (it churns until max turns).
     history: list[str] = []
-    # Completeness guard: if the task enumerates specific files to create, don't
-    # accept finish until they all exist on disk — models otherwise call finish
-    # early (e.g. 8 of 30) and ship a partial deliverable. Checking existence (not
-    # this run's writes) keeps an idempotent continue correct. The enumerated list
-    # lives in the issue body (issue_context), not the short dispatch instructions.
-    required_files = expected_artifact_files(f"{instructions}\n\n{issue_context}")
+    # Completeness guard: if the task enumerates specific files to CREATE, don't
+    # accept finish until they all exist — models otherwise finish early (e.g. 8 of
+    # 30) and ship a partial deliverable. Only files that are ABSENT at the start of
+    # the run count: on a modify task the enumerated files (and the file paths the
+    # Business Analysis cites in its plan) already exist, so they must not be treated
+    # as "to create" — that previously blocked finish forever on modify jobs (#140).
+    required_files = [
+        f
+        for f in expected_artifact_files(f"{instructions}\n\n{issue_context}")
+        if not (workdir / f).exists()
+    ]
 
     def build_conversation(extra: str = "") -> str:
         parts = [user]
@@ -637,16 +642,27 @@ def main(argv: list[str] | None = None) -> int:
             # body, so fetch the same context the agent saw.
             workdir = Path(argv[1])
             queue_repo, issue_s = argv[2], argv[3]
+            base = os.environ.get("SQUAD_TARGET_BASE_BRANCH", "main")
             task_text = fetch_issue_context_with_parent(queue_repo, int(issue_s))
-            required = expected_artifact_files(task_text)
-            if not required:
+            enumerated = expected_artifact_files(task_text)
+            # Only files the task names that DON'T already exist in the base branch
+            # are "to be created" — otherwise a modify task (whose enumerated files,
+            # and the BA plan's file references, already exist in base) would be
+            # wrongly judged incomplete (#140).
+            def _in_base(path: str) -> bool:
+                return (
+                    subprocess.run(
+                        ["git", "cat-file", "-e", f"{base}:{path}"],
+                        cwd=workdir, capture_output=True,
+                    ).returncode == 0
+                )
+            to_create = [f for f in enumerated if not _in_base(f)]
+            if not to_create:
                 return 0
-            # Check the specific enumerated files exist on disk (committed or not),
-            # so an idempotent continue on an existing branch is measured correctly.
-            missing = [f for f in required if not (workdir / f).exists()]
+            missing = [f for f in to_create if not (workdir / f).exists()]
             if missing:
                 print(
-                    f"incomplete: {len(required) - len(missing)}/{len(required)} required files "
+                    f"incomplete: {len(to_create) - len(missing)}/{len(to_create)} files to create "
                     "present; missing: " + ", ".join(missing[:12]) + ("…" if len(missing) > 12 else "")
                 )
                 return 4
