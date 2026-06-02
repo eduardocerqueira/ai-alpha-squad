@@ -139,6 +139,15 @@ export default {
       return handleRetry(request, env);
     }
 
+    // Director stops a running job: cancel its in-flight Actions run(s), clear
+    // the in-progress marker, and set `blocked` so it stays halted (Retry
+    // clears `blocked` and resumes).
+    if (url.pathname === "/api/director/stop" && request.method === "POST") {
+      const email = await sessionEmail(env, request);
+      if (!email) return json({ error: "unauthorized" }, 401);
+      return handleStop(request, env);
+    }
+
     // Authenticated dashboards open a WebSocket here; the hub pushes "refresh"
     // when CI publishes new data, so the UI updates without polling.
     if (url.pathname === "/api/director/live") {
@@ -228,6 +237,11 @@ async function handleWebhook(request: Request, env: Env, ctx: ExecutionContext):
 }
 
 const ORCHESTRATOR_WORKFLOW = "squad-v2-orchestrator.yml";
+// Workflows whose in-flight runs a Stop should cancel. Both carry the issue
+// number in their run-name (see .github/workflows/*) so we cancel only the
+// runs that belong to the job being stopped.
+const STOPPABLE_WORKFLOWS = ["squad-v2-orchestrator.yml", "squad-actions-agent.yml"];
+const RUN_AGENTS_V2 = ["business-owner", "developer", "qa"];
 
 /** Re-run a stuck/blocked job via the v2 orchestrator's workflow_dispatch. */
 async function handleRetry(request: Request, env: Env): Promise<Response> {
@@ -315,6 +329,111 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
     { error: `Could not start the re-run (GitHub ${dispatch.status}).`, status: dispatch.status },
     502,
   );
+}
+
+interface GhComment {
+  body?: string;
+}
+interface GhRun {
+  id: number;
+  name?: string;
+  display_title?: string;
+  status?: string;
+}
+
+/** The agent whose run is currently in progress on the issue (latest
+ *  `squad-v2-run:in_progress:<agent>` marker with no terminal marker after). */
+function activeRunAgent(comments: GhComment[]): string | null {
+  let agent: string | null = null;
+  for (const c of comments) {
+    const body = (c.body || "").toLowerCase();
+    for (const a of RUN_AGENTS_V2) {
+      if (body.includes(`squad-v2-run:in_progress:${a}`)) agent = a;
+      if (body.includes(`squad-v2-run:failed:${a}`) || body.includes(`squad-v2-run:reset:${a}`)) {
+        if (agent === a) agent = null; // a terminal marker came after — no longer running
+      }
+    }
+  }
+  return agent;
+}
+
+/** Stop a running job: cancel its in-flight Actions runs, clear the in-progress
+ *  marker (no failure penalty), and set `blocked` so it stays halted. */
+async function handleStop(request: Request, env: Env): Promise<Response> {
+  if (!env.GITHUB_READ_TOKEN) return json({ error: "GitHub token not configured" }, 503);
+  let body: { number?: number };
+  try {
+    body = (await request.json()) as { number?: number };
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  const number = Number(body.number);
+  if (!Number.isInteger(number) || number <= 0) return json({ error: "Invalid issue number" }, 400);
+
+  const headers = {
+    Authorization: `Bearer ${env.GITHUB_READ_TOKEN}`,
+    Accept: "application/vnd.github+json",
+    "User-Agent": "ai-alpha-squad-dashboard",
+    "Content-Type": "application/json",
+  };
+  const issueApi = `https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`;
+
+  // Cancel in-flight runs whose run-name carries this issue number (matches
+  // "#<n>" not followed by another digit, so #14 ≠ #140).
+  const tag = new RegExp(`#${number}(?!\\d)`);
+  let cancelled = 0;
+  for (const wf of STOPPABLE_WORKFLOWS) {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${DASHBOARD_REPO}/actions/workflows/${wf}/runs?per_page=30`,
+        { headers },
+      );
+      if (!res.ok) continue;
+      const { workflow_runs = [] } = (await res.json()) as { workflow_runs?: GhRun[] };
+      for (const run of workflow_runs) {
+        const live = run.status === "in_progress" || run.status === "queued";
+        const title = `${run.display_title || ""} ${run.name || ""}`;
+        if (!live || !tag.test(title)) continue;
+        const c = await fetch(
+          `https://api.github.com/repos/${DASHBOARD_REPO}/actions/runs/${run.id}/cancel`,
+          { method: "POST", headers },
+        );
+        if (c.ok || c.status === 202) cancelled++;
+      }
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  // Clear the in-progress marker so the dashboard reflects the stop immediately.
+  // failed+reset in one comment clears in-progress with a net-zero failure count.
+  let agent: string | null = null;
+  try {
+    const res = await fetch(`${issueApi}/comments?per_page=100`, { headers });
+    if (res.ok) agent = activeRunAgent((await res.json()) as GhComment[]);
+  } catch {
+    /* ignore */
+  }
+  if (agent) {
+    const marker =
+      `squad-v2-run:failed:${agent} squad-v2-run:reset:${agent}\n\n` +
+      "⏹ **Stopped by the Director** from the dashboard. The in-flight run was cancelled; " +
+      "use **Retry** to resume.";
+    await fetch(`${issueApi}/comments`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ body: marker }),
+    }).catch(() => {});
+  }
+
+  // Hold it in the Blocked tab so schedulers don't auto-resume it.
+  await fetch(`${issueApi}/labels`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ labels: ["blocked"] }),
+  }).catch(() => {});
+
+  return json({ ok: true, cancelled, agent });
 }
 
 async function verifyWebhookSignature(raw: string, request: Request, secret: string): Promise<boolean> {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import time
 from dataclasses import asdict, dataclass
@@ -576,28 +577,60 @@ def _v2_dev_pr(comments: tuple[dict, ...]) -> str | None:
     return found
 
 
-def _v2_agent_model(comments: tuple[dict, ...], role: str) -> str | None:
-    """AI model an agent used: the developer's escalation marker wins, else the
-    model embedded in the agent's latest result comment ("· model `X`")."""
-    import re
+# Squad result comments are rendered as an HTML card; the posting agent is
+# identified by its avatar (assets/agents/<role>.svg) and the model is printed
+# as "Model: `org/Name`" (a "squad-v2-model:X" marker records a developer
+# escalation to a stronger coder). These match the real comment bodies.
+_RESULT_ROLE_RE = re.compile(r"/agents/([a-z-]+)\.svg")
+_MODEL_RE = re.compile(r"\bmodel:?\**\s*`([^`]+)`", re.IGNORECASE)
+_ESCALATION_RE = re.compile(r"squad-v2-model:(\S+)")
 
-    if role == "developer":
-        escalated: str | None = None
-        for c in comments:
-            m = re.search(r"squad-v2-model:(\S+)", c.get("body") or "")
-            if m:
-                escalated = m.group(1)
-        if escalated:
-            return escalated
-    model: str | None = None
+
+def _result_role(body: str) -> str | None:
+    m = _RESULT_ROLE_RE.search(body)
+    return m.group(1) if m else None
+
+
+def _v2_agent_model_history(comments: tuple[dict, ...], role: str) -> tuple[dict[str, Any], ...]:
+    """Chronological list of every AI model an agent used on this issue.
+
+    Agents announce the model they ran on in their result card ("Model: `X`");
+    the developer additionally posts a ``squad-v2-model:X`` marker when a re-run
+    escalates to a stronger model. Returns ``[{model, at, kind}]`` ordered
+    oldest→newest, with consecutive duplicates of the same model collapsed so
+    the history reads as distinct hand-offs/escalations rather than one entry
+    per comment.
+    """
+    raw: list[dict[str, Any]] = []
     for c in comments:
         body = c.get("body") or ""
-        low = body.lower()
-        if ("squad hf agent result" in low or "squad actions agent result" in low) and f"`{role}`" in low:
-            m = re.search(r"· model `([^`]+)`", body)
+        at = c.get("createdAt") or c.get("created_at") or ""
+        if role == "developer":
+            m = _ESCALATION_RE.search(body)
             if m:
-                model = m.group(1)
-    return model
+                raw.append({"model": m.group(1), "at": at, "kind": "escalation"})
+                continue
+        low = body.lower()
+        if ("squad hf agent result" in low or "squad actions agent result" in low) and _result_role(
+            body
+        ) == role:
+            m = _MODEL_RE.search(body)
+            if m:
+                raw.append({"model": m.group(1), "at": at, "kind": "result"})
+
+    history: list[dict[str, Any]] = []
+    for entry in raw:
+        if history and history[-1]["model"] == entry["model"]:
+            # Same model still in use — keep the first time we saw it.
+            continue
+        history.append(entry)
+    return tuple(history)
+
+
+def _v2_agent_model(comments: tuple[dict, ...], role: str) -> str | None:
+    """The latest AI model an agent used (back-compat single value)."""
+    history = _v2_agent_model_history(comments, role)
+    return history[-1]["model"] if history else None
 
 
 def _v2_agents(
@@ -617,6 +650,7 @@ def _v2_agents(
             "issue_url": parent,
             "detail": detail,
             "model": _v2_agent_model(comments, role),
+            "model_history": _v2_agent_model_history(comments, role),
         }
 
     # Business Owner
