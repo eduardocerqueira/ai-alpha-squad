@@ -58,6 +58,8 @@ export interface TimelineEvent {
   detail: string;
   action?: EventAction;
   pr_url?: string;
+  /** ISO timestamp this step occurred (absent for not-yet-reached steps). */
+  at?: string;
 }
 
 export type Bucket = "needs_you" | "in_progress" | "stuck" | "completed";

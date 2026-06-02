@@ -2,13 +2,14 @@ import {
   ArrowUpRight,
   Check,
   CircleDashed,
+  Clock,
   GitPullRequest,
   Loader2,
   TriangleAlert,
   UserCheck,
 } from "lucide-react";
 import type { EventStatus, TimelineEvent } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime, relativeTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -93,11 +94,24 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
         const isDirector = event.status === "director";
         const dimmed = event.status === "pending";
         return (
-          <li key={event.key} className="relative flex gap-4 pb-6 last:pb-0">
-            {!isLast && (
-              <span className="absolute left-[18px] top-9 -bottom-0 w-px bg-border" aria-hidden />
-            )}
-            <TimelineNode status={event.status} />
+          <li key={event.key} className="flex gap-3 pb-6 last:pb-0">
+            {/* Left gutter: the step's date + time */}
+            <div className="w-32 shrink-0 pt-1.5 text-right">
+              {event.at && (
+                <span
+                  className="inline-flex items-center gap-1 whitespace-nowrap text-xs leading-none text-muted-foreground"
+                  title={`${formatDateTime(event.at)} · ${relativeTime(event.at)}`}
+                >
+                  <Clock className="h-3 w-3 shrink-0" />
+                  {formatDateTime(event.at)}
+                </span>
+              )}
+            </div>
+            {/* Node + connector */}
+            <div className="flex flex-col items-center self-stretch">
+              <TimelineNode status={event.status} />
+              {!isLast && <span className="mt-1 w-px flex-1 bg-border" aria-hidden />}
+            </div>
             <div
               className={cn(
                 "flex-1 pt-1",

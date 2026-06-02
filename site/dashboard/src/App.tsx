@@ -343,7 +343,7 @@ export default function App() {
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               {/* Selected job — header + timeline */}
               <section className="min-w-0">
-                <div className="mb-4 flex flex-col gap-3">
+                <div className="mb-10 flex flex-col gap-3">
                   <div className="min-w-0">
                     <a
                       href={job.url}

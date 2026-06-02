@@ -703,6 +703,31 @@ def _v2_agents(
     return tuple(rows)
 
 
+def _comment_at(comments: tuple[dict, ...], idx: int | None) -> str:
+    """ISO timestamp of comments[idx] ("" if out of range/unknown)."""
+    if idx is None or not (0 <= idx < len(comments)):
+        return ""
+    c = comments[idx]
+    return c.get("createdAt") or c.get("created_at") or ""
+
+
+def _first_marker_at(comments: tuple[dict, ...], needle: str) -> str:
+    """ISO timestamp of the first comment containing ``needle`` ("" if none)."""
+    for c in comments:
+        if needle in (c.get("body") or "").lower():
+            return c.get("createdAt") or c.get("created_at") or ""
+    return ""
+
+
+def _released_at(comments: tuple[dict, ...]) -> str:
+    """ISO timestamp of the latest 'Released — …' comment ("" if none)."""
+    at = ""
+    for c in comments:
+        if (c.get("body") or "").lstrip().lower().startswith("released"):
+            at = c.get("createdAt") or c.get("created_at") or ""
+    return at
+
+
 def _v2_events(
     *,
     lc: str | None,
@@ -715,6 +740,16 @@ def _v2_events(
     dev_idx = squad_v2._latest_deliverable_index(comments, "developer")
     qa_idx, qa_verdict = squad_v2.latest_qa_verdict(comments)
     rounds = squad_v2.qa_fails_since_escalation(comments)
+    # Best-available timestamp per phase, from the comment that marks it.
+    bo_idx = squad_v2._latest_deliverable_index(comments, "business-owner")
+    ba_at = _comment_at(comments, bo_idx)
+    phase_at = {
+        "new": _first_marker_at(comments, "squad-v2-run:in_progress:business-owner") or ba_at,
+        "awaiting-approval": ba_at,
+        "implementation": _comment_at(comments, dev_idx),
+        "qa": _comment_at(comments, qa_idx),
+        "released": _released_at(comments),
+    }
     order = ["new", "awaiting-approval", "director-approved", "release-candidate", "released"]
     cur = order.index(lc) if lc in order else -1
 
@@ -781,6 +816,10 @@ def _v2_events(
             event["action"] = action
         if key == "implementation" and pr_url:
             event["pr_url"] = pr_url
+        # Timestamp the step once it has actually happened (skip not-yet-reached).
+        at = phase_at.get(key, "")
+        if at and status != "pending":
+            event["at"] = at
         events.append(event)
     return tuple(events)
 

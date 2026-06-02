@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-02T13:59:41Z",
+  "generated_at": "2026-06-02T14:41:34Z",
   "repo": "eduardocerqueira/ai-alpha-squad",
   "counts": {
     "needs_you": 0,
@@ -17,7 +17,7 @@
       "active_agent": "developer",
       "bucket": "in_progress",
       "blocked": false,
-      "updated_at": "2026-06-02T13:37:31Z",
+      "updated_at": "2026-06-02T14:40:00Z",
       "target_repo": "eduardocerqueira/jenkins-plugin-monitor",
       "target_pr_url": "https://github.com/eduardocerqueira/jenkins-plugin-monitor/pull/1",
       "target_pr_merged": false,
@@ -97,14 +97,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T01:12:37Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T01:13:52Z"
         },
         {
           "key": "implementation",
@@ -112,14 +114,16 @@
           "owner": "developer",
           "status": "current",
           "detail": "PR open",
-          "pr_url": "https://github.com/eduardocerqueira/jenkins-plugin-monitor/pull/1"
+          "pr_url": "https://github.com/eduardocerqueira/jenkins-plugin-monitor/pull/1",
+          "at": "2026-06-02T12:07:35Z"
         },
         {
           "key": "qa",
           "title": "QA review",
           "owner": "qa",
           "status": "current",
-          "detail": "QA requested changes \u2014 developer reworking (1/3)"
+          "detail": "QA requested changes \u2014 developer reworking (1/3)",
+          "at": "2026-06-02T12:08:28Z"
         },
         {
           "key": "release-candidate",
@@ -207,14 +211,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T23:08:23Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T23:08:40Z"
         },
         {
           "key": "implementation",
@@ -222,14 +228,16 @@
           "owner": "developer",
           "status": "done",
           "detail": "",
-          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/9"
+          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/9",
+          "at": "2026-06-01T23:12:21Z"
         },
         {
           "key": "qa",
           "title": "QA review",
           "owner": "qa",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T23:28:15Z"
         },
         {
           "key": "release-candidate",
@@ -243,7 +251,8 @@
           "title": "Released",
           "owner": "Done",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T23:38:35Z"
         }
       ]
     },
@@ -314,14 +323,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T00:55:36Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T00:56:05Z"
         },
         {
           "key": "implementation",
@@ -329,14 +340,16 @@
           "owner": "developer",
           "status": "done",
           "detail": "",
-          "pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/1"
+          "pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/1",
+          "at": "2026-06-02T01:01:31Z"
         },
         {
           "key": "qa",
           "title": "QA review",
           "owner": "qa",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T01:02:12Z"
         },
         {
           "key": "release-candidate",
@@ -350,7 +363,8 @@
           "title": "Released",
           "owner": "Done",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T01:05:56Z"
         }
       ]
     },
@@ -421,14 +435,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T23:42:26Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T23:42:53Z"
         },
         {
           "key": "implementation",
@@ -436,14 +452,16 @@
           "owner": "developer",
           "status": "done",
           "detail": "",
-          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/10"
+          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/10",
+          "at": "2026-06-02T00:39:41Z"
         },
         {
           "key": "qa",
           "title": "QA review",
           "owner": "qa",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T00:40:20Z"
         },
         {
           "key": "release-candidate",
@@ -457,7 +475,8 @@
           "title": "Released",
           "owner": "Done",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-02T00:44:48Z"
         }
       ]
     },
@@ -522,14 +541,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T22:13:34Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T22:14:21Z"
         },
         {
           "key": "implementation",
@@ -537,7 +558,8 @@
           "owner": "developer",
           "status": "done",
           "detail": "",
-          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/8"
+          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/8",
+          "at": "2026-06-01T22:56:21Z"
         },
         {
           "key": "qa",
@@ -623,14 +645,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T20:58:15Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T20:58:36Z"
         },
         {
           "key": "implementation",
@@ -724,14 +748,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T20:53:09Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T20:53:34Z"
         },
         {
           "key": "implementation",
@@ -739,7 +765,8 @@
           "owner": "developer",
           "status": "done",
           "detail": "",
-          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/7"
+          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/7",
+          "at": "2026-06-01T20:59:11Z"
         },
         {
           "key": "qa",
@@ -831,14 +858,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T20:13:45Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T20:14:18Z"
         },
         {
           "key": "implementation",
@@ -846,7 +875,8 @@
           "owner": "developer",
           "status": "done",
           "detail": "",
-          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/6"
+          "pr_url": "https://github.com/eduardocerqueira/experimental-hello-world/pull/6",
+          "at": "2026-06-01T20:32:39Z"
         },
         {
           "key": "qa",
@@ -938,14 +968,16 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T16:50:03Z"
         },
         {
           "key": "awaiting-approval",
           "title": "Business analysis ready",
           "owner": "Director",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T16:50:26Z"
         },
         {
           "key": "implementation",
@@ -1035,7 +1067,8 @@
           "title": "Request triaged",
           "owner": "business-owner",
           "status": "done",
-          "detail": ""
+          "detail": "",
+          "at": "2026-06-01T12:38:22Z"
         },
         {
           "key": "awaiting-approval",
