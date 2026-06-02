@@ -340,3 +340,29 @@ def test_model_override_in_resolve_model(monkeypatch):
 
 def test_model_marker_is_internal():
     assert is_squad_internal_comment("squad-v2-model:model-b — escalated")
+
+
+def test_forced_model_bypasses_qa_cap_even_with_empty_ladder():
+    # 3 QA fails, NO ladder, but the Director picked a model via the dropdown →
+    # dispatch the developer on that model instead of blocking (the #140 dropdown bug).
+    comments = [_DEV] + [{"body": "squad-v2-qa:fail"} for _ in range(3)]
+    act = next_action(
+        _dev_approved(comments), model_ladder=[], forced_model="Qwen/Qwen2.5-Coder-32B-Instruct"
+    )
+    assert act.kind == "dispatch" and act.agent == "developer"
+    assert "Qwen/Qwen2.5-Coder-32B-Instruct" in act.reason
+
+
+def test_forced_model_equal_to_current_does_not_loop():
+    # Forced == current model already in effect → no escalation → blocks at the cap.
+    comments = [
+        _DEV,
+        {"body": "squad-v2-model:Qwen/Qwen2.5-Coder-32B-Instruct — escalated"},
+        {"body": "squad-v2-qa:fail"},
+        {"body": "squad-v2-qa:fail"},
+        {"body": "squad-v2-qa:fail"},
+    ]
+    act = next_action(
+        _dev_approved(comments), model_ladder=[], forced_model="Qwen/Qwen2.5-Coder-32B-Instruct"
+    )
+    assert act.kind == "failed"
