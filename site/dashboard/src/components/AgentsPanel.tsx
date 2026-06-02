@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const STATUS_TEXT: Record<NormStatus, string> = {
   done: "text-green",
+  running: "text-green",
   review: "text-amber",
   progress: "text-amber",
   blocked: "text-danger",
@@ -24,6 +25,7 @@ const STATUS_TEXT: Record<NormStatus, string> = {
 
 const STATUS_LABEL: Record<NormStatus, string> = {
   done: "Done",
+  running: "Running",
   review: "In review",
   progress: "In progress",
   blocked: "Blocked",

@@ -623,11 +623,19 @@ def _v2_agents(
     else:
         qa = ("waiting", "After the developer delivers")
 
-    return (
+    rows = [
         row("business-owner", bo[0], bo[1]),
         row("developer", dev[0], dev[1]),
         row("qa", qa[0], qa[1]),
-    )
+    ]
+    # A live run marker means this agent is executing now — surface "running".
+    active = squad_v2.run_in_progress(tuple(comments))
+    if active:
+        for r in rows:
+            if r["role"] == active:
+                r["status"] = "running"
+                r["detail"] = f"Running now — {r['detail']}"
+    return tuple(rows)
 
 
 def _v2_events(
