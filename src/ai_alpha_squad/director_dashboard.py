@@ -733,10 +733,13 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
     action = squad_v2.next_action(view)
     pr_url = _v2_dev_pr(comments)
 
-    # `blocked` outranks closed: keep blocked jobs surfaced (Blocked tab) instead
-    # of hiding them under Done. `released` is done.
+    # Priority: released is done; an active agent run shows In progress even if
+    # the issue is closed; `blocked` outranks closed (Blocked tab); then closed.
+    active_run = squad_v2.run_in_progress(tuple(comments)) is not None
     if lc == "released":
         bucket = "completed"
+    elif active_run and not blocked:
+        bucket = "in_progress"
     elif blocked:
         bucket = "stuck"
     elif state.upper() == "CLOSED":

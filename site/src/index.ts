@@ -245,19 +245,31 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
   // Resume at the phase the orchestrator understands (new | director-approved),
   // derived from the issue's live labels (ignoring the `blocked` overlay).
   let lifecycleLabel = "director-approved";
+  let closed = false;
   try {
     const res = await fetch(`https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`, { headers });
     if (res.ok) {
-      const issue = (await res.json()) as { labels?: { name: string }[] };
+      const issue = (await res.json()) as { labels?: { name: string }[]; state?: string };
       const labels = (issue.labels ?? []).map((l) => l.name);
       lifecycleLabel = labels.includes("director-approved")
         ? "director-approved"
         : labels.includes("new")
           ? "new"
           : "director-approved";
+      closed = (issue.state || "").toLowerCase() === "closed";
     }
   } catch {
     /* fall back to director-approved */
+  }
+
+  // Retrying means working it again — reopen a closed issue so it isn't stuck
+  // under Done while the agent runs.
+  if (closed) {
+    await fetch(`https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ state: "open" }),
+    }).catch(() => {});
   }
 
   const dispatch = await fetch(

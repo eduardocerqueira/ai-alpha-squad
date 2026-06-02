@@ -64,6 +64,17 @@ def test_v2_blocked_closed_goes_to_blocked_not_done():
     assert rel.bucket == "completed"
 
 
+def test_v2_active_run_on_closed_shows_in_progress():
+    # An agent actively running (in_progress marker, no terminal) shows In
+    # progress even if the issue is closed.
+    comments = [
+        {"body": "# Business Analysis\nok"},
+        {"body": "squad-v2-run:in_progress:developer — working"},
+    ]
+    card = _load_job_card_v2("o/r", _v2_row(206, ["director-approved"], comments, state="CLOSED"))
+    assert card.bucket == "in_progress"
+
+
 def test_v2_awaiting_approval_is_director_gate():
     comments = [{"body": "# Business Analysis\nok"}]
     card = _load_job_card_v2("o/r", _v2_row(203, ["awaiting-approval"], comments))
