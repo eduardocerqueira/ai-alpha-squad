@@ -384,3 +384,44 @@ def test_repo_map_lists_files(tmp_path):
     (tmp_path / "sub" / "y.txt").write_text("2\n")
     m = _repo_map(tmp_path)
     assert "x.py" in m and "sub/y.txt" in m
+
+
+def test_guard_matches_deep_files_by_basename_modify_task(tmp_path, monkeypatch):
+    """#140 regression: enumerated files referenced by bare/wrong paths but present
+    at a deep path must count as existing — not 'to create' — so finish isn't blocked."""
+    # Real files live deep in the tree.
+    deep = tmp_path / "src/main/java/com/x/buildmonitor"
+    deep.mkdir(parents=True)
+    (deep / "BuildMonitorView.java").write_text("class X {}\n")
+    resdir = tmp_path / "src/main/resources/com/x/buildmonitor/BuildMonitorView"
+    resdir.mkdir(parents=True)
+    (resdir / "index.jelly").write_text("<x/>\n")
+    (resdir / "configure-entries.jelly").write_text("<x/>\n")
+
+    # Issue/BA enumerate them by bare names + a WRONG path (java instead of resources).
+    task = (
+        "Pointers:\n"
+        "1. `src/main/java/com/x/buildmonitor/BuildMonitorView/index.jelly`\n"
+        "2. `BuildMonitorView.java`\n"
+        "3. `configure-entries.jelly`\n"
+    )
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 4)
+    monkeypatch.setattr(actions_agent, "chat_completion",
+                        lambda *a, **k: '{"tool":"finish","args":{"summary":"added logoUrl"}}')
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions="add configurable logo",
+        issue_context=task, token="t",
+    )
+    assert finished is True   # not blocked — all referenced files already exist
+    assert "logoUrl" in summary
+
+
+def test_file_artifact_present_basename(tmp_path):
+    from ai_alpha_squad.actions_agent import file_artifact_present
+    d = tmp_path / "deep/pkg"
+    d.mkdir(parents=True)
+    (d / "Foo.java").write_text("x\n")
+    assert file_artifact_present("Foo.java", tmp_path)            # bare name
+    assert file_artifact_present("wrong/path/Foo.java", tmp_path)  # wrong path, right basename
+    assert not file_artifact_present("Bar.java", tmp_path)
