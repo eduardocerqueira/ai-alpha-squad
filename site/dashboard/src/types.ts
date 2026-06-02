@@ -21,13 +21,25 @@ export type AgentStatus =
   | "stuck"
   | "blocked";
 
+/** One model an agent used, parsed from its GH issue comments. */
+export interface ModelUse {
+  model: string;
+  /** ISO timestamp of the comment that announced the model ("" if unknown). */
+  at: string;
+  /** "result" = posted a deliverable on this model; "escalation" = re-run bumped to it. */
+  kind: "result" | "escalation";
+}
+
 export interface Agent {
   role: string;
   status: AgentStatus;
   issue_number: number | null;
   issue_url: string | null;
   detail: string;
+  /** Latest model (back-compat); prefer model_history for the full timeline. */
   model?: string | null;
+  /** Chronological models the agent used on this job (oldest → newest). */
+  model_history?: ModelUse[];
 }
 
 export type EventStatus = "done" | "current" | "director" | "blocked" | "pending";

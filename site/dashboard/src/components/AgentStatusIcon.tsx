@@ -23,12 +23,12 @@ export function normalizeAgentStatus(status: AgentStatus | string, detail = ""):
 }
 
 const COLORS: Record<NormStatus, string> = {
-  done: "var(--green)",
-  running: "var(--green)",
-  review: "var(--amber)",
-  progress: "var(--amber)",
-  idle: "var(--muted)",
-  blocked: "var(--danger)",
+  done: "hsl(var(--brand-green))",
+  running: "hsl(var(--brand-green))",
+  review: "hsl(var(--brand-amber))",
+  progress: "hsl(var(--brand-amber))",
+  idle: "hsl(var(--muted-foreground))",
+  blocked: "hsl(var(--brand-danger))",
 };
 
 /** Static SVG status indicator for an agent — no spinner (the dashboard can't

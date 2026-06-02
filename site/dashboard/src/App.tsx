@@ -1,13 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ExternalLink, GitPullRequest, LogOut, RefreshCw, RotateCcw } from "lucide-react";
-import type { Bucket, Dashboard, JobCard } from "@/types";
+import { toast } from "sonner";
+import {
+  AlertCircle,
+  ExternalLink,
+  GitPullRequest,
+  RefreshCw,
+  RotateCcw,
+  Square,
+} from "lucide-react";
+import type { Dashboard, JobCard } from "@/types";
+import { GROUPS, isTabKey, jobsInGroup, type TabKey } from "@/lib/jobs";
 import { cn, prNumber, relativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
+import { JobList } from "@/components/JobList";
 import { Timeline } from "@/components/Timeline";
 import { AgentsPanel } from "@/components/AgentsPanel";
-import { JobSwitcher } from "@/components/JobSwitcher";
-import { StatusTabs, type TabDef, type TabKey } from "@/components/StatusTabs";
+import { ModelHistory } from "@/components/ModelHistory";
 import { Login } from "@/components/Login";
 
 // Live endpoint (Worker fetches fresh data); static jobs.json is the fallback
@@ -15,12 +34,12 @@ import { Login } from "@/components/Login";
 const JOBS_URL = "/api/director/jobs";
 const JOBS_FALLBACK_URL = "/director/jobs.json";
 const REFRESH_MS = 30_000;
+// Baked at build time from site/VERSION; matches the marketing-site footer.
+const BUILD_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0";
 
 class UnauthorizedError extends Error {}
 
 async function fetchDashboard(live = false): Promise<Dashboard> {
-  // `live` asks the backend to rebuild from GitHub now (manual Refresh).
-  // Supported by `squad-director-dashboard.py --serve --live`; harmless elsewhere.
   const primary = live ? `${JOBS_URL}?live=1&refresh=1` : JOBS_URL;
   for (const u of [primary, JOBS_URL, JOBS_FALLBACK_URL]) {
     const res = await fetch(u, { cache: "no-store" });
@@ -34,29 +53,16 @@ async function fetchDashboard(live = false): Promise<Dashboard> {
   );
 }
 
-// Job tabs: Open (needs you) · In progress · Blocked · Done (released/closed).
-const GROUPS: { key: TabKey; label: string; buckets: Bucket[]; empty: string }[] = [
-  { key: "open", label: "Open", buckets: ["needs_you"], empty: "Nothing needs your approval right now." },
-  { key: "in_progress", label: "In progress", buckets: ["in_progress"], empty: "No jobs in progress right now." },
-  { key: "blocked", label: "Blocked", buckets: ["stuck"], empty: "No blocked jobs — nice." },
-  { key: "done", label: "Done", buckets: ["completed"], empty: "No completed jobs yet." },
-];
-
-function jobsInGroup(data: Dashboard | null, key: TabKey): JobCard[] {
-  if (!data) return [];
-  const group = GROUPS.find((g) => g.key === key)!;
-  return group.buckets.flatMap((b) => data[b] ?? []);
-}
-
 export default function App() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // null = checking, "" = not signed in, email = signed in
   const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [version, setVersion] = useState(BUILD_VERSION);
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t === "in_progress" || t === "blocked" || t === "done" ? t : "open";
+    return isTabKey(t) ? t : "open";
   });
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -94,8 +100,6 @@ export default function App() {
         setAuthEmail("");
       }
     })();
-    // Background tabs throttle setInterval — refetch when the tab regains focus
-    // so returning to it (e.g. after approving on GitHub) shows current data.
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };
@@ -107,8 +111,7 @@ export default function App() {
   }, [load]);
 
   // Real-time push: when signed in, hold a WebSocket to the hub. CI pushes a
-  // "refresh" the moment new data is published, so we refetch instantly instead
-  // of waiting for the poll. Polling (above) stays as a fallback.
+  // "refresh" the moment new data is published.
   useEffect(() => {
     if (!authEmail || import.meta.env.DEV) return; // dev has no WS endpoint
     let closed = false;
@@ -167,20 +170,20 @@ export default function App() {
   }
 
   const [retrying, setRetrying] = useState(false);
-  const [retryNote, setRetryNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [modelLadder, setModelLadder] = useState<string[]>([]);
-  const [chosenModel, setChosenModel] = useState("");
-  useEffect(() => setRetryNote(null), [selected]);
+  const [chosenModel, setChosenModel] = useState("default");
   useEffect(() => {
     fetch("/api/config", { cache: "no-store" })
       .then((r) => r.json())
-      .then((c: { modelLadder?: string[] }) => setModelLadder(c.modelLadder ?? []))
+      .then((c: { modelLadder?: string[]; version?: string }) => {
+        setModelLadder(c.modelLadder ?? []);
+        if (c.version) setVersion(c.version);
+      })
       .catch(() => {});
   }, []);
 
   async function retryJob(n: number, model?: string) {
     setRetrying(true);
-    setRetryNote(null);
     try {
       const res = await fetch("/api/director/retry", {
         method: "POST",
@@ -189,30 +192,40 @@ export default function App() {
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(body.error || "Could not start the re-run.");
-      setRetryNote({ ok: true, text: "Re-run started — the squad is picking it up." });
+      toast.success("Re-run started — the squad is picking it up.");
     } catch (e) {
-      setRetryNote({ ok: false, text: e instanceof Error ? e.message : "Retry failed." });
+      toast.error(e instanceof Error ? e.message : "Retry failed.");
     } finally {
       setRetrying(false);
     }
   }
 
-  const tabs: TabDef[] = useMemo(
-    () =>
-      GROUPS.map((g) => ({
-        key: g.key,
-        label: g.label,
-        count: jobsInGroup(data, g.key).length,
-        alert:
-          (g.key === "open" && (data?.counts.needs_you ?? 0) > 0) ||
-          (g.key === "blocked" && (data?.counts.stuck ?? 0) > 0),
-      })),
-    [data],
-  );
+  const [stopping, setStopping] = useState(false);
+  async function stopJob(n: number) {
+    setStopping(true);
+    try {
+      const res = await fetch("/api/director/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: n }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; cancelled?: number };
+      if (!res.ok) throw new Error(body.error || "Could not stop the job.");
+      toast.success(
+        body.cancelled
+          ? `Stopped — cancelled ${body.cancelled} run${body.cancelled === 1 ? "" : "s"}. Use Retry to resume.`
+          : "Stopped — the job is held in Blocked. Use Retry to resume.",
+      );
+      load(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Stop failed.");
+    } finally {
+      setStopping(false);
+    }
+  }
 
   // On first data load only, default to the first non-empty tab (unless the URL
-  // pinned one). After that, never auto-switch — the user can freely open any
-  // tab, including empty ones (which show an empty state).
+  // pinned one). After that, never auto-switch.
   const didDefaultTab = useRef(false);
   useEffect(() => {
     if (!data || didDefaultTab.current) return;
@@ -235,192 +248,237 @@ export default function App() {
     }
   }, [tabJobs, selected]);
 
-  const job = tabJobs.find((j) => j.number === selected) ?? null;
-  const needsYou = data?.counts.needs_you ?? 0;
+  const job: JobCard | null = tabJobs.find((j) => j.number === selected) ?? null;
   const totalJobs = useMemo(
     () => GROUPS.reduce((n, g) => n + jobsInGroup(data, g.key).length, 0),
     [data],
   );
+  const groupLabel = GROUPS.find((g) => g.key === activeTab)?.label ?? "Jobs";
+  const canRetry = !!job && (job.bucket === "stuck" || job.blocked || job.bucket === "completed");
+  const canStop = !!job && job.bucket === "in_progress";
 
-  // Conditional rendering only AFTER all hooks have run (rules of hooks).
   if (authEmail === null) {
     return (
-      <div className="grid min-h-[60vh] place-items-center text-muted">
+      <div className="grid min-h-svh place-items-center text-muted-foreground">
         <RefreshCw className="h-5 w-5 animate-spin" />
       </div>
     );
   }
-  if (authEmail === "") return <Login />;
+  if (authEmail === "") return <Login version={version} />;
 
   return (
-    <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-5 px-5 py-6 lg:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Director</h1>
-          <p className="mt-1 text-sm text-muted">
-            {data?.repo ?? "AI Alpha Squad"}
-            {data && (
-              <>
-                {" · "}updated {relativeTime(data.generated_at)}
-                {data.stale && <span className="text-amber"> · stale snapshot</span>}
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {needsYou > 0 && (
-            <Badge variant="amber">{needsYou} need{needsYou === 1 ? "s" : ""} you</Badge>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => load(true)}
-            disabled={loading}
-            title="Reload the latest status from GitHub"
-          >
-            <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-            Refresh
-          </Button>
-          <Button variant="ghost" size="sm" onClick={logout} title={authEmail || undefined}>
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </Button>
-        </div>
-      </header>
-
-      {error && (
-        <div className="flex items-start gap-2 rounded-lg border border-danger/50 bg-[color:rgba(248,113,113,0.08)] p-4 text-sm text-danger">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p>{error}</p>
-            <p className="mt-1 text-muted">
-              Terminal fallback: <code className="font-mono text-xs">./scripts/squad-director-now.sh</code>
+    <SidebarProvider>
+      <AppSidebar
+        data={data}
+        active={activeTab}
+        onSelect={setActiveTab}
+        email={authEmail}
+        repo={data?.repo ?? "AI Alpha Squad"}
+        onSignOut={logout}
+      />
+      <SidebarInset>
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-1 h-5" />
+          <div className="flex min-w-0 flex-col">
+            <h1 className="truncate text-sm font-semibold leading-tight">{groupLabel}</h1>
+            <p className="truncate text-xs text-muted-foreground">
+              {data ? (
+                <>
+                  updated {relativeTime(data.generated_at)}
+                  {data.stale && <span className="text-brand-amber"> · stale snapshot</span>}
+                </>
+              ) : (
+                "loading…"
+              )}
             </p>
           </div>
-        </div>
-      )}
+          <div className="ml-auto flex items-center gap-2">
+            <Badge variant="outline" className="hidden font-mono sm:inline-flex">
+              v{version}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => load(true)}
+              disabled={loading}
+              title="Reload the latest status from GitHub"
+            >
+              <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+              Refresh
+            </Button>
+          </div>
+        </header>
 
-      {!error && totalJobs === 0 && !loading && (
-        <div className="rounded-lg border border-border bg-surface p-8 text-center text-muted">
-          No squad jobs found.
-        </div>
-      )}
-
-      {totalJobs > 0 && (
-        <>
-          <StatusTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
-          {tabJobs.length > 0 ? (
-            <JobSwitcher jobs={tabJobs} selected={selected ?? tabJobs[0].number} onSelect={setSelected} />
-          ) : (
-            <div className="rounded-lg border border-dashed border-border bg-surface/40 p-10 text-center text-sm text-muted">
-              {GROUPS.find((g) => g.key === activeTab)?.empty ?? "No jobs in this tab."}
+        <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 p-4 lg:p-6">
+          {error && (
+            <div className="flex items-start gap-2 rounded-lg border border-brand-danger/50 bg-brand-danger/[0.08] p-4 text-sm text-brand-danger">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p>{error}</p>
+                <p className="mt-1 text-muted-foreground">
+                  Terminal fallback:{" "}
+                  <code className="font-mono text-xs">./scripts/squad-director-now.sh</code>
+                </p>
+              </div>
             </div>
           )}
-        </>
-      )}
 
-      {job && (
-        <div className="grid gap-6 lg:grid-cols-[80%_20%]">
-          {/* 80% — timeline for the selected job */}
-          <section className="min-w-0">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <a
-                  href={job.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group inline-flex items-center gap-1.5 text-lg font-semibold text-text hover:text-green"
-                >
-                  <span className="font-mono text-sm text-muted">#{job.number}</span>
-                  <span className="truncate">{job.title}</span>
-                  <ExternalLink className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-                </a>
-                <p className="mt-1 text-sm text-muted">{job.headline || job.summary}</p>
-                {job.blocked && (
-                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-danger/50 bg-[color:rgba(248,113,113,0.08)] px-2 py-1 text-xs text-danger">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    <span><code className="font-mono">blocked</code> label set on the issue — clear it if the squad has moved on.</span>
-                  </p>
-                )}
-                {retryNote && (
-                  <p className={cn("mt-2 text-xs", retryNote.ok ? "text-green" : "text-danger")}>{retryNote.text}</p>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {(job.bucket === "stuck" || job.blocked || job.bucket === "completed") && modelLadder.length > 0 && (
-                  <select
-                    value={chosenModel}
-                    onChange={(e) => setChosenModel(e.target.value)}
-                    disabled={retrying}
-                    title="Developer model for the re-run (default keeps the current/escalation model)"
-                    className="h-8 max-w-[12rem] rounded-md border border-border bg-surface px-2 text-xs text-text"
-                  >
-                    <option value="">Model: default</option>
-                    {modelLadder.map((m) => (
-                      <option key={m} value={m}>
-                        {m.includes("/") ? m.split("/").pop() : m}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {(job.bucket === "stuck" || job.blocked || job.bucket === "completed") && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (
-                        job.bucket === "completed" &&
-                        !window.confirm(
-                          `Re-open and re-run #${job.number}? It will reopen the issue, reset it to director-approved, and re-run the developer → QA flow.`,
-                        )
-                      )
-                        return;
-                      retryJob(job.number, chosenModel || undefined);
-                    }}
-                    disabled={retrying}
-                    title={
-                      job.bucket === "completed"
-                        ? "Reopen this issue and re-run the squad"
-                        : "Re-run the orchestrator (clears the failure count + removes the blocked label)"
-                    }
-                  >
-                    <RotateCcw className={retrying ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-                    {retrying
-                      ? job.bucket === "completed"
-                        ? "Re-opening…"
-                        : "Retrying…"
-                      : job.bucket === "completed"
-                        ? "Re-open & re-run"
-                        : "Retry job"}
-                  </Button>
-                )}
-                {job.target_pr_url && (
-                  <a
-                    href={job.target_pr_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={job.target_pr_url}
-                    className={cn(
-                      "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                      job.target_pr_merged
-                        ? "border-[var(--green-dim)] bg-[color:rgba(34,197,94,0.12)] text-green hover:border-green"
-                        : "border-border bg-surface text-text hover:border-green hover:text-green",
-                    )}
-                  >
-                    <GitPullRequest className="h-3.5 w-3.5" />
-                    PR{prNumber(job.target_pr_url)} {job.target_pr_merged ? "merged" : "open"}
-                    <ExternalLink className="h-3 w-3 opacity-70" />
-                  </a>
-                )}
-              </div>
+          {!error && totalJobs === 0 && !loading && (
+            <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
+              No squad jobs found.
             </div>
-            <Timeline events={job.events} />
-          </section>
+          )}
 
-          {/* 20% — agents assigned to the work */}
-          <AgentsPanel agents={job.agents} />
+          {totalJobs > 0 &&
+            (tabJobs.length > 0 ? (
+              <JobList jobs={tabJobs} selected={selected ?? tabJobs[0].number} onSelect={setSelected} />
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-card/40 p-10 text-center text-sm text-muted-foreground">
+                {GROUPS.find((g) => g.key === activeTab)?.empty ?? "No jobs in this tab."}
+              </div>
+            ))}
+
+          {job && (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              {/* Selected job — header + timeline */}
+              <section className="min-w-0">
+                <div className="mb-4 flex flex-col gap-3">
+                  <div className="min-w-0">
+                    <a
+                      href={job.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group inline-flex items-center gap-1.5 text-lg font-semibold hover:text-brand-green"
+                    >
+                      <span className="font-mono text-sm text-muted-foreground">#{job.number}</span>
+                      <span className="truncate">{job.title}</span>
+                      <ExternalLink className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </a>
+                    <p className="mt-1 text-sm text-muted-foreground">{job.headline || job.summary}</p>
+                    {job.blocked && (
+                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-brand-danger/50 bg-brand-danger/[0.08] px-2 py-1 text-xs text-brand-danger">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        <span>
+                          <code className="font-mono">blocked</code> label set on the issue — clear
+                          it if the squad has moved on.
+                        </span>
+                      </p>
+                    )}
+                  </div>
+
+                  {(canRetry || canStop || job.target_pr_url) && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canStop && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Stop #${job.number}? This cancels the in-flight run and holds the job in Blocked. Use Retry to resume.`,
+                            )
+                          )
+                            stopJob(job.number);
+                        }}
+                        disabled={stopping}
+                        title="Cancel the running Actions run and halt this job"
+                      >
+                        <Square
+                          className={cn("h-3.5 w-3.5 text-brand-danger", stopping && "animate-pulse")}
+                        />
+                        {stopping ? "Stopping…" : "Stop execution"}
+                      </Button>
+                    )}
+                    {canRetry && modelLadder.length > 0 && (
+                      <Select value={chosenModel} onValueChange={setChosenModel} disabled={retrying}>
+                        <SelectTrigger className="h-8 w-[12rem] text-xs">
+                          <SelectValue placeholder="Model: default" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Model: default</SelectItem>
+                          {modelLadder.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m.includes("/") ? m.split("/").pop() : m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {canRetry && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (
+                            job.bucket === "completed" &&
+                            !window.confirm(
+                              `Re-open and re-run #${job.number}? It will reopen the issue, reset it to director-approved, and re-run the developer → QA flow.`,
+                            )
+                          )
+                            return;
+                          retryJob(job.number, chosenModel === "default" ? undefined : chosenModel);
+                        }}
+                        disabled={retrying}
+                        title={
+                          job.bucket === "completed"
+                            ? "Reopen this issue and re-run the squad"
+                            : "Re-run the orchestrator (clears the failure count + removes the blocked label)"
+                        }
+                      >
+                        <RotateCcw className={retrying ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+                        {retrying
+                          ? job.bucket === "completed"
+                            ? "Re-opening…"
+                            : "Retrying…"
+                          : job.bucket === "completed"
+                            ? "Re-open & re-run"
+                            : "Retry job"}
+                      </Button>
+                    )}
+                    {job.target_pr_url && (
+                      <a
+                        href={job.target_pr_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={job.target_pr_url}
+                        className={cn(
+                          "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                          job.target_pr_merged
+                            ? "border-brand-green-dim bg-brand-green/12 text-brand-green hover:border-brand-green"
+                            : "border-border bg-card hover:border-brand-green hover:text-brand-green",
+                        )}
+                      >
+                        <GitPullRequest className="h-3.5 w-3.5" />
+                        PR{prNumber(job.target_pr_url)} {job.target_pr_merged ? "merged" : "open"}
+                        <ExternalLink className="h-3 w-3 opacity-70" />
+                      </a>
+                    )}
+                  </div>
+                  )}
+                </div>
+                <Timeline events={job.events} />
+              </section>
+
+              {/* Right rail — squad + model history */}
+              <aside className="flex min-w-0 flex-col gap-6">
+                <div>
+                  <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Squad ({job.agents.length})
+                  </h2>
+                  <AgentsPanel agents={job.agents} />
+                </div>
+                <div>
+                  <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Model history
+                  </h2>
+                  <ModelHistory agents={job.agents} />
+                </div>
+              </aside>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
