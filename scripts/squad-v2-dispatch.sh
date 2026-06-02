@@ -148,8 +148,16 @@ Issue: https://github.com/${REPO}/issues/${ISSUE}
 2. Post on THIS issue (#${ISSUE}) — heading must include: # Developer Deliverable
    Include the PR URL and summary of changes.
 3. If the issue has a "# QA Report" comment ending in \`squad-v2-qa:fail\`, this is a
-   REWORK: fix every gap it lists (continue on the existing branch), then post an
-   updated # Developer Deliverable.
+   REWORK on the EXISTING branch. Work its fix-list methodically, ONE ITEM AT A TIME:
+   - Fix BLOCKER items FIRST (compile errors, missing required files) — these gate
+     everything else. Then REQUIRED, then NICE-to-have.
+   - For each item: read the exact file, make a TARGETED edit_file (never rewrite a
+     whole file — you will drop code), then re-read that region to confirm the change
+     applied as intended before moving to the next item.
+   - Do NOT re-implement parts QA already marked ✅ — leave working code alone.
+   - Verify the project still builds (run the build/compile command if available)
+     before posting. Then post an updated # Developer Deliverable listing which
+     fix-list items you addressed.
 4. Do not create sub-issues.
 EOF
       ;;
@@ -193,13 +201,21 @@ existing file to be changed, but only N of M were"). Then review the actual chan
 ${PR_DIFF:-(no open PR diff found — treat as not delivered)}
 \`\`\`
 
+Be a strict but OBJECTIVE reviewer. The Developer is a code model that acts best on a
+short, concrete fix-list — not prose. Keep the report tight.
+
 Post ONE comment on THIS issue (#${ISSUE}) with heading: # QA Report
-- List each success criterion and whether it is met (✅/❌) with a one-line reason.
-- For any count/coverage criterion, state the numbers (e.g. "47/54 files changed").
+- "## Criteria" — one line per success criterion: \`✅\` or \`❌ <≤12-word reason>\`.
+  For any count/coverage criterion, give numbers (e.g. "47/54 files changed").
+  Do NOT write paragraphs, code blocks, or restate the criteria text.
+- "## Fixes required" — ONLY if failing. A prioritized, numbered list the Developer
+  can act on directly. Each item EXACTLY: \`[BLOCKER|REQUIRED|NICE] <file path> — <the
+  concrete change to make>\`. Order BLOCKER (won't compile / missing required file)
+  first, then REQUIRED, then NICE. Be specific (name the file, function, and line if
+  known). No item should need interpretation.
 - End with EXACTLY one verdict line, nothing after it:
   - \`squad-v2-qa:pass\` — if and only if every criterion is fully met.
-  - \`squad-v2-qa:fail\` — otherwise, immediately followed by a bullet list of the
-    specific, actionable gaps the Developer must fix.
+  - \`squad-v2-qa:fail\` — otherwise.
 Do not open PRs or sub-issues; review only.
 EOF
       ;;
