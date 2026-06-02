@@ -33,6 +33,8 @@ jobs:
     if: github.repository == 'eduardocerqueira/ai-alpha-squad'
     env:
       GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      # The builder picks the v2 model (BO → Developer → QA, no sub-issues) from this.
+      SQUAD_V2: ${{ vars.SQUAD_V2 }}
     steps:
       - uses: actions/checkout@v4
 
