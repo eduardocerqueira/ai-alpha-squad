@@ -249,6 +249,43 @@ def expected_artifact_count(text: str) -> int | None:
     return len(files) if files else None
 
 
+def _repo_basenames(workdir: Path) -> set[str]:
+    """Basenames of files currently in the working tree (tracked + untracked).
+
+    Used so the completeness guard recognises a file referenced by a bare name or a
+    wrong/guessed path (e.g. the issue 'pointers' or BA plan say `BuildMonitorView.java`
+    or `src/main/java/.../index.jelly` while the real file lives elsewhere). Matching
+    by basename keeps the guard from demanding the 'creation' of files that already
+    exist under a different path (#140), while still enforcing genuinely new files.
+    """
+    import os
+
+    names: set[str] = set()
+    try:
+        for args in (["git", "ls-files"], ["git", "ls-files", "--others", "--exclude-standard"]):
+            proc = subprocess.run(args, cwd=str(workdir), capture_output=True, text=True)
+            if proc.returncode == 0:
+                names.update(os.path.basename(f) for f in proc.stdout.splitlines() if f)
+    except Exception:
+        pass
+    if not names:
+        try:
+            names = {p.name for p in Path(workdir).rglob("*") if p.is_file()}
+        except Exception:
+            names = set()
+    return names
+
+
+def file_artifact_present(name: str, workdir: Path, basenames: set[str] | None = None) -> bool:
+    """True if the enumerated artifact exists in the repo (exact path or basename)."""
+    import os
+
+    if (workdir / name).exists():
+        return True
+    bset = basenames if basenames is not None else _repo_basenames(workdir)
+    return os.path.basename(name) in bset
+
+
 def _extract_json_object(text: str, start: int) -> str | None:
     depth = 0
     for i in range(start, len(text)):
@@ -452,10 +489,11 @@ Output only the JSON object."""
     # the run count: on a modify task the enumerated files (and the file paths the
     # Business Analysis cites in its plan) already exist, so they must not be treated
     # as "to create" — that previously blocked finish forever on modify jobs (#140).
+    _start_basenames = _repo_basenames(workdir)
     required_files = [
         f
         for f in expected_artifact_files(f"{instructions}\n\n{issue_context}")
-        if not (workdir / f).exists()
+        if not file_artifact_present(f, workdir, _start_basenames)
     ]
 
     def build_conversation(extra: str = "") -> str:
@@ -491,7 +529,8 @@ Output only the JSON object."""
         print(f"[actions] turn {_turn + 1}/{MAX_TURNS}: {tool_name}", file=sys.stderr)
         if tool_name == "finish":
             if required_files:
-                missing = [f for f in required_files if not (workdir / f).exists()]
+                _now = _repo_basenames(workdir)
+                missing = [f for f in required_files if not file_artifact_present(f, workdir, _now)]
                 if missing:
                     print(
                         f"[actions] finish blocked: {len(required_files) - len(missing)}"
@@ -697,20 +736,24 @@ def main(argv: list[str] | None = None) -> int:
             task_text = fetch_issue_context_with_parent(queue_repo, int(issue_s))
             enumerated = expected_artifact_files(task_text)
             # Only files the task names that DON'T already exist in the base branch
-            # are "to be created" — otherwise a modify task (whose enumerated files,
-            # and the BA plan's file references, already exist in base) would be
-            # wrongly judged incomplete (#140).
-            def _in_base(path: str) -> bool:
-                return (
-                    subprocess.run(
-                        ["git", "cat-file", "-e", f"{base}:{path}"],
-                        cwd=workdir, capture_output=True,
-                    ).returncode == 0
-                )
-            to_create = [f for f in enumerated if not _in_base(f)]
+            # are "to be created" — match by basename so a modify task (whose
+            # enumerated files / BA-plan references already exist in base, possibly
+            # under bare or guessed paths) isn't wrongly judged incomplete (#140).
+            base_basenames: set[str] = set()
+            proc = subprocess.run(
+                ["git", "ls-tree", "-r", "--name-only", base],
+                cwd=workdir, capture_output=True, text=True,
+            )
+            if proc.returncode == 0:
+                base_basenames = {os.path.basename(f) for f in proc.stdout.splitlines() if f}
+            to_create = [
+                f for f in enumerated
+                if os.path.basename(f) not in base_basenames and not (workdir / f).exists()
+            ]
             if not to_create:
                 return 0
-            missing = [f for f in to_create if not (workdir / f).exists()]
+            now = _repo_basenames(workdir)
+            missing = [f for f in to_create if not file_artifact_present(f, workdir, now)]
             if missing:
                 print(
                     f"incomplete: {len(to_create) - len(missing)}/{len(to_create)} files to create "
