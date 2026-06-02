@@ -22,6 +22,7 @@ from ai_alpha_squad.project_sync import (
     PlanningDeliverables,
     derive_state,
 )
+from ai_alpha_squad import squad_v2
 
 DEFAULT_REPO = "eduardocerqueira/ai-alpha-squad"
 
@@ -545,11 +546,251 @@ def _extract_target_repo(body: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# v2 model: Business Owner → Developer → QA, deliverables as parent comments,
+# no sub-issues, no designed/implemented/validation phases. See squad_v2.py.
+# ---------------------------------------------------------------------------
+
+# (lifecycle/synthetic key, human title, owning actor)
+TIMELINE_PHASES_V2: tuple[tuple[str, str, str], ...] = (
+    ("new", "Request triaged", "business-owner"),
+    ("awaiting-approval", "Business analysis ready", "Director"),
+    ("implementation", "Implementation — PR on target repo", "developer"),
+    ("qa", "QA review", "qa"),
+    ("release-candidate", "Release candidate", "Director"),
+    ("released", "Released", "Done"),
+)
+
+_V2_DIRECTOR_GATES = frozenset({"awaiting-approval", "release-candidate"})
+
+
+def _v2_dev_pr(comments: tuple[dict, ...]) -> str | None:
+    """Latest non-self PR URL posted on the issue (the developer deliverable)."""
+    import re
+
+    found: str | None = None
+    for c in comments:
+        for m in re.finditer(r"https://github\.com/([\w.-]+/[\w.-]+)/pull/\d+", c.get("body") or ""):
+            if "ai-alpha-squad" not in m.group(1).lower():
+                found = m.group(0)
+    return found
+
+
+def _v2_agents(
+    repo: str, number: int, comments: tuple[dict, ...], lc: str | None, pr_url: str | None
+) -> tuple[dict[str, Any], ...]:
+    parent = f"https://github.com/{repo}/issues/{number}"
+    dev_idx = squad_v2._latest_deliverable_index(comments, "developer")
+    qa_idx, qa_verdict = squad_v2.latest_qa_verdict(comments)
+    active = squad_v2.run_in_progress(comments)
+    done_phase = lc in ("release-candidate", "released")
+
+    def row(role: str, status: str, detail: str) -> dict[str, Any]:
+        return {"role": role, "status": status, "issue_number": number, "issue_url": parent, "detail": detail}
+
+    # Business Owner
+    if squad_v2.has_deliverable(comments, "business-owner"):
+        bo = ("done", "Business analysis posted")
+    elif lc == "new":
+        bo = ("active", "Writing business analysis")
+    else:
+        bo = ("done", "Complete")
+
+    # Developer
+    pr_suffix = f" — {pr_url}" if pr_url else ""
+    if done_phase:
+        dev = ("done", f"Delivered{pr_suffix}")
+    elif dev_idx is not None and qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
+        dev = ("active", f"QA requested changes — reworking{pr_suffix}")
+    elif dev_idx is not None:
+        dev = ("done", f"Deliverable posted{pr_suffix}")
+    elif lc == "director-approved":
+        dev = ("active", "Implementing on the target repo")
+    else:
+        dev = ("waiting", "After Director approves the analysis")
+
+    # QA (acceptance gate)
+    rounds = squad_v2.qa_fail_rounds(comments)
+    if done_phase:
+        qa = ("done", "Passed")
+    elif dev_idx is not None and qa_verdict == "pass" and (qa_idx or 0) > dev_idx:
+        qa = ("done", "Passed")
+    elif dev_idx is not None and qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
+        state = "blocked" if rounds >= squad_v2.MAX_QA_ROUNDS else "active"
+        qa = (state, f"Requested changes (round {rounds}/{squad_v2.MAX_QA_ROUNDS})")
+    elif dev_idx is not None:
+        qa = ("active", "Reviewing the deliverable")
+    else:
+        qa = ("waiting", "After the developer delivers")
+
+    return (
+        row("business-owner", bo[0], bo[1]),
+        row("developer", dev[0], dev[1]),
+        row("qa", qa[0], qa[1]),
+    )
+
+
+def _v2_events(
+    *,
+    lc: str | None,
+    bucket: str,
+    comments: tuple[dict, ...],
+    director_action: str,
+    issue_url: str,
+    pr_url: str | None,
+) -> tuple[dict[str, Any], ...]:
+    dev_idx = squad_v2._latest_deliverable_index(comments, "developer")
+    qa_idx, qa_verdict = squad_v2.latest_qa_verdict(comments)
+    rounds = squad_v2.qa_fail_rounds(comments)
+    order = ["new", "awaiting-approval", "director-approved", "release-candidate", "released"]
+    cur = order.index(lc) if lc in order else -1
+
+    def at_or_past(label: str) -> bool:
+        return cur >= order.index(label)
+
+    events: list[dict[str, Any]] = []
+    for key, title, owner in TIMELINE_PHASES_V2:
+        status = "pending"
+        detail = ""
+        action = None
+        if key == "new":
+            status = "done" if (cur > 0 or squad_v2.has_deliverable(comments, "business-owner")) else (
+                "current" if lc == "new" else "pending"
+            )
+        elif key == "awaiting-approval":
+            if at_or_past("director-approved"):
+                status = "done"
+            elif lc == "awaiting-approval":
+                status = "director"
+            else:
+                status = "pending"
+        elif key == "implementation":
+            if at_or_past("release-candidate"):
+                status = "done"
+            elif dev_idx is not None:
+                status = "done" if qa_verdict != "fail" or (qa_idx or 0) <= dev_idx else "current"
+                if pr_url:
+                    detail = "PR open" if not at_or_past("release-candidate") else "PR merged"
+            elif lc == "director-approved":
+                status = "current"
+                detail = "Developer implementing on the target repo"
+        elif key == "qa":
+            if at_or_past("release-candidate"):
+                status = "done"
+            elif dev_idx is None:
+                status = "pending"
+            elif qa_verdict == "pass" and (qa_idx or 0) > dev_idx:
+                status = "done"
+            elif qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
+                status = "blocked" if rounds >= squad_v2.MAX_QA_ROUNDS else "current"
+                detail = (
+                    f"QA requested changes — developer reworking ({rounds}/{squad_v2.MAX_QA_ROUNDS})"
+                )
+            else:
+                status = "current"
+                detail = "Reviewing the developer deliverable"
+        elif key == "release-candidate":
+            if lc == "released":
+                status = "done"
+            elif lc == "release-candidate":
+                status = "director"
+            else:
+                status = "pending"
+        elif key == "released":
+            status = "done" if lc == "released" else "pending"
+
+        if status == "director":
+            detail = director_action or "Director decision required."
+            action = {"label": "Open issue & respond", "url": issue_url, "message": detail}
+
+        event: dict[str, Any] = {"key": key, "title": title, "owner": owner, "status": status, "detail": detail}
+        if action:
+            event["action"] = action
+        if key == "implementation" and pr_url:
+            event["pr_url"] = pr_url
+        events.append(event)
+    return tuple(events)
+
+
+def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
+    title = str(row.get("title") or "")
+    body = str(row.get("body") or "")
+    if not _is_parent_job(title, body):
+        return None
+
+    number = int(row["number"])
+    labels = tuple(item["name"] for item in row.get("labels") or [])
+    state = str(row.get("state") or "OPEN")
+    updated_at = str(row.get("updatedAt") or "")
+    comments = tuple(row.get("comments") or [])
+
+    lc = squad_v2.current_lifecycle(set(labels))
+    view = squad_v2.IssueView(number, state, frozenset(labels), comments, body)
+    action = squad_v2.next_action(view)
+    blocked = "blocked" in labels
+    pr_url = _v2_dev_pr(comments)
+
+    if state.upper() == "CLOSED" or lc == "released":
+        bucket = "completed"
+    elif lc in _V2_DIRECTOR_GATES:
+        bucket = "needs_you"
+    elif lc == "blocked" or action.kind == "failed":
+        bucket = "stuck"
+    else:
+        bucket = "in_progress"
+
+    director_action = _director_action_for_card(bucket, lc)
+    issue_url = f"https://github.com/{repo}/issues/{number}"
+    stuck_reasons: tuple[str, ...] = (action.reason,) if action.kind == "failed" else ()
+
+    if bucket == "completed":
+        headline = "This job is done."
+    elif bucket == "needs_you":
+        headline = _headline_for_card("needs_you", lc, (), False)
+    elif bucket == "stuck":
+        headline = action.reason or "This job needs attention."
+    else:
+        headline = action.reason or "Squad is working — nothing needed from you."
+
+    agents = _v2_agents(repo, number, comments, lc, pr_url)
+    events = _v2_events(
+        lc=lc,
+        bucket=bucket,
+        comments=comments,
+        director_action=director_action,
+        issue_url=issue_url,
+        pr_url=pr_url,
+    )
+
+    return JobCard(
+        number=number,
+        title=title,
+        url=issue_url,
+        lifecycle=lc,
+        active_agent=(action.agent or ""),
+        bucket=bucket,
+        blocked=blocked,
+        updated_at=updated_at,
+        target_repo=squad_v2.extract_target_repo(body),
+        target_pr_url=pr_url,
+        target_pr_merged=lc in ("release-candidate", "released") and pr_url is not None,
+        summary=headline,
+        headline=headline,
+        director_action=director_action,
+        labels=labels,
+        stuck_reasons=stuck_reasons,
+        suggested_action="",
+        agents=agents,
+        events=events,
+    )
+
+
 def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 15) -> DirectorDashboard:
     """List parent jobs by bucket. Open jobs surface needs-you / in-progress /
     stuck; recently closed or released jobs land in ``completed`` (the Done tab)."""
     index = SquadIssueIndex.from_repo(repo, include_closed=include_closed)
     rows = list(index.by_number.values())
+    v2 = squad_v2.v2_enabled()
 
     buckets: dict[str, list[JobCard]] = {
         "needs_you": [],
@@ -558,7 +799,7 @@ def build_dashboard(repo: str = DEFAULT_REPO, *, include_closed: int = 15) -> Di
         "completed": [],
     }
     for row in rows:
-        card = _load_job_card(repo, row, index=index)
+        card = _load_job_card_v2(repo, row) if v2 else _load_job_card(repo, row, index=index)
         if card is None:
             continue
         buckets[card.bucket].append(card)

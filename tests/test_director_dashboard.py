@@ -9,8 +9,56 @@ from ai_alpha_squad.director_dashboard import (
     _effective_phase,
     _headline_for_card,
     _is_parent_job,
+    _load_job_card_v2,
     fetch_dashboard_json,
 )
+
+
+def _v2_row(number, labels, comments, state="OPEN"):
+    return {
+        "number": number,
+        "title": "[Request]: demo job",
+        "body": "Target repo: https://github.com/acme/target",
+        "labels": [{"name": n} for n in labels],
+        "state": state,
+        "updatedAt": "2026-06-01T00:00:00Z",
+        "comments": comments,
+    }
+
+
+def test_v2_card_three_agents_only():
+    card = _load_job_card_v2("o/r", _v2_row(200, ["new"], []))
+    assert [a["role"] for a in card.agents] == ["business-owner", "developer", "qa"]
+
+
+def test_v2_released_all_done():
+    card = _load_job_card_v2(
+        "o/r", _v2_row(201, ["released"], [{"body": "# Business Analysis\nok"}], state="CLOSED")
+    )
+    assert card.bucket == "completed"
+    assert all(a["status"] == "done" for a in card.agents)
+
+
+def test_v2_qa_fail_shows_rework():
+    comments = [
+        {"body": "# Business Analysis\nok"},
+        {"body": "# Developer Deliverable\nhttps://github.com/acme/target/pull/10"},
+        {"body": "# QA Report\nsquad-v2-qa:fail needs work"},
+    ]
+    card = _load_job_card_v2("o/r", _v2_row(202, ["director-approved"], comments))
+    assert card.bucket == "in_progress"
+    qa = next(a for a in card.agents if a["role"] == "qa")
+    dev = next(a for a in card.agents if a["role"] == "developer")
+    assert qa["status"] == "active" and "round 1/3" in qa["detail"]
+    assert dev["status"] == "active" and "pull/10" in dev["detail"]
+
+
+def test_v2_awaiting_approval_is_director_gate():
+    comments = [{"body": "# Business Analysis\nok"}]
+    card = _load_job_card_v2("o/r", _v2_row(203, ["awaiting-approval"], comments))
+    assert card.bucket == "needs_you"
+    gate = next(e for e in card.events if e["key"] == "awaiting-approval")
+    assert gate["status"] == "director" and "action" in gate
 from ai_alpha_squad.project_sync import AGENT_PENDING_ON_ISSUE, PlanningDeliverables
 
 
