@@ -53,6 +53,17 @@ def test_v2_qa_fail_shows_rework():
     assert dev["status"] == "active" and "pull/10" in dev["detail"]
 
 
+def test_v2_blocked_closed_goes_to_blocked_not_done():
+    # A blocked job that was closed must surface in the Blocked bucket, not hide
+    # under Done (released still wins → Done).
+    card = _load_job_card_v2(
+        "o/r", _v2_row(204, ["blocked", "director-approved"], [{"body": "# Business Analysis\nok"}], state="CLOSED")
+    )
+    assert card.bucket == "stuck" and card.blocked is True
+    rel = _load_job_card_v2("o/r", _v2_row(205, ["released"], [], state="CLOSED"))
+    assert rel.bucket == "completed"
+
+
 def test_v2_awaiting_approval_is_director_gate():
     comments = [{"body": "# Business Analysis\nok"}]
     card = _load_job_card_v2("o/r", _v2_row(203, ["awaiting-approval"], comments))

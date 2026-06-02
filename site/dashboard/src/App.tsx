@@ -34,10 +34,11 @@ async function fetchDashboard(live = false): Promise<Dashboard> {
   );
 }
 
-// Job tabs: Open (needs-you / stuck) · In progress · Done (released/closed).
+// Job tabs: Open (needs you) · In progress · Blocked · Done (released/closed).
 const GROUPS: { key: TabKey; label: string; buckets: Bucket[]; empty: string }[] = [
-  { key: "open", label: "Open", buckets: ["needs_you", "stuck"], empty: "Nothing needs your attention — no open jobs." },
+  { key: "open", label: "Open", buckets: ["needs_you"], empty: "Nothing needs your approval right now." },
   { key: "in_progress", label: "In progress", buckets: ["in_progress"], empty: "No jobs in progress right now." },
+  { key: "blocked", label: "Blocked", buckets: ["stuck"], empty: "No blocked jobs — nice." },
   { key: "done", label: "Done", buckets: ["completed"], empty: "No completed jobs yet." },
 ];
 
@@ -55,7 +56,7 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t === "in_progress" || t === "done" ? t : "open";
+    return t === "in_progress" || t === "blocked" || t === "done" ? t : "open";
   });
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -194,7 +195,9 @@ export default function App() {
         key: g.key,
         label: g.label,
         count: jobsInGroup(data, g.key).length,
-        alert: g.key === "open" && (data?.counts.needs_you ?? 0) > 0,
+        alert:
+          (g.key === "open" && (data?.counts.needs_you ?? 0) > 0) ||
+          (g.key === "blocked" && (data?.counts.stuck ?? 0) > 0),
       })),
     [data],
   );
