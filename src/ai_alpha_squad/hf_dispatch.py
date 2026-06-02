@@ -23,8 +23,13 @@ HF_ROUTER_URL = os.environ.get(
     "SQUAD_HF_ROUTER_URL",
     "https://router.huggingface.co/v1/chat/completions",
 )
-MAX_ISSUE_CHARS = int(os.environ.get("SQUAD_HF_MAX_ISSUE_CHARS", "12000"))
+MAX_ISSUE_CHARS = int(os.environ.get("SQUAD_HF_MAX_ISSUE_CHARS", "16000"))
 MAX_OUTPUT_TOKENS = int(os.environ.get("SQUAD_HF_MAX_OUTPUT_TOKENS", "4096"))
+
+# Orchestration markers carry zero value for an agent but pile up fast (a long
+# issue can have dozens), crowding the real deliverable/QA feedback out of the
+# context budget. Drop them when building agent context.
+CONTEXT_NOISE_PREFIXES = ("squad-v2-run:", "squad-v2-model:")
 
 class HFCreditsDepletedError(RuntimeError):
     """Raised on HTTP 402 — the account is out of Inference-Providers credits.
@@ -111,6 +116,46 @@ def parse_parent_issue_number(issue_body: str) -> int | None:
     return None
 
 
+def _build_issue_context(title: str, body: str, comments: list, *, limit: int = MAX_ISSUE_CHARS) -> str:
+    """Assemble the agent-facing issue context: title + body + comments.
+
+    Two things make this more than a naive concat (the #140 non-convergence bug):
+      - drop orchestration markers (in_progress / model escalation) — pure noise
+        that crowds out real feedback;
+      - when over budget, keep the MOST RECENT comments, not the oldest. The
+        latest QA rejection ("you declared X 3×, add file Y") is what a reworking
+        developer most needs; truncating from the front discarded exactly that.
+    The issue title + body (spec / BA) are always kept.
+    """
+    header = "\n\n".join(p for p in [f"# {title}".strip(), (body or "").strip()] if p)
+    blocks = []
+    for comment in comments or []:
+        cbody = (comment.get("body") or "").strip()
+        if not cbody or cbody.startswith(CONTEXT_NOISE_PREFIXES):
+            continue
+        author = (comment.get("author") or {}).get("login", "unknown")
+        blocks.append(f"\n---\n**Comment by @{author}:**\n{cbody}")
+
+    budget = max(0, limit - len(header))
+    kept: list[str] = []
+    running = 0
+    dropped = False
+    for block in reversed(blocks):  # newest first
+        if kept and running + len(block) > budget:
+            dropped = True
+            break
+        kept.append(block)
+        running += len(block)
+    kept.reverse()  # restore chronological order
+
+    note = "\n\n…(older comments truncated for context limit)" if dropped else ""
+    text = (header + "\n\n" + "".join(kept)).strip() if kept else header
+    if len(text) > limit:  # backstop: a single huge latest comment
+        text = text[:limit] + "\n\n…(truncated for context limit)"
+        return text
+    return text + note
+
+
 def fetch_issue_context(repo: str, issue: int) -> str:
     data = _gh_json(
         [
@@ -123,16 +168,9 @@ def fetch_issue_context(repo: str, issue: int) -> str:
             "title,body,comments",
         ]
     )
-    parts = [f"# {data.get('title', '')}", (data.get("body") or "").strip()]
-    for comment in data.get("comments") or []:
-        author = (comment.get("author") or {}).get("login", "unknown")
-        body = (comment.get("body") or "").strip()
-        if body:
-            parts.append(f"\n---\n**Comment by @{author}:**\n{body}")
-    text = "\n\n".join(p for p in parts if p)
-    if len(text) > MAX_ISSUE_CHARS:
-        text = text[:MAX_ISSUE_CHARS] + "\n\n…(truncated for HF context limit)"
-    return text
+    return _build_issue_context(
+        data.get("title", ""), data.get("body") or "", data.get("comments") or []
+    )
 
 
 def fetch_issue_context_with_parent(repo: str, issue: int) -> str:
