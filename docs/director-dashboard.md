@@ -17,32 +17,50 @@
 
 ## Web dashboard
 
-A two-column React dashboard (served at `/director/` by the site Worker):
+A [shadcn/ui](https://ui.shadcn.com) sidebar dashboard (brand dark + green), served
+at `/director/` by the site Worker. Live at [aialphasquad.com/director](https://aialphasquad.com/director/).
 
-- **80% — timeline.** A timeline19-style vertical timeline of the selected job's
-  lifecycle (`new → awaiting-approval → … → released`). Each step shows its owning
-  agent and status (done / current / blocked / pending). When a job is **awaiting a
-  Director decision**, that step renders as a highlighted "request for Director" node
-  with the message and an **Open issue & respond** action link.
-- **20% — squad.** Every agent assigned to the job with an SVG status indicator
-  (idle / working / blocked / done) and a link to its sub-issue.
-- **Job tabs** group jobs by status: **Open** (needs-you / stuck) · **In progress** ·
-  **Done** (released/closed). Each tab shows a count; the Open tab flags when an
-  approval is waiting. A job switcher under the tabs picks which job's timeline shows.
-  Deep-link a tab with `?tab=done` (also `in_progress`, `open`).
+- **Sidebar.** Status nav with live counts — **Open** (needs you) · **In progress** ·
+  **Blocked** · **Done** — plus the signed-in account and the site version (matching
+  the marketing-site footer). The Open/Blocked counts glow when they want attention.
+  Deep-link a status with `?tab=done` (also `in_progress`, `blocked`, `open`).
+- **Job switcher.** Horizontally scrollable cards for the selected status; each shows
+  the issue number, a status badge, and `needs human` / `blocked` flags.
+- **Timeline.** The selected job's lifecycle (`new → awaiting-approval → … → released`)
+  as a vertical timeline. Each step carries its owning agent, status
+  (done / current / blocked / pending), **and the date/time it happened** (left gutter).
+  A step **awaiting a Director decision** renders as a highlighted node with the message
+  and an **Open issue & respond** action.
+- **Squad panel.** Every agent on the job with a status indicator
+  (idle / working / blocked / done) and a link to its issue.
+- **Model history.** Per-agent timeline of the AI models each agent ran on, including
+  developer **escalations** (fast model → stronger coder after QA pushback) — the story
+  of how the work actually got done.
+- **Actions.** **Stop execution** halts an in-progress job (cancels the in-flight
+  Actions run and holds it in Blocked); **Retry** / **Re-open & re-run** resumes a
+  stuck, blocked, or done job, optionally on a chosen model from the ladder. PR status
+  (open / merged) links straight to the target repo.
 
 ### Where the data comes from (and how it refreshes)
 
-The dashboard reads `/api/director/jobs`. The deployed Worker serves the
-**live** copy CI publishes to the `director-jobs-json` branch (edge-cached ~60s),
-falling back to the `jobs.json` bundled at deploy time. The page also
-**auto-refreshes every 60s**, and **Refresh** reloads the latest status:
+The dashboard reads `/api/director/jobs`. The deployed Worker **computes the snapshot
+live** (TypeScript port of the Python builder, in `site/src/director-data.ts`) from the
+GitHub GraphQL API and caches it in KV; it falls back to the `director-jobs-json` branch
+copy and then the bundled `jobs.json`. The page **auto-refreshes every 30s**, refetches
+when the tab regains focus, and holds a **WebSocket** to the hub for instant push when CI
+publishes new data. **Refresh** forces a recompute.
 
-- **Deployed:** Refresh re-pulls the CI-maintained branch copy. The
-  `Director dashboard` workflow regenerates it on issue events (labeled / closed /
-  reopened) and every 15 min.
+- **Deployed:** the `Director dashboard` workflow regenerates the snapshot on issue
+  events (labeled / closed / reopened) and every 15 min, ingesting it to KV
+  (`/api/director/ingest`) and force-pushing the `director-jobs-json` branch; GitHub
+  issue webhooks also trigger a live recompute.
 - **Local `--serve --live`:** Refresh rebuilds **live from GitHub** via `gh`
   (`?live=1&refresh=1`).
+
+> Keep `site/src/director-data.ts` (live worker compute) and
+> `src/ai_alpha_squad/director_dashboard.py` (CI snapshot + local `--serve`) in sync —
+> both must emit the same fields (timeline `at`, agent `model_history`, …) or a feature
+> will appear on one path but not the other.
 
 ### Sign-in (magic link)
 
@@ -79,8 +97,8 @@ until you sign in.
 ### Develop / build the dashboard
 
 Source lives in [`site/dashboard/`](../site/dashboard) (Vite + React + TypeScript +
-Tailwind, shadcn-style components). It builds to `site/public/director/` so the
-existing Cloudflare Worker serves it as static assets — no extra routing.
+Tailwind + [shadcn/ui](https://ui.shadcn.com)). It builds to `site/public/director/` so
+the existing Cloudflare Worker serves it as static assets — no extra routing.
 
 ```bash
 cd site/dashboard
