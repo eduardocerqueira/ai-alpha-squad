@@ -135,6 +135,24 @@ def execute_tool(workdir: Path, name: str, args: dict) -> str:
                 f"{'[dir]' if e.is_dir() else '[file]'} {e.name}" for e in entries
             ]
             return "\n".join(lines) or "(empty)"
+        if name == "search":
+            query = str(args.get("query", "")).strip()
+            if not query:
+                return "error: search requires a non-empty 'query'"
+            rel = str(args.get("path", ".") or ".")
+            base = _safe_path(workdir, rel)
+            proc = subprocess.run(
+                ["grep", "-rIn", "--exclude-dir=.git", "-F", "-e", query, str(base)],
+                capture_output=True, text=True, timeout=COMMAND_TIMEOUT,
+            )
+            wd = str(_normalize_workdir(workdir))
+            lines = []
+            for line in proc.stdout.splitlines()[:60]:
+                lines.append(line[len(wd) + 1:] if line.startswith(wd + "/") else line)
+            out = "\n".join(lines)
+            if len(out) > 4000:
+                out = out[:4000] + "\n…(truncated; refine the query)"
+            return out or "(no matches)"
         if name == "run_command":
             return _run_command(workdir, str(args.get("command", "")))
         if name == "finish":
@@ -344,6 +362,34 @@ def format_actions_result_comment(
     return format_squad_comment(body, avatar=agent_slug, repo=repo)
 
 
+def _repo_map(workdir: Path, max_files: int = 200) -> str:
+    """A compact listing of the repo's tracked files, so the agent knows the
+    layout up front instead of crawling it with repeated list_dir."""
+    files: list[str] = []
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files"], cwd=str(workdir), capture_output=True, text=True
+        )
+        if proc.returncode == 0:
+            files = [f for f in proc.stdout.splitlines() if f]
+    except Exception:
+        files = []
+    if not files:
+        try:
+            files = sorted(
+                str(p.relative_to(workdir))
+                for p in Path(workdir).rglob("*")
+                if p.is_file() and ".git" not in p.parts
+            )
+        except Exception:
+            files = []
+    total = len(files)
+    listing = "\n".join(files[:max_files])
+    if total > max_files:
+        listing += f"\n…(+{total - max_files} more files; use search)"
+    return listing or "(empty repository)"
+
+
 def run_agent_loop(
     workdir: Path,
     *,
@@ -372,10 +418,13 @@ Tools:
 - read_file: {{"path": "relative/path"}}
 - write_file: {{"path": "relative/path", "content": "..."}}  (NEW files only)
 - edit_file: {{"path": "relative/path", "old_string": "exact text to replace", "new_string": "replacement"}}
+- search: {{"query": "literal text", "path": "."}}  (grep the repo — find where something is)
 - list_dir: {{"path": "."}}
 - run_command: {{"command": "npm install"}}  (allowlisted: npm, pnpm, yarn, npx, node, python, make, cargo, go, git status/diff/add/commit)
 - finish: {{"summary": "what you did"}}
 
+The repository layout is listed below — use it and `search` to jump straight to the
+relevant file. Do NOT crawl the tree with repeated list_dir.
 To CHANGE an existing file, use edit_file with a unique snippet copied verbatim from a
 prior read_file — do NOT rewrite the whole file with write_file (you will drop code and
 the change will be rejected). Use write_file only to create NEW files.
@@ -383,11 +432,13 @@ For new files, prefer write_file for each artifact; if the task lists multiple l
 create every language, then call finish immediately.
 The "Progress so far" list below shows the tools you have ALREADY run this session —
 do not repeat completed work, and once every required artifact exists call finish.
-Do not repeat list_dir on the same path. Output only the JSON object."""
+Output only the JSON object."""
 
+    repo_map = _repo_map(workdir)
     user = (
         f"## GitHub issue context\n\n{issue_context}\n\n"
         f"## Task\n\n{instructions.strip()}\n\n"
+        f"## Repository layout\n\n{repo_map}\n\n"
         "Repository root is the current working directory for tools."
     )
 

@@ -351,3 +351,36 @@ def test_loop_guard_ignores_preexisting_enumerated_files_modify_task(tmp_path, m
     )
     assert finished is True  # not blocked, because nothing was "to create"
     assert "edited" in summary
+
+
+# --- search tool + repo map (agent navigation) ---
+
+def test_search_tool_finds_matches(tmp_path):
+    (tmp_path / "a.py").write_text("import os\nLOGO_URL = 'x'\n")
+    (tmp_path / "b.txt").write_text("nothing here\n")
+    res = execute_tool(tmp_path, "search", {"query": "LOGO_URL"})
+    assert "a.py" in res and "LOGO_URL" in res
+    assert "b.txt" not in res
+
+
+def test_search_tool_no_match(tmp_path):
+    (tmp_path / "a.py").write_text("hello\n")
+    assert execute_tool(tmp_path, "search", {"query": "zzzznope"}) == "(no matches)"
+
+
+def test_search_tool_requires_query(tmp_path):
+    assert execute_tool(tmp_path, "search", {"query": ""}).startswith("error:")
+
+
+def test_search_tool_respects_sandbox(tmp_path):
+    res = execute_tool(tmp_path, "search", {"query": "x", "path": "../../.."})
+    assert res.startswith("error:")
+
+
+def test_repo_map_lists_files(tmp_path):
+    from ai_alpha_squad.actions_agent import _repo_map
+    (tmp_path / "x.py").write_text("1\n")
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "y.txt").write_text("2\n")
+    m = _repo_map(tmp_path)
+    assert "x.py" in m and "sub/y.txt" in m
