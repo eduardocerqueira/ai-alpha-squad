@@ -273,3 +273,70 @@ def test_qa_passed_helper():
 def test_qa_markers_are_internal():
     assert is_squad_internal_comment("squad-v2-qa:pass")
     assert is_squad_internal_comment("# QA Report\n\nsquad-v2-qa:fail\n- gap")
+
+
+# --- developer model-escalation ladder ---
+
+LADDER = ["model-a", "model-b", "model-c"]
+
+
+def test_dev_model_ladder_parsing():
+    from ai_alpha_squad.squad_v2 import dev_model_ladder
+    assert dev_model_ladder("a, b ,a,c") == ["a", "b", "c"]
+    assert dev_model_ladder("") == []
+    assert dev_model_ladder(None) == []
+
+
+def test_current_and_next_model_base():
+    from ai_alpha_squad.squad_v2 import current_dev_model, next_dev_model
+    assert current_dev_model((), LADDER) == "model-a"
+    assert next_dev_model((), LADDER) == "model-b"
+
+
+def test_escalation_after_3_fails_dispatches_dev_on_next_model():
+    # dev deliverable + 3 QA fails at base tier → escalate (still a dispatch, not failed)
+    comments = [_DEV] + [{"body": "squad-v2-qa:fail"} for _ in range(3)]
+    act = next_action(_dev_approved(comments), model_ladder=LADDER)
+    assert act.kind == "dispatch" and act.agent == "developer"
+    assert "escalating developer model to model-b" in act.reason
+
+
+def test_fails_counted_since_escalation_marker():
+    from ai_alpha_squad.squad_v2 import qa_fails_since_escalation, current_dev_model
+    comments = (
+        {"body": "squad-v2-qa:fail"},
+        {"body": "squad-v2-qa:fail"},
+        {"body": "squad-v2-model:model-b — escalated"},
+        {"body": "squad-v2-qa:fail"},
+    )
+    assert qa_fails_since_escalation(comments) == 1
+    assert current_dev_model(comments, LADDER) == "model-b"
+
+
+def test_ladder_exhausted_blocks():
+    # at the top rung (model-c) with 3 more fails → no next → failed
+    comments = [
+        _DEV,
+        {"body": "squad-v2-model:model-c — escalated"},
+        {"body": "squad-v2-qa:fail"},
+        {"body": "squad-v2-qa:fail"},
+        {"body": "squad-v2-qa:fail"},
+    ]
+    act = next_action(_dev_approved(comments), model_ladder=LADDER)
+    assert act.kind == "failed" and "ladder is exhausted" in act.reason
+
+
+def test_no_ladder_blocks_after_3_like_before():
+    comments = [_DEV] + [{"body": "squad-v2-qa:fail"} for _ in range(3)]
+    act = next_action(_dev_approved(comments), model_ladder=[])
+    assert act.kind == "failed"
+
+
+def test_model_override_in_resolve_model(monkeypatch):
+    import ai_alpha_squad.agent_models as am
+    monkeypatch.setenv("SQUAD_AGENT_MODEL_OVERRIDE", "org/super-model")
+    assert am.resolve_model("developer", "huggingface") == "org/super-model"
+
+
+def test_model_marker_is_internal():
+    assert is_squad_internal_comment("squad-v2-model:model-b — escalated")

@@ -137,6 +137,75 @@ def qa_fail_rounds(comments: tuple[dict, ...]) -> int:
     return sum(1 for c in comments if QA_FAIL_MARKER in (c.get("body") or "").lower())
 
 
+# --- Developer model-escalation ladder ---
+# After MAX_QA_ROUNDS rejections on a model, escalate the developer to the next
+# model in the ladder (a marker records it) and give it a fresh set of rounds;
+# block only when the ladder is exhausted.
+RUN_MODEL_MARKER = "squad-v2-model:"
+_MODEL_RE = re.compile(r"squad-v2-model:(\S+)")
+
+
+def dev_model_ladder(raw: str | None) -> list[str]:
+    """Parse a comma/whitespace/newline-separated model ladder; de-duped, ordered."""
+    parts = re.split(r"[,\s]+", (raw or "").strip())
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in parts:
+        p = p.strip()
+        if p and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+
+def _latest_model_marker(comments: tuple[dict, ...]) -> tuple[int | None, str | None]:
+    idx: int | None = None
+    model: str | None = None
+    for i, c in enumerate(comments):
+        m = _MODEL_RE.search(c.get("body") or "")
+        if m:
+            idx, model = i, m.group(1)
+    return idx, model
+
+
+def qa_fails_since_escalation(comments: tuple[dict, ...]) -> int:
+    """QA failures since the latest model-escalation marker (the current tier)."""
+    mk_idx, _ = _latest_model_marker(comments)
+    start = mk_idx if mk_idx is not None else -1
+    return sum(
+        1
+        for i, c in enumerate(comments)
+        if i > start and QA_FAIL_MARKER in (c.get("body") or "").lower()
+    )
+
+
+def current_dev_model(comments: tuple[dict, ...], ladder: list[str]) -> str | None:
+    """The developer model currently in effect (latest marker, else ladder base)."""
+    _, model = _latest_model_marker(comments)
+    if model:
+        return model
+    return ladder[0] if ladder else None
+
+
+def next_dev_model(comments: tuple[dict, ...], ladder: list[str]) -> str | None:
+    """The next model up the ladder from the current one (None if at/after the top)."""
+    if not ladder:
+        return None
+    cur = current_dev_model(comments, ladder)
+    if cur in ladder:
+        i = ladder.index(cur)
+        return ladder[i + 1] if i + 1 < len(ladder) else None
+    # Current model isn't in the ladder (custom/Director-chosen) → no auto-next.
+    return None
+
+
+def model_marker_comment(model: str) -> str:
+    return (
+        f"{RUN_MODEL_MARKER}{model} — developer model escalated after "
+        f"{MAX_QA_ROUNDS} QA rejections; fresh attempts on this model."
+    )
+
+
 def qa_passed(comments: tuple[dict, ...]) -> bool:
     """True when the latest developer deliverable has since been QA-approved."""
     dev_idx = _latest_deliverable_index(comments, "developer")
@@ -270,7 +339,9 @@ def find_stale_in_progress(
     return agent if age_minutes >= max_age_minutes else None
 
 
-def next_action(view: IssueView) -> NextAction:
+def next_action(view: IssueView, model_ladder: list[str] | None = None) -> NextAction:
+    if model_ladder is None:
+        model_ladder = dev_model_ladder(os.environ.get("SQUAD_DEV_MODEL_LADDER"))
     if view.state.upper() == "CLOSED":
         return NextAction("done", reason="Issue closed")
 
@@ -334,12 +405,24 @@ def next_action(view: IssueView) -> NextAction:
             return NextAction(
                 "idle", reason="QA passed — sync should add release-candidate"
             )
-        # QA rejected the latest deliverable → Developer reworks (capped).
-        if qa_fail_rounds(view.comments) >= MAX_QA_ROUNDS:
+        # QA rejected the latest deliverable → Developer reworks (capped per model).
+        if qa_fails_since_escalation(view.comments) >= MAX_QA_ROUNDS:
+            nxt = next_dev_model(view.comments, model_ladder)
+            if nxt:
+                # Escalate the developer to a stronger model and reset the rounds.
+                # The dispatch posts the squad-v2-model marker and applies the model.
+                return NextAction(
+                    "dispatch",
+                    agent="developer",
+                    reason=f"QA rejected {MAX_QA_ROUNDS}× — escalating developer model to {nxt}",
+                )
             return NextAction(
                 "failed",
                 agent="qa",
-                reason=f"QA rejected the deliverable {MAX_QA_ROUNDS} times",
+                reason=(
+                    f"QA rejected the deliverable {MAX_QA_ROUNDS} times"
+                    + (" and the model ladder is exhausted" if model_ladder else "")
+                ),
             )
         if run_failures(view.comments, "developer") >= MAX_RUN_ATTEMPTS:
             return NextAction(
@@ -365,6 +448,7 @@ def is_squad_internal_comment(body: str) -> bool:
         or RUN_FAILED_MARKER in text
         or RUN_RESET_MARKER in text
         or RUN_SETUP_FAILED_MARKER in text
+        or RUN_MODEL_MARKER in text
     ):
         return True
     if QA_PASS_MARKER in text or QA_FAIL_MARKER in text:

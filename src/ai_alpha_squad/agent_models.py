@@ -261,6 +261,12 @@ def resolve_model(agent_slug: str, provider: str | None = None) -> str:
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError(f"Unsupported provider: {provider!r}")
 
+    # Highest precedence: a per-dispatch override (model-escalation ladder, or a
+    # Director-chosen model from the dashboard). Beats the agent doc / config.
+    override = os.environ.get("SQUAD_AGENT_MODEL_OVERRIDE", "").strip()
+    if override and provider == "huggingface":
+        return override
+
     doc_models = parse_agent_doc_models(agent_slug)
     if provider in doc_models:
         return doc_models[provider]
