@@ -125,17 +125,26 @@ def execute_tool(workdir: Path, name: str, args: dict) -> str:
                 return f"error: not a file: {path} (use write_file to create new files)"
             old = str(args.get("old_string", ""))
             new = str(args.get("new_string", ""))
+            replace_all = bool(args.get("replace_all"))
             if not old:
                 return "error: edit_file requires a non-empty old_string"
             text = path.read_text(encoding="utf-8", errors="replace")
             count = text.count(old)
             if count == 0:
                 return "error: old_string not found — read_file first and copy the exact text"
-            if count > 1:
+            if count > 1 and not replace_all:
+                # The duplicate-line case (e.g. a field declared 3×) trips here:
+                # spell out the ways to resolve it so a weaker model doesn't stall.
                 return (
-                    f"error: old_string matches {count} places; add surrounding "
-                    "context so it is unique"
+                    f"error: old_string matches {count} places. To target ONE, add "
+                    "surrounding context so it is unique. To REMOVE duplicates, set "
+                    "old_string to the whole block containing all the copies and "
+                    "new_string to the single intended version. To change EVERY "
+                    'occurrence, pass "replace_all": true.'
                 )
+            if replace_all:
+                path.write_text(text.replace(old, new), encoding="utf-8")
+                return f"ok: edited {path.relative_to(workdir)} ({count} replacements)"
             path.write_text(text.replace(old, new, 1), encoding="utf-8")
             return f"ok: edited {path.relative_to(workdir)} (1 replacement)"
         if name == "list_dir":
@@ -466,7 +475,7 @@ Respond with ONE JSON object per message — no markdown fences, no extra text:
 Tools:
 - read_file: {{"path": "relative/path"}}
 - write_file: {{"path": "relative/path", "content": "..."}}  (NEW files only)
-- edit_file: {{"path": "relative/path", "old_string": "exact text to replace", "new_string": "replacement"}}
+- edit_file: {{"path": "relative/path", "old_string": "exact text to replace", "new_string": "replacement"}}  (add "replace_all": true to change every occurrence — e.g. rename a symbol)
 - search: {{"query": "literal text", "path": "."}}  (grep the repo — find where something is)
 - list_dir: {{"path": "."}}
 - run_command: {{"command": "npm install"}}  (allowlisted: npm, pnpm, yarn, npx, node, python, make, cargo, go, git status/diff/add/commit)

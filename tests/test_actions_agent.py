@@ -302,6 +302,33 @@ def test_edit_file_errors_on_ambiguous_match(tmp_path):
     (tmp_path / "u.py").write_text("x\nx\n")
     res = execute_tool(tmp_path, "edit_file", {"path": "u.py", "old_string": "x", "new_string": "y"})
     assert res.startswith("error:") and "matches 2" in res
+    # The error must guide the model on de-dup + replace_all (the #140 stall).
+    assert "replace_all" in res and "duplicate" in res.lower()
+
+
+def test_edit_file_replace_all(tmp_path):
+    (tmp_path / "u.py").write_text("a\na\na\n")
+    res = execute_tool(
+        tmp_path, "edit_file",
+        {"path": "u.py", "old_string": "a", "new_string": "b", "replace_all": True},
+    )
+    assert res.startswith("ok:") and "3 replacements" in res
+    assert (tmp_path / "u.py").read_text() == "b\nb\nb\n"
+
+
+def test_edit_file_collapses_duplicate_block(tmp_path):
+    """The QA BLOCKER case: remove duplicate field declarations by matching the block."""
+    (tmp_path / "B.java").write_text(
+        "class B {\n  private String logoUrl;\n  private String logoUrl;\n"
+        "  private String logoUrl;\n}\n"
+    )
+    block = "  private String logoUrl;\n  private String logoUrl;\n  private String logoUrl;\n"
+    res = execute_tool(
+        tmp_path, "edit_file",
+        {"path": "B.java", "old_string": block, "new_string": "  private String logoUrl;\n"},
+    )
+    assert res.startswith("ok:")
+    assert (tmp_path / "B.java").read_text().count("private String logoUrl;") == 1
 
 
 def test_edit_file_errors_on_missing_file(tmp_path):
