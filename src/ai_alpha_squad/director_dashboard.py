@@ -641,7 +641,7 @@ def _v2_agents(
         dev = ("waiting", "After Director approves the analysis")
 
     # QA (acceptance gate)
-    rounds = squad_v2.qa_fail_rounds(comments)
+    rounds = squad_v2.qa_fails_since_escalation(comments)
     if done_phase:
         qa = ("done", "Passed")
     elif dev_idx is not None and qa_verdict == "pass" and (qa_idx or 0) > dev_idx:
@@ -680,7 +680,7 @@ def _v2_events(
 ) -> tuple[dict[str, Any], ...]:
     dev_idx = squad_v2._latest_deliverable_index(comments, "developer")
     qa_idx, qa_verdict = squad_v2.latest_qa_verdict(comments)
-    rounds = squad_v2.qa_fail_rounds(comments)
+    rounds = squad_v2.qa_fails_since_escalation(comments)
     order = ["new", "awaiting-approval", "director-approved", "release-candidate", "released"]
     cur = order.index(lc) if lc in order else -1
 

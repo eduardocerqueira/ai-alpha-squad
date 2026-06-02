@@ -96,8 +96,17 @@ function latestQaVerdict(comments: RawComment[]): { idx: number | null; verdict:
   return { idx, verdict };
 }
 
+const RUN_MODEL = "squad-v2-model:";
+
+/** QA failures since the latest model-escalation marker — the current model's
+ *  round count. Mirrors squad_v2.qa_fails_since_escalation so the QA row and the
+ *  stuck classification reset when the developer model escalates. */
 function qaFailRounds(comments: RawComment[]): number {
-  return comments.filter((c) => (c.body || "").toLowerCase().includes(QA_FAIL)).length;
+  let mkIdx = -1;
+  comments.forEach((c, i) => {
+    if ((c.body || "").toLowerCase().includes(RUN_MODEL)) mkIdx = i;
+  });
+  return comments.filter((c, i) => i > mkIdx && (c.body || "").toLowerCase().includes(QA_FAIL)).length;
 }
 
 function runFailures(comments: RawComment[], agent: string): number {
