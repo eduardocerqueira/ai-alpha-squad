@@ -314,7 +314,7 @@ def test_fails_counted_since_escalation_marker():
 
 
 def test_ladder_exhausted_blocks():
-    # at the top rung (model-c) with 3 more fails → no next → failed
+    # at the top rung (model-c) with 3 more fails → no next → failed + needs_human
     comments = [
         _DEV,
         {"body": "squad-v2-model:model-c — escalated"},
@@ -324,6 +324,47 @@ def test_ladder_exhausted_blocks():
     ]
     act = next_action(_dev_approved(comments), model_ladder=LADDER)
     assert act.kind == "failed" and "ladder is exhausted" in act.reason
+    assert act.needs_human is True
+
+
+def test_developer_retry_limit_sets_needs_human():
+    # 3 dev run-failures, no deliverable ever produced → needs human
+    comments = [{"body": "squad-v2-run:failed:developer — x"} for _ in range(3)]
+    act = next_action(_dev_approved(comments), model_ladder=LADDER)
+    assert act.kind == "failed" and act.needs_human is True
+
+
+def test_missing_target_repo_is_not_needs_human():
+    # a malformed issue (config error) blocks but is NOT an AI-exhausted case
+    act = next_action(IssueView(1, "OPEN", frozenset({"director-approved"}), (), "no repo here"))
+    assert act.kind == "failed" and act.needs_human is False
+
+
+def test_models_tried_lists_base_then_escalations():
+    from ai_alpha_squad.squad_v2 import models_tried
+    comments = (
+        _DEV,
+        {"body": "squad-v2-model:model-b — escalated"},
+        {"body": "squad-v2-model:model-c — escalated"},
+    )
+    assert models_tried(comments, LADDER) == ["model-a", "model-b", "model-c"]
+    assert models_tried((), LADDER) == ["model-a"]
+
+
+def test_human_assistance_summary_content():
+    from ai_alpha_squad.squad_v2 import human_assistance_summary
+    comments = (
+        _DEV,
+        {"body": "# QA Report\n## Fixes required\n1. [BLOCKER] Foo.java:7 — remove duplicate field\nsquad-v2-qa:fail"},
+        {"body": "squad-v2-model:model-b — escalated"},
+        {"body": "# Developer Deliverable\n\nattempt 2\n" + "z" * 200},
+        {"body": "# QA Report\n## Fixes required\n1. [BLOCKER] Foo.java:7 — still duplicated\nsquad-v2-qa:fail"},
+    )
+    msg = human_assistance_summary(comments, LADDER)
+    assert "needs human assistance" in msg.lower()
+    assert "model-a" in msg and "model-b" in msg  # models tried
+    assert "2 QA review round" in msg  # two qa:fail markers
+    assert "still duplicated" in msg  # latest blocker, not the earlier one
 
 
 def test_no_ladder_blocks_after_3_like_before():

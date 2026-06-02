@@ -41,7 +41,11 @@ export function JobList({
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-xs text-muted-foreground">#{job.number}</span>
                 <span className="flex items-center gap-1">
-                  {job.blocked && <Badge variant="danger">blocked</Badge>}
+                  {job.needs_human ? (
+                    <Badge variant="danger">needs human</Badge>
+                  ) : (
+                    job.blocked && <Badge variant="danger">blocked</Badge>
+                  )}
                   <Badge variant={meta.variant}>{meta.label}</Badge>
                 </span>
               </div>

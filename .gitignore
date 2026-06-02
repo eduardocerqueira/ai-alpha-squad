@@ -225,3 +225,8 @@ TODO.md
 # Worker build artifacts
 workers/**/node_modules/
 workers/**/.wrangler/
+# The Python template's `lib/` rule above also matches the Director dashboard's
+# frontend source dir (site/dashboard/src/lib/) — keep that tracked so the
+# dashboard builds from a clean checkout.
+!site/dashboard/src/lib/
+!site/dashboard/src/lib/**

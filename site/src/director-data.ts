@@ -164,6 +164,19 @@ function parentRef(body: string): boolean {
   return /Parent\s+Issue\s*\|\s*#\d+|Parent\s+issue:\s*#\d+|issues\/\d+/i.test(body);
 }
 
+// Strip the HTML-table wrapper + markdown from a Squad notice comment down to a
+// plain-text summary for the dashboard card.
+function noticeSummary(body: string | undefined): string {
+  if (!body) return "";
+  const text = body
+    .replace(/<[^>]+>/g, " ") // HTML tags
+    .replace(/[#>*_`]/g, " ") // markdown emphasis/heading marks
+    .replace(/🚫|👉/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 320 ? text.slice(0, 320) + "…" : text;
+}
+
 function isParentJob(title: string, body: string): boolean {
   if (parentRef(body)) return false;
   const t = title.trim();
@@ -381,10 +394,17 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
   const state = (issue.state || "OPEN").toUpperCase();
   const comments = issue.comments || [];
   const blocked = labelSet.has("blocked");
-  // `blocked` is an overlay, not a phase — compute the real phase from the other
-  // labels so the timeline/agents still reflect progress (Blocked tab + flag
-  // convey the blocked state).
-  const lc = currentLifecycle(blocked ? new Set([...labelSet].filter((l) => l !== "blocked")) : labelSet);
+  // needs-human: the squad exhausted every model + retry and gave up — a stronger
+  // signal than a plain block. Always implies blocked.
+  const needsHuman = labelSet.has("needs-human");
+  // `blocked`/`needs-human` are overlays, not phases — compute the real phase from
+  // the other labels so the timeline/agents still reflect progress (the Blocked tab
+  // + flags convey the state).
+  const lc = currentLifecycle(
+    blocked || needsHuman
+      ? new Set([...labelSet].filter((l) => l !== "blocked" && l !== "needs-human"))
+      : labelSet,
+  );
   const prUrl = devPrUrl(comments);
   const issueUrl = `https://github.com/${repo}/issues/${number}`;
 
@@ -409,8 +429,26 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
   if (bucket === "completed") headline = "This job is done.";
   else if (bucket === "needs_you")
     headline = lc === "awaiting-approval" ? "Approve the Business Analysis." : lc === "release-candidate" ? "Approve or reject the release." : "Your approval is required.";
-  else if (bucket === "stuck") headline = blocked ? "This job is blocked." : "This job needs attention.";
+  else if (bucket === "stuck")
+    headline = needsHuman
+      ? "Needs human assistance — the AI squad exhausted all attempts."
+      : blocked
+        ? "This job is blocked."
+        : "This job needs attention.";
   else headline = "Squad is working — nothing needed from you.";
+
+  // Surface the human-assistance message the squad posted, so the dashboard shows
+  // why it gave up without opening the issue.
+  const stuckReasons: string[] = [];
+  if (needsHuman) {
+    const notice = [...comments]
+      .reverse()
+      .find((c) => /needs \*\*?human/i.test(c.body || "") || /needs human assistance/i.test(c.body || ""));
+    stuckReasons.push(
+      noticeSummary(notice?.body) ||
+        "The AI squad tried every available model and exhausted its retries without passing QA. A human should review the PR and take over.",
+    );
+  }
 
   return {
     number,
@@ -428,7 +466,8 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
     headline,
     director_action: action,
     labels,
-    stuck_reasons: [] as string[],
+    needs_human: needsHuman,
+    stuck_reasons: stuckReasons,
     suggested_action: "",
     agents: buildAgents(issueUrl, number, comments, lc, prUrl),
     events: buildEvents(lc, comments, action, issueUrl, prUrl),

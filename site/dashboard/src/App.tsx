@@ -356,14 +356,29 @@ export default function App() {
                       <ExternalLink className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
                     </a>
                     <p className="mt-1 text-sm text-muted-foreground">{job.headline || job.summary}</p>
-                    {job.blocked && (
-                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-brand-danger/50 bg-brand-danger/[0.08] px-2 py-1 text-xs text-brand-danger">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        <span>
-                          <code className="font-mono">blocked</code> label set on the issue — clear
-                          it if the squad has moved on.
-                        </span>
-                      </p>
+                    {job.needs_human ? (
+                      <div className="mt-2 rounded-md border border-brand-danger/50 bg-brand-danger/[0.08] px-2.5 py-2 text-xs text-brand-danger">
+                        <p className="inline-flex items-center gap-1.5 font-medium">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          Needs human assistance — the AI squad exhausted all attempts.
+                        </p>
+                        {job.stuck_reasons.length > 0 && (
+                          <p className="mt-1 text-brand-danger/90">{job.stuck_reasons[0]}</p>
+                        )}
+                        <p className="mt-1 text-brand-danger/80">
+                          Review the PR and take over, then Retry (optionally with a stronger model).
+                        </p>
+                      </div>
+                    ) : (
+                      job.blocked && (
+                        <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-brand-danger/50 bg-brand-danger/[0.08] px-2 py-1 text-xs text-brand-danger">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          <span>
+                            <code className="font-mono">blocked</code> label set on the issue — clear
+                            it if the squad has moved on.
+                          </span>
+                        </p>
+                      )
                     )}
                   </div>
 
