@@ -16,7 +16,7 @@
     "DIRECTOR_ALLOWED_EMAILS": "eduardomcerqueira@gmail.com",
     // Models offered in the dashboard "re-run with model" dropdown (comma-separated).
     // Keep in sync with the SQUAD_DEV_MODEL_LADDER Actions variable.
-    "SQUAD_DEV_MODEL_LADDER": "deepseek-ai/DeepSeek-V4-Flash, Qwen/Qwen2.5-Coder-32B-Instruct, meta-llama/Llama-3.3-70B-Instruct"
+    "SQUAD_DEV_MODEL_LADDER": "deepseek-ai/DeepSeek-V4-Flash, Qwen/Qwen3-Coder-480B-A35B-Instruct, zai-org/GLM-4.6, moonshotai/Kimi-K2-Instruct-0905, deepseek-ai/DeepSeek-V4-Pro"
   },
   "assets": {
     "directory": "./public",
