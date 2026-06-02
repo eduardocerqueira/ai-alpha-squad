@@ -9,6 +9,8 @@ import {
 } from "./auth";
 
 export { DashboardHub } from "./dashboard-hub";
+import { computeDashboard } from "./director-data";
+import { fetchIssues } from "./github";
 
 export interface Env {
   EMAIL: SendEmail;
@@ -26,9 +28,15 @@ export interface Env {
   // Real-time push (CI → browsers)
   NOTIFY_SECRET: string;
   DASHBOARD_HUB: DurableObjectNamespace;
+  // Real-time compute (GitHub webhook → Worker → KV)
+  DASHBOARD_KV?: KVNamespace;
+  GITHUB_READ_TOKEN?: string;
+  WEBHOOK_SECRET?: string;
 }
 
 const DASHBOARD_HUB_NAME = "global";
+const DASHBOARD_REPO = "eduardocerqueira/ai-alpha-squad";
+const KV_SNAPSHOT_KEY = "snapshot";
 
 interface ContactPayload {
   name?: string;
@@ -53,8 +61,27 @@ const DIRECTOR_JOBS_BRANCH_URL =
 const DIRECTOR_JOBS_TTL_SEC = 20;
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    // GitHub webhook → recompute the dashboard now → KV → push to open tabs.
+    if (url.pathname === "/api/director/webhook" && request.method === "POST") {
+      return handleWebhook(request, env, ctx);
+    }
+
+    // CI reconciler posts the Python-computed snapshot to keep KV fresh.
+    if (url.pathname === "/api/director/ingest" && request.method === "POST") {
+      const auth = request.headers.get("Authorization") || "";
+      if (!env.NOTIFY_SECRET || auth !== `Bearer ${env.NOTIFY_SECRET}`) {
+        return json({ error: "unauthorized" }, 401);
+      }
+      const body = await request.text();
+      if (env.DASHBOARD_KV && body.trimStart().startsWith("{")) {
+        await env.DASHBOARD_KV.put(KV_SNAPSHOT_KEY, body);
+      }
+      await broadcastRefresh(env);
+      return json({ ok: true });
+    }
 
     if (url.pathname === "/api/contact") {
       if (request.method === "POST") {
@@ -95,7 +122,7 @@ export default {
       const email = await sessionEmail(env, request);
       if (!email) return json({ error: "unauthorized" }, 401);
       const force = url.searchParams.get("refresh") === "1" || url.searchParams.get("live") === "1";
-      return handleDirectorJobs(env, force);
+      return serveJobs(env, force);
     }
 
     // Authenticated dashboards open a WebSocket here; the hub pushes "refresh"
@@ -113,17 +140,97 @@ export default {
     // CI (director-dashboard.yml) calls this after publishing the data branch.
     if (url.pathname === "/api/director/notify" && request.method === "POST") {
       const auth = request.headers.get("Authorization") || "";
-      const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-      if (!env.NOTIFY_SECRET || token !== env.NOTIFY_SECRET) {
+      if (!env.NOTIFY_SECRET || auth !== `Bearer ${env.NOTIFY_SECRET}`) {
         return json({ error: "unauthorized" }, 401);
       }
-      const stub = env.DASHBOARD_HUB.get(env.DASHBOARD_HUB.idFromName(DASHBOARD_HUB_NAME));
-      return stub.fetch("https://hub.local/notify", { method: "POST" });
+      await broadcastRefresh(env);
+      return json({ ok: true });
     }
 
     return env.ASSETS.fetch(request);
   },
 };
+
+/** Tell every open dashboard to refetch (via the WebSocket hub). */
+async function broadcastRefresh(env: Env): Promise<void> {
+  try {
+    const stub = env.DASHBOARD_HUB.get(env.DASHBOARD_HUB.idFromName(DASHBOARD_HUB_NAME));
+    await stub.fetch("https://hub.local/notify", { method: "POST" });
+  } catch (err) {
+    console.error("broadcastRefresh failed:", err);
+  }
+}
+
+/** Recompute the dashboard live from GitHub and cache it in KV. */
+async function recomputeDashboard(env: Env): Promise<string> {
+  const issues = await fetchIssues(DASHBOARD_REPO, env.GITHUB_READ_TOKEN!);
+  const snapshot = computeDashboard(DASHBOARD_REPO, issues, new Date().toISOString());
+  const body = JSON.stringify(snapshot);
+  if (env.DASHBOARD_KV) await env.DASHBOARD_KV.put(KV_SNAPSHOT_KEY, body);
+  return body;
+}
+
+/** Serve the dashboard: KV snapshot (instant) → live recompute → branch/bundled. */
+async function serveJobs(env: Env, force: boolean): Promise<Response> {
+  const headers = { "Content-Type": "application/json", "Cache-Control": "no-store" };
+  if (env.GITHUB_READ_TOKEN && env.DASHBOARD_KV) {
+    try {
+      if (!force) {
+        const cached = await env.DASHBOARD_KV.get(KV_SNAPSHOT_KEY);
+        if (cached) return new Response(cached, { headers: { ...headers, "X-Data-Source": "kv" } });
+      }
+      const body = await recomputeDashboard(env);
+      return new Response(body, { headers: { ...headers, "X-Data-Source": "live" } });
+    } catch (err) {
+      console.error("serveJobs live/KV path failed, falling back:", err);
+    }
+  }
+  return handleDirectorJobs(env, force); // legacy branch/bundled fallback
+}
+
+/** GitHub webhook: verify signature, recompute on relevant events, push. */
+async function handleWebhook(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const raw = await request.text();
+  if (!env.WEBHOOK_SECRET || !(await verifyWebhookSignature(raw, request, env.WEBHOOK_SECRET))) {
+    return json({ error: "invalid signature" }, 401);
+  }
+  const event = request.headers.get("X-GitHub-Event") || "";
+  if (event === "ping") return json({ ok: true, pong: true });
+  if (!["issues", "issue_comment", "pull_request"].includes(event)) {
+    return json({ ok: true, ignored: event });
+  }
+  // Recompute + push after responding, so GitHub gets a fast 200.
+  ctx.waitUntil(
+    (async () => {
+      try {
+        await recomputeDashboard(env);
+        await broadcastRefresh(env);
+      } catch (err) {
+        console.error("webhook recompute failed:", err);
+      }
+    })(),
+  );
+  return json({ ok: true });
+}
+
+async function verifyWebhookSignature(raw: string, request: Request, secret: string): Promise<boolean> {
+  const sig = request.headers.get("X-Hub-Signature-256") || "";
+  if (!sig.startsWith("sha256=")) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw));
+  const expected = "sha256=" + [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  // constant-time-ish compare
+  if (expected.length !== sig.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
+  return diff === 0;
+}
 
 /**
  * Serve the Director dashboard snapshot from the CI-refreshed

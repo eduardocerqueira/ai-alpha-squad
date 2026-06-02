@@ -84,16 +84,20 @@ jobs:
             echo "::warning::Could not push dashboard JSON (branch protection or permissions). Artifact uploaded; use ./scripts/squad-director-now.sh locally."
           fi
 
-      # Push a "refresh" to every open dashboard so the UI updates instantly.
-      - name: Notify open dashboards
+      # Reconciler: push the snapshot to KV (in case a webhook was missed) and
+      # refresh every open dashboard. The webhook is the real-time path; this is
+      # the 15-min safety net.
+      - name: Ingest snapshot + notify dashboards
         continue-on-error: true
         env:
           NOTIFY_SECRET: ${{ secrets.DASHBOARD_NOTIFY_SECRET }}
         run: |
           if [ -z "$NOTIFY_SECRET" ]; then
-            echo "DASHBOARD_NOTIFY_SECRET not set — skipping push"; exit 0
+            echo "DASHBOARD_NOTIFY_SECRET not set — skipping"; exit 0
           fi
           code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Authorization: Bearer $NOTIFY_SECRET" \
-            https://aialphasquad.com/api/director/notify)
-          echo "notify -> HTTP $code"
+            -H "Content-Type: application/json" \
+            --data-binary @site/public/director/jobs.json \
+            https://aialphasquad.com/api/director/ingest)
+          echo "ingest -> HTTP $code"
