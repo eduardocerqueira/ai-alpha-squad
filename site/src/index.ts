@@ -50,7 +50,7 @@ const MAX_MESSAGE = 4000;
 // dashboard reads it live so it tracks GitHub without a redeploy.
 const DIRECTOR_JOBS_BRANCH_URL =
   "https://raw.githubusercontent.com/eduardocerqueira/ai-alpha-squad/director-jobs-json/site/public/director/jobs.json";
-const DIRECTOR_JOBS_TTL_SEC = 60;
+const DIRECTOR_JOBS_TTL_SEC = 20;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
