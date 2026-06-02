@@ -166,7 +166,7 @@ function parentRef(body: string): boolean {
 
 // Strip the HTML-table wrapper + markdown from a Squad notice comment down to a
 // plain-text summary for the dashboard card.
-function noticeSummary(body: string | undefined): string {
+function noticeSummary(body: string | null | undefined): string {
   if (!body) return "";
   const text = body
     .replace(/<[^>]+>/g, " ") // HTML tags
@@ -216,6 +216,11 @@ const TIMELINE_PHASES_V2: [string, string, string][] = [
 
 const PHASE_ORDER = ["new", "awaiting-approval", "director-approved", "release-candidate", "released"];
 
+interface ModelUse {
+  model: string;
+  at: string;
+  kind: "result" | "escalation";
+}
 interface AgentRow {
   role: string;
   status: string;
@@ -223,30 +228,55 @@ interface AgentRow {
   issue_url: string | null;
   detail: string;
   model?: string | null;
+  model_history?: ModelUse[];
 }
 
-/** The AI model an agent used: the developer's escalation marker wins, else the
- *  model embedded in the agent's latest result comment ("· model `X`"). */
-function agentModel(comments: RawComment[], role: string): string | null {
-  if (role === "developer") {
-    let escalated: string | null = null;
-    for (const c of comments) {
-      const m = (c.body || "").match(/squad-v2-model:(\S+)/);
-      if (m) escalated = m[1];
-    }
-    if (escalated) return escalated;
-  }
-  let model: string | null = null;
+// Squad result comments render as an HTML card: the posting agent is identified
+// by its avatar (assets/agents/<role>.svg) and the model is printed as
+// "Model: `org/Name`". A "squad-v2-model:X" marker records a developer
+// escalation. Mirrors director_dashboard._v2_agent_model_history.
+const RESULT_ROLE_RE = /\/agents\/([a-z-]+)\.svg/;
+const MODEL_RE = /\bmodel:?\**\s*`([^`]+)`/i;
+const ESCALATION_RE = /squad-v2-model:(\S+)/;
+
+function resultRole(body: string): string | null {
+  const m = body.match(RESULT_ROLE_RE);
+  return m ? m[1] : null;
+}
+
+/** Chronological models an agent used on this issue (oldest→newest), with
+ *  consecutive duplicates collapsed so it reads as distinct hand-offs. */
+function agentModelHistory(comments: RawComment[], role: string): ModelUse[] {
+  const raw: ModelUse[] = [];
   for (const c of comments) {
-    const b = c.body || "";
-    const low = b.toLowerCase();
+    const body = c.body || "";
+    const at = c.createdAt || "";
+    if (role === "developer") {
+      const m = body.match(ESCALATION_RE);
+      if (m) {
+        raw.push({ model: m[1], at, kind: "escalation" });
+        continue;
+      }
+    }
+    const low = body.toLowerCase();
     const isResult = low.includes("squad hf agent result") || low.includes("squad actions agent result");
-    if (isResult && low.includes("`" + role + "`")) {
-      const m = b.match(/· model `([^`]+)`/);
-      if (m) model = m[1];
+    if (isResult && resultRole(body) === role) {
+      const m = body.match(MODEL_RE);
+      if (m) raw.push({ model: m[1], at, kind: "result" });
     }
   }
-  return model;
+  const history: ModelUse[] = [];
+  for (const e of raw) {
+    if (history.length && history[history.length - 1].model === e.model) continue;
+    history.push(e);
+  }
+  return history;
+}
+
+/** Latest model an agent used (back-compat single value). */
+function agentModel(comments: RawComment[], role: string): string | null {
+  const h = agentModelHistory(comments, role);
+  return h.length ? h[h.length - 1].model : null;
 }
 interface EventRow {
   key: string;
@@ -256,6 +286,21 @@ interface EventRow {
   detail: string;
   action?: { label: string; url: string; message: string };
   pr_url?: string;
+  at?: string;
+}
+
+function commentAt(comments: RawComment[], idx: number | null): string {
+  if (idx === null || idx < 0 || idx >= comments.length) return "";
+  return comments[idx].createdAt || "";
+}
+function firstMarkerAt(comments: RawComment[], needle: string): string {
+  for (const c of comments) if ((c.body || "").toLowerCase().includes(needle)) return c.createdAt || "";
+  return "";
+}
+function releasedAt(comments: RawComment[]): string {
+  let at = "";
+  for (const c of comments) if ((c.body || "").trimStart().toLowerCase().startsWith("released")) at = c.createdAt || "";
+  return at;
 }
 
 function directorAction(bucket: string, lc: string | null): string {
@@ -283,6 +328,7 @@ function buildAgents(
     issue_url: parentUrl,
     detail,
     model: agentModel(comments, role),
+    model_history: agentModelHistory(comments, role),
   });
 
   let bo: [string, string];
@@ -338,6 +384,16 @@ function buildEvents(
   const cur = lc && PHASE_ORDER.includes(lc) ? PHASE_ORDER.indexOf(lc) : -1;
   const atOrPast = (label: string) => cur >= PHASE_ORDER.indexOf(label);
 
+  // Best-available timestamp per phase, from the comment that marks it.
+  const baAt = commentAt(comments, latestDeliverableIndex(comments, "business-owner"));
+  const phaseAt: Record<string, string> = {
+    new: firstMarkerAt(comments, "squad-v2-run:in_progress:business-owner") || baAt,
+    "awaiting-approval": baAt,
+    implementation: commentAt(comments, devIdx),
+    qa: commentAt(comments, qaIdx),
+    released: releasedAt(comments),
+  };
+
   return TIMELINE_PHASES_V2.map(([key, title, owner]) => {
     let status = "pending";
     let detail = "";
@@ -379,6 +435,8 @@ function buildEvents(
       ev.action = { label: "Open issue & respond", url: issueUrl, message: ev.detail };
     }
     if (key === "implementation" && prUrl) ev.pr_url = prUrl;
+    const at = phaseAt[key] || "";
+    if (at && status !== "pending") ev.at = at;
     return ev;
   });
 }
