@@ -64,17 +64,19 @@ jobs:
           fi
 
       - name: Reset failure count on manual re-run
-        # A deliberate workflow_dispatch re-run is a fresh session: clear the
-        # failure counter and lift any `blocked` label so an issue that hit the
-        # retry limit (e.g. before an infra fix) can proceed again.
+        # A deliberate workflow_dispatch re-run is a fresh session: reopen the issue
+        # if it was closed (otherwise next_action short-circuits on "Issue closed"
+        # and the retry silently no-ops), clear the failure counter, and lift any
+        # `blocked` label so an issue that hit the retry limit can proceed again.
         if: github.event_name == 'workflow_dispatch' && contains(fromJSON('["new","director-approved"]'), steps.lc.outputs.name)
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
           if [ "${{ steps.lc.outputs.name }}" = "new" ]; then AGENT=business-owner; else AGENT=developer; fi
+          gh issue reopen "$ISSUE" --repo "$REPO" 2>/dev/null || true
+          gh issue edit "$ISSUE" --repo "$REPO" --remove-label blocked 2>/dev/null || true
           MARKER="$(python3 -c "from ai_alpha_squad.squad_v2 import reset_comment; print(reset_comment('$AGENT'))")"
           gh issue comment "$ISSUE" --repo "$REPO" --body "$MARKER"
-          gh issue edit "$ISSUE" --repo "$REPO" --remove-label blocked 2>/dev/null || true
 
       - name: Dispatch v2 agent
         if: contains(fromJSON('["new","director-approved"]'), steps.lc.outputs.name)
