@@ -28,6 +28,11 @@ from ai_alpha_squad.hf_dispatch import (
 
 MAX_TURNS = int(os.environ.get("SQUAD_ACTIONS_MAX_TURNS", "50"))
 COMMAND_TIMEOUT = int(os.environ.get("SQUAD_ACTIONS_CMD_TIMEOUT", "300"))
+# Early-abort thresholds: a model that ignores the tool protocol or never edits
+# anything should fail fast (and let the orchestrator escalate / the Director pick
+# another model) instead of grinding all the way to MAX_TURNS.
+MAX_CONSECUTIVE_UNPARSED = int(os.environ.get("SQUAD_ACTIONS_MAX_UNPARSED", "8"))
+MAX_TURNS_NO_PROGRESS = int(os.environ.get("SQUAD_ACTIONS_MAX_STALL", "60"))
 
 _TOOL_JSON_RE = re.compile(
     r"\{[^{}]*\"tool\"\s*:\s*\"[^\"]+\"[^{}]*\}",
@@ -503,6 +508,9 @@ Output only the JSON object."""
         parts.append("Next: reply with ONE JSON tool object." + extra)
         return "\n\n---\n".join(parts)
 
+    consecutive_unparsed = 0
+    turns_since_change = 0
+    made_a_change = False
     for _turn in range(MAX_TURNS):
         remaining = MAX_TURNS - _turn
         urgency = ""
@@ -519,12 +527,29 @@ Output only the JSON object."""
         )
         parsed = parse_tool_call(content)
         if not parsed:
+            consecutive_unparsed += 1
+            turns_since_change += 1
             print(
-                f"[actions] turn {_turn + 1}/{MAX_TURNS}: unparsed ({len(content)} chars)",
+                f"[actions] turn {_turn + 1}/{MAX_TURNS}: unparsed ({len(content)} chars), "
+                f"consecutive={consecutive_unparsed}",
                 file=sys.stderr,
             )
+            if consecutive_unparsed >= MAX_CONSECUTIVE_UNPARSED:
+                print(
+                    f"[actions] ABORT: {consecutive_unparsed} consecutive unparsed responses "
+                    f"(>= {MAX_CONSECUTIVE_UNPARSED}); model is not following the tool protocol",
+                    file=sys.stderr,
+                )
+                return (
+                    f"Aborted after {_turn + 1} turns: the model produced "
+                    f"{consecutive_unparsed} consecutive responses that were not valid tool "
+                    f"calls and is not following the JSON tool protocol. This usually means the "
+                    f"model is a poor fit for the task — escalate to a stronger model.",
+                    False,
+                )
             history.append(f"[turn {_turn + 1}] (model output was not valid JSON; reminded to emit a tool object)")
             continue
+        consecutive_unparsed = 0
         tool_name, tool_args = parsed
         print(f"[actions] turn {_turn + 1}/{MAX_TURNS}: {tool_name}", file=sys.stderr)
         if tool_name == "finish":
@@ -551,6 +576,26 @@ Output only the JSON object."""
         history.append(
             f"[turn {_turn + 1}] {tool_name} {arg_hint}".rstrip() + f" -> {result_brief}"
         )
+        # Track progress: a write/edit that succeeded counts as forward motion.
+        if tool_name in ("write_file", "edit_file") and not result.lower().startswith("error"):
+            made_a_change = True
+            turns_since_change = 0
+        else:
+            turns_since_change += 1
+        if turns_since_change >= MAX_TURNS_NO_PROGRESS:
+            print(
+                f"[actions] ABORT: {turns_since_change} turns with no file change "
+                f"(>= {MAX_TURNS_NO_PROGRESS}); agent is stalling",
+                file=sys.stderr,
+            )
+            return (
+                f"Aborted after {_turn + 1} turns: the agent went "
+                f"{turns_since_change} turns without writing or editing any file"
+                + (" after earlier edits" if made_a_change else "")
+                + ". It is stuck navigating without making progress — escalate to a "
+                "stronger model.",
+                False,
+            )
         # Bound transcript size; a 10-artifact task stays well under this.
         while len(history) > 1 and sum(len(h) for h in history) > 12000:
             history.pop(0)

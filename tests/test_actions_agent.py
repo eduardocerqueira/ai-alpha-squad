@@ -85,6 +85,82 @@ def test_run_agent_loop_reports_max_turns(tmp_path, monkeypatch):
     assert "max turns" in summary.lower()
 
 
+def test_run_agent_loop_aborts_on_consecutive_unparsed(tmp_path, monkeypatch):
+    """A model that never emits valid JSON should fail fast, not grind to MAX_TURNS."""
+    monkeypatch.setattr(actions_agent, "chat_completion",
+                        lambda *a, **k: "I think we should consider the architecture…")
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 500)
+    monkeypatch.setattr(actions_agent, "MAX_CONSECUTIVE_UNPARSED", 4)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions="x", issue_context="c", token="t"
+    )
+    assert finished is False
+    assert "consecutive" in summary.lower()
+    assert "tool protocol" in summary.lower()
+
+
+def test_run_agent_loop_unparsed_counter_resets_on_valid_call(tmp_path, monkeypatch):
+    """Sporadic unparsed turns interspersed with real tool calls must NOT abort."""
+    calls = {"n": 0}
+
+    def fake_chat(model, *, system, user, token):
+        calls["n"] += 1
+        # alternate: unparsed, list_dir, unparsed, list_dir … then finish
+        if calls["n"] >= 9:
+            return '{"tool":"finish","args":{"summary":"done"}}'
+        if calls["n"] % 2 == 1:
+            return "musing, not json"
+        return '{"tool":"list_dir","args":{"path":"."}}'
+
+    monkeypatch.setattr(actions_agent, "chat_completion", fake_chat)
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 50)
+    monkeypatch.setattr(actions_agent, "MAX_CONSECUTIVE_UNPARSED", 3)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions="x", issue_context="c", token="t"
+    )
+    assert finished is True
+
+
+def test_run_agent_loop_aborts_on_no_progress(tmp_path, monkeypatch):
+    """A model that only navigates (read/list) without ever editing should abort."""
+    monkeypatch.setattr(actions_agent, "chat_completion",
+                        lambda *a, **k: '{"tool":"list_dir","args":{"path":"."}}')
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 500)
+    monkeypatch.setattr(actions_agent, "MAX_TURNS_NO_PROGRESS", 5)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions="x", issue_context="c", token="t"
+    )
+    assert finished is False
+    assert "without writing or editing" in summary.lower()
+
+
+def test_run_agent_loop_no_progress_resets_on_edit(tmp_path, monkeypatch):
+    """Writing a file resets the stall counter so steady editing is never aborted."""
+    calls = {"n": 0}
+
+    def fake_chat(model, *, system, user, token):
+        calls["n"] += 1
+        # navigate a few turns, write a file (resets stall), navigate again, finish
+        if calls["n"] >= 9:
+            return '{"tool":"finish","args":{"summary":"done"}}'
+        if calls["n"] == 4:
+            return '{"tool":"write_file","args":{"path":"out.txt","content":"hi"}}'
+        return '{"tool":"list_dir","args":{"path":"."}}'
+
+    monkeypatch.setattr(actions_agent, "chat_completion", fake_chat)
+    monkeypatch.setattr(actions_agent, "resolve_model", lambda *a, **k: "m")
+    monkeypatch.setattr(actions_agent, "MAX_TURNS", 50)
+    monkeypatch.setattr(actions_agent, "MAX_TURNS_NO_PROGRESS", 6)
+    summary, finished = run_agent_loop(
+        tmp_path, agent="developer", instructions="x", issue_context="c", token="t"
+    )
+    assert finished is True
+    assert (tmp_path / "out.txt").read_text() == "hi"
+
+
 def test_finish_summary_uses_args_summary():
     from ai_alpha_squad.actions_agent import _finish_summary
     assert _finish_summary({"summary": "did the thing"}, '{"tool":"finish","args":{"summary":"did the thing"}}') == "did the thing"
