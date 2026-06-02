@@ -18,8 +18,11 @@ on:
     types: [created]
 
 concurrency:
+  # Do NOT cancel in-progress: a tick can run an HF agent inline (QA, or a BO/dev
+  # rework), and cancelling mid-run orphans the in_progress marker so the issue
+  # looks "active" forever. Queue ticks per issue instead.
   group: squad-v2-watch-${{ github.event.issue.number || 'scan' }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   tick:
