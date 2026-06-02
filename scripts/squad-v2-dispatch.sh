@@ -148,12 +148,18 @@ Issue: https://github.com/${REPO}/issues/${ISSUE}
 2. Post on THIS issue (#${ISSUE}) — heading must include: # Developer Deliverable
    Include the PR URL and summary of changes.
 3. If the issue has a "# QA Report" comment ending in \`squad-v2-qa:fail\`, this is a
-   REWORK on the EXISTING branch. Work its fix-list methodically, ONE ITEM AT A TIME:
-   - Fix BLOCKER items FIRST (compile errors, missing required files) — these gate
+   REWORK on the EXISTING branch. The QA "## Fixes required" list gives you the EXACT
+   file path (and often line numbers) for each item. Work it ONE ITEM AT A TIME:
+   - Go STRAIGHT to the file each fix names and edit it — do NOT search or list_dir to
+     "explore the codebase" first; QA already told you where to go. Land your first
+     edit within a few turns.
+   - Fix BLOCKER items FIRST (compile errors, missing required files) — they gate
      everything else. Then REQUIRED, then NICE-to-have.
-   - For each item: read the exact file, make a TARGETED edit_file (never rewrite a
-     whole file — you will drop code), then re-read that region to confirm the change
-     applied as intended before moving to the next item.
+   - Use TARGETED edit_file (never rewrite a whole file — you will drop code). To
+     remove a DUPLICATE declaration, set old_string to the whole block containing all
+     the copies and new_string to the single line you want to keep (a bare duplicated
+     line is not unique, so edit_file will reject it otherwise). After each edit,
+     re-read that region to confirm it applied before moving on.
    - Do NOT re-implement parts QA already marked ✅ — leave working code alone.
    - Verify the project still builds (run the build/compile command if available)
      before posting. Then post an updated # Developer Deliverable listing which
