@@ -38,7 +38,7 @@ jobs:
       SQUAD_V2: "1"
       SQUAD_ACTIONS_INLINE: "1"
       SQUAD_ACTIONS_SCAFFOLD_GREENFIELD: "0"
-      SQUAD_ACTIONS_MAX_TURNS: "200"
+      SQUAD_ACTIONS_MAX_TURNS: "500"
       SQUAD_AI_PROVIDER: huggingface
       SQUAD_CODE_RUNTIME: actions
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
