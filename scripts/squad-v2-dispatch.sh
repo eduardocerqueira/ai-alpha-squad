@@ -28,6 +28,11 @@ MAX_CHAIN=1
 if [[ "${SQUAD_ACTIONS_INLINE:-}" == "1" ]]; then
   MAX_CHAIN="${SQUAD_V2_MAX_CHAIN:-8}"
 fi
+# Resilience: if an EXTERNAL actor closes the issue mid-chain (we've seen a process
+# auto-close issues seconds after reopen), reopen and continue rather than abandon a
+# loop we already started. Bounded so we never fight indefinitely.
+MAX_REOPEN="${SQUAD_V2_MAX_REOPEN:-6}"
+reopens=0
 
 TARGET="$(python3 -c "
 import subprocess, sys
@@ -68,7 +73,23 @@ print(act.reason)
 
   case "$KIND" in
     dispatch) ;;
-    gate | done | idle)
+    done)
+      # Mid-chain external close: we already dispatched at least one agent this run
+      # (step > 1) and the issue is now closed under us — reopen and continue the
+      # loop instead of abandoning it. Only for "Issue closed" (not "Released"), and
+      # only inline, bounded by MAX_REOPEN. A genuinely released/closed job ends its
+      # chain at the release-candidate gate before this, so it isn't resurrected.
+      if [[ "${SQUAD_ACTIONS_INLINE:-}" == "1" && "$REASON" == *"Issue closed"* \
+            && $step -gt 1 && $reopens -lt $MAX_REOPEN ]]; then
+        reopens=$((reopens + 1))
+        echo "v2 #$ISSUE: issue closed mid-chain — reopening to continue (resilience ${reopens}/${MAX_REOPEN})"
+        gh issue reopen "$ISSUE" --repo "$REPO" 2>/dev/null || true
+        sleep 2
+        continue
+      fi
+      exit 0
+      ;;
+    gate | idle)
       exit 0
       ;;
     failed)
