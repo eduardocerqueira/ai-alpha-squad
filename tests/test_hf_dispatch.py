@@ -11,6 +11,41 @@ import pytest
 from ai_alpha_squad import hf_dispatch as hd
 
 
+def _c(author, body):
+    return {"author": {"login": author}, "body": body}
+
+
+def test_build_issue_context_drops_orchestration_markers():
+    comments = [
+        _c("dev", "# Developer Deliverable\nmade a thing"),
+        _c("bot", "squad-v2-run:in_progress:developer — do not start another agent"),
+        _c("bot", "squad-v2-model:Qwen/Qwen3-Coder — escalated"),
+        _c("qa", "# QA Report\nsquad-v2-qa:fail — add configure-entries.jelly"),
+    ]
+    ctx = hd._build_issue_context("Add logo", "spec body", comments)
+    assert "spec body" in ctx
+    assert "Developer Deliverable" in ctx
+    assert "configure-entries.jelly" in ctx
+    assert "in_progress:developer" not in ctx
+    assert "squad-v2-model:" not in ctx
+
+
+def test_build_issue_context_keeps_latest_qa_when_truncating():
+    """The #140 bug: with many comments, the newest QA feedback must survive."""
+    filler = [_c("qa", f"# QA Report round {i}\n" + "old feedback " * 200) for i in range(20)]
+    latest = _c("qa", "# QA Report FINAL\nsquad-v2-qa:fail CRITICAL: declared logoUrl 3 times")
+    ctx = hd._build_issue_context("Title", "body", filler + [latest], limit=4000)
+    assert "CRITICAL: declared logoUrl 3 times" in ctx  # newest survives
+    assert "QA Report round 0" not in ctx  # oldest dropped
+    assert "older comments truncated" in ctx
+    assert "Title" in ctx and "body" in ctx  # spec always kept
+
+
+def test_build_issue_context_title_body_always_present():
+    ctx = hd._build_issue_context("My Issue", "the body", [])
+    assert "# My Issue" in ctx and "the body" in ctx
+
+
 def test_parse_parent_issue_number():
     body = "| Parent Issue | #64 |\n| Target repo | `org/repo` |"
     assert hd.parse_parent_issue_number(body) == 64
