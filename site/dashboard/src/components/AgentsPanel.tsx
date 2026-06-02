@@ -77,6 +77,11 @@ function AgentRow({ agent }: { agent: Agent }) {
             {STATUS_LABEL[norm]}
           </span>
         </div>
+        {agent.model && (
+          <p className="mt-0.5 truncate font-mono text-[11px] text-muted" title={agent.model}>
+            {agent.model.includes("/") ? agent.model.split("/").pop() : agent.model}
+          </p>
+        )}
         {agent.detail && <AgentDetail detail={agent.detail} />}
         {agent.issue_url && agent.issue_number && (
           <a

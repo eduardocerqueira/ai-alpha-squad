@@ -576,6 +576,30 @@ def _v2_dev_pr(comments: tuple[dict, ...]) -> str | None:
     return found
 
 
+def _v2_agent_model(comments: tuple[dict, ...], role: str) -> str | None:
+    """AI model an agent used: the developer's escalation marker wins, else the
+    model embedded in the agent's latest result comment ("· model `X`")."""
+    import re
+
+    if role == "developer":
+        escalated: str | None = None
+        for c in comments:
+            m = re.search(r"squad-v2-model:(\S+)", c.get("body") or "")
+            if m:
+                escalated = m.group(1)
+        if escalated:
+            return escalated
+    model: str | None = None
+    for c in comments:
+        body = c.get("body") or ""
+        low = body.lower()
+        if ("squad hf agent result" in low or "squad actions agent result" in low) and f"`{role}`" in low:
+            m = re.search(r"· model `([^`]+)`", body)
+            if m:
+                model = m.group(1)
+    return model
+
+
 def _v2_agents(
     repo: str, number: int, comments: tuple[dict, ...], lc: str | None, pr_url: str | None
 ) -> tuple[dict[str, Any], ...]:
@@ -586,7 +610,14 @@ def _v2_agents(
     done_phase = lc in ("release-candidate", "released")
 
     def row(role: str, status: str, detail: str) -> dict[str, Any]:
-        return {"role": role, "status": status, "issue_number": number, "issue_url": parent, "detail": detail}
+        return {
+            "role": role,
+            "status": status,
+            "issue_number": number,
+            "issue_url": parent,
+            "detail": detail,
+            "model": _v2_agent_model(comments, role),
+        }
 
     # Business Owner
     if squad_v2.has_deliverable(comments, "business-owner"):

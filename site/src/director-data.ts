@@ -200,6 +200,31 @@ interface AgentRow {
   issue_number: number | null;
   issue_url: string | null;
   detail: string;
+  model?: string | null;
+}
+
+/** The AI model an agent used: the developer's escalation marker wins, else the
+ *  model embedded in the agent's latest result comment ("· model `X`"). */
+function agentModel(comments: RawComment[], role: string): string | null {
+  if (role === "developer") {
+    let escalated: string | null = null;
+    for (const c of comments) {
+      const m = (c.body || "").match(/squad-v2-model:(\S+)/);
+      if (m) escalated = m[1];
+    }
+    if (escalated) return escalated;
+  }
+  let model: string | null = null;
+  for (const c of comments) {
+    const b = c.body || "";
+    const low = b.toLowerCase();
+    const isResult = low.includes("squad hf agent result") || low.includes("squad actions agent result");
+    if (isResult && low.includes("`" + role + "`")) {
+      const m = b.match(/· model `([^`]+)`/);
+      if (m) model = m[1];
+    }
+  }
+  return model;
 }
 interface EventRow {
   key: string;
@@ -235,6 +260,7 @@ function buildAgents(
     issue_number: number,
     issue_url: parentUrl,
     detail,
+    model: agentModel(comments, role),
   });
 
   let bo: [string, string];
