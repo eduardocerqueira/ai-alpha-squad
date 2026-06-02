@@ -32,6 +32,8 @@ export interface Env {
   DASHBOARD_KV?: KVNamespace;
   GITHUB_READ_TOKEN?: string;
   WEBHOOK_SECRET?: string;
+  // Developer model ladder for the dashboard "re-run with model" dropdown.
+  SQUAD_DEV_MODEL_LADDER?: string;
 }
 
 const DASHBOARD_HUB_NAME = "global";
@@ -95,7 +97,11 @@ export default {
     }
 
     if (url.pathname === "/api/config" && request.method === "GET") {
-      return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY });
+      const ladder = (env.SQUAD_DEV_MODEL_LADDER || "")
+        .split(/[,\s]+/)
+        .map((m) => m.trim())
+        .filter(Boolean);
+      return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, modelLadder: ladder });
     }
 
     if (url.pathname === "/api/director/auth/request" && request.method === "POST") {
@@ -226,14 +232,15 @@ const ORCHESTRATOR_WORKFLOW = "squad-v2-orchestrator.yml";
 /** Re-run a stuck/blocked job via the v2 orchestrator's workflow_dispatch. */
 async function handleRetry(request: Request, env: Env): Promise<Response> {
   if (!env.GITHUB_READ_TOKEN) return json({ error: "GitHub token not configured" }, 503);
-  let body: { number?: number };
+  let body: { number?: number; model?: string };
   try {
-    body = (await request.json()) as { number?: number };
+    body = (await request.json()) as { number?: number; model?: string };
   } catch {
     return json({ error: "Invalid JSON body" }, 400);
   }
   const number = Number(body.number);
   if (!Number.isInteger(number) || number <= 0) return json({ error: "Invalid issue number" }, 400);
+  const developerModel = typeof body.model === "string" ? body.model.trim() : "";
 
   const headers = {
     Authorization: `Bearer ${env.GITHUB_READ_TOKEN}`,
@@ -291,7 +298,11 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
       headers,
       body: JSON.stringify({
         ref: "main",
-        inputs: { issue_number: String(number), lifecycle_label: lifecycleLabel },
+        inputs: {
+          issue_number: String(number),
+          lifecycle_label: lifecycleLabel,
+          ...(developerModel ? { developer_model: developerModel } : {}),
+        },
       }),
     },
   );
