@@ -125,6 +125,14 @@ export default {
       return serveJobs(env, force);
     }
 
+    // Director retries a stuck/blocked job: dispatch the v2 orchestrator
+    // (auto-clears the failure count + removes `blocked`, then re-runs the agent).
+    if (url.pathname === "/api/director/retry" && request.method === "POST") {
+      const email = await sessionEmail(env, request);
+      if (!email) return json({ error: "unauthorized" }, 401);
+      return handleRetry(request, env);
+    }
+
     // Authenticated dashboards open a WebSocket here; the hub pushes "refresh"
     // when CI publishes new data, so the UI updates without polling.
     if (url.pathname === "/api/director/live") {
@@ -211,6 +219,67 @@ async function handleWebhook(request: Request, env: Env, ctx: ExecutionContext):
     })(),
   );
   return json({ ok: true });
+}
+
+const ORCHESTRATOR_WORKFLOW = "squad-v2-orchestrator.yml";
+
+/** Re-run a stuck/blocked job via the v2 orchestrator's workflow_dispatch. */
+async function handleRetry(request: Request, env: Env): Promise<Response> {
+  if (!env.GITHUB_READ_TOKEN) return json({ error: "GitHub token not configured" }, 503);
+  let body: { number?: number };
+  try {
+    body = (await request.json()) as { number?: number };
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  const number = Number(body.number);
+  if (!Number.isInteger(number) || number <= 0) return json({ error: "Invalid issue number" }, 400);
+
+  const headers = {
+    Authorization: `Bearer ${env.GITHUB_READ_TOKEN}`,
+    Accept: "application/vnd.github+json",
+    "User-Agent": "ai-alpha-squad-dashboard",
+    "Content-Type": "application/json",
+  };
+
+  // Resume at the phase the orchestrator understands (new | director-approved),
+  // derived from the issue's live labels (ignoring the `blocked` overlay).
+  let lifecycleLabel = "director-approved";
+  try {
+    const res = await fetch(`https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`, { headers });
+    if (res.ok) {
+      const issue = (await res.json()) as { labels?: { name: string }[] };
+      const labels = (issue.labels ?? []).map((l) => l.name);
+      lifecycleLabel = labels.includes("director-approved")
+        ? "director-approved"
+        : labels.includes("new")
+          ? "new"
+          : "director-approved";
+    }
+  } catch {
+    /* fall back to director-approved */
+  }
+
+  const dispatch = await fetch(
+    `https://api.github.com/repos/${DASHBOARD_REPO}/actions/workflows/${ORCHESTRATOR_WORKFLOW}/dispatches`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ref: "main",
+        inputs: { issue_number: String(number), lifecycle_label: lifecycleLabel },
+      }),
+    },
+  );
+  if (dispatch.status === 204) {
+    return json({ ok: true, lifecycle_label: lifecycleLabel });
+  }
+  const detail = await dispatch.text();
+  console.error("retry dispatch failed:", dispatch.status, detail);
+  return json(
+    { error: `Could not start the re-run (GitHub ${dispatch.status}).`, status: dispatch.status },
+    502,
+  );
 }
 
 async function verifyWebhookSignature(raw: string, request: Request, secret: string): Promise<boolean> {
