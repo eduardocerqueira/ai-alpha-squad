@@ -339,9 +339,15 @@ def find_stale_in_progress(
     return agent if age_minutes >= max_age_minutes else None
 
 
-def next_action(view: IssueView, model_ladder: list[str] | None = None) -> NextAction:
+def next_action(
+    view: IssueView,
+    model_ladder: list[str] | None = None,
+    forced_model: str | None = None,
+) -> NextAction:
     if model_ladder is None:
         model_ladder = dev_model_ladder(os.environ.get("SQUAD_DEV_MODEL_LADDER"))
+    if forced_model is None:
+        forced_model = (os.environ.get("SQUAD_DEV_MODEL_INPUT") or "").strip() or None
     if view.state.upper() == "CLOSED":
         return NextAction("done", reason="Issue closed")
 
@@ -407,7 +413,12 @@ def next_action(view: IssueView, model_ladder: list[str] | None = None) -> NextA
             )
         # QA rejected the latest deliverable → Developer reworks (capped per model).
         if qa_fails_since_escalation(view.comments) >= MAX_QA_ROUNDS:
+            cur = current_dev_model(view.comments, model_ladder)
             nxt = next_dev_model(view.comments, model_ladder)
+            # A Director-chosen model (dashboard dropdown) is an explicit "try this
+            # one" — it bypasses the cap and acts as the next rung.
+            if forced_model and forced_model != cur:
+                nxt = forced_model
             if nxt:
                 # Escalate the developer to a stronger model and reset the rounds.
                 # The dispatch posts the squad-v2-model marker and applies the model.
