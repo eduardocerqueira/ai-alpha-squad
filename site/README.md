@@ -1,6 +1,8 @@
 # AI Alpha Squad landing (`aialphasquad.com`)
 
-Static site + contact API on Cloudflare Workers.
+The public face of the squad: the marketing landing page at [aialphasquad.com](https://aialphasquad.com) **and** the authenticated [Director Dashboard](https://aialphasquad.com/director/) — both served from one Cloudflare Worker. The landing page pitches the project and routes people to the three ways to reach the squad (GitHub Issues, REST API, WhatsApp); the dashboard is the live control room for the Director.
+
+Static site + contact API + Director Dashboard on Cloudflare Workers.
 
 | Path | Purpose |
 | ---- | ------- |

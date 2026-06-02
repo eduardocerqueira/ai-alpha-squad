@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-AI Alpha Squad is an autonomous software delivery organization composed of specialized AI agents collaborating through GitHub Issues.
+AI Alpha Squad is an autonomous software delivery organization composed of specialized AI agents collaborating through GitHub Issues — **business requests in, working software out.** Public site: [aialphasquad.com](https://aialphasquad.com).
 
 The system receives business requests as GitHub Issues and autonomously progresses them through analysis, design, implementation, validation, security review, documentation, release preparation, and deployment.
 
