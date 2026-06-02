@@ -134,12 +134,22 @@ EOF
       ;;
     qa)
       PR_DIFF=""
+      QA_CHANGED=""
+      QA_CHANGED_COUNT=0
+      QA_TREE=""
       QA_PR="$(gh pr list --repo "$TARGET" --head "squad/developer-issue-${ISSUE}" --state open --json number -q '.[0].number' 2>/dev/null || true)"
       if [[ -n "$QA_PR" ]]; then
         # Large budget so QA sees the WHOLE diff — a truncated diff makes QA think
         # unshown files are missing and wrongly fail bulk/multi-file deliverables.
         PR_DIFF="$(gh pr diff "$QA_PR" --repo "$TARGET" 2>/dev/null | head -c 60000)"
+        # Explicit changed-file list + count: a reliable completeness signal that
+        # doesn't depend on parsing a (possibly truncated) diff.
+        QA_CHANGED="$(gh pr view "$QA_PR" --repo "$TARGET" --json files -q '.files[].path' 2>/dev/null || true)"
+        QA_CHANGED_COUNT="$(printf '%s\n' "$QA_CHANGED" | grep -c . || true)"
       fi
+      # Files that exist in the base branch (so QA can judge "all existing X were touched").
+      QA_TREE="$(gh api "repos/${TARGET}/git/trees/${SQUAD_TARGET_BASE_BRANCH:-main}?recursive=1" \
+        --jq '[.tree[] | select(.type=="blob") | .path] | join("\n")' 2>/dev/null | head -c 16000 || true)"
       cat > "$INSTRUCTIONS" <<EOF
 You are the QA engineer for AI Alpha Squad (v2). Read .agents/agent-qa.md.
 
@@ -147,7 +157,16 @@ Issue: https://github.com/${REPO}/issues/${ISSUE}
 Target repo: ${TARGET}
 
 Evaluate whether the Developer's deliverable satisfies EVERY success criterion in
-the issue above (the criteria are in the issue body). Review the delivered changes:
+the issue above (the criteria are in the issue body).
+
+## Files changed in this PR (${QA_CHANGED_COUNT})
+${QA_CHANGED:-(no open PR / no files changed — treat as not delivered)}
+
+## Files in the repository base branch (for completeness checks)
+${QA_TREE:-(unavailable)}
+
+Use the two lists above to judge **completeness** (e.g. "the task requires every
+existing file to be changed, but only N of M were"). Then review the actual changes:
 
 \`\`\`diff
 ${PR_DIFF:-(no open PR diff found — treat as not delivered)}
@@ -155,6 +174,7 @@ ${PR_DIFF:-(no open PR diff found — treat as not delivered)}
 
 Post ONE comment on THIS issue (#${ISSUE}) with heading: # QA Report
 - List each success criterion and whether it is met (✅/❌) with a one-line reason.
+- For any count/coverage criterion, state the numbers (e.g. "47/54 files changed").
 - End with EXACTLY one verdict line, nothing after it:
   - \`squad-v2-qa:pass\` — if and only if every criterion is fully met.
   - \`squad-v2-qa:fail\` — otherwise, immediately followed by a bullet list of the
