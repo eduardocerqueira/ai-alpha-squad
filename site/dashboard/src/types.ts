@@ -72,6 +72,7 @@ export interface JobCard {
   active_agent: string;
   bucket: Bucket;
   blocked: boolean;
+  needs_human: boolean;
   updated_at: string;
   target_repo: string | null;
   target_pr_url: string | null;

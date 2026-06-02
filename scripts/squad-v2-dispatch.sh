@@ -26,7 +26,11 @@ export SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT=1
 # dedicated workflow wouldn't have finished, so re-evaluating would be premature).
 MAX_CHAIN=1
 if [[ "${SQUAD_ACTIONS_INLINE:-}" == "1" ]]; then
-  MAX_CHAIN="${SQUAD_V2_MAX_CHAIN:-8}"
+  # High enough that one run can walk the whole model ladder to a terminal verdict
+  # (release-candidate or needs-human) rather than stalling mid-escalation: a full
+  # ladder is len(ladder) × MAX_QA_ROUNDS dev⇄QA steps. The 90-minute job timeout
+  # is the real backstop.
+  MAX_CHAIN="${SQUAD_V2_MAX_CHAIN:-20}"
 fi
 # Resilience: if an EXTERNAL actor closes the issue mid-chain (we've seen a process
 # auto-close issues seconds after reopen), reopen and continue rather than abandon a
@@ -47,8 +51,8 @@ print(extract_target_repo(body) or repo)
 
 for ((step = 1; step <= MAX_CHAIN; step++)); do
   ACTION="$(python3 -c "
-from ai_alpha_squad.squad_v2 import IssueView, next_action
-import json, subprocess, sys
+from ai_alpha_squad.squad_v2 import IssueView, next_action, dev_model_ladder
+import os, json, subprocess, sys
 
 repo, issue = sys.argv[1], int(sys.argv[2])
 data = json.loads(subprocess.check_output(
@@ -59,15 +63,19 @@ data = json.loads(subprocess.check_output(
 labels = frozenset(x['name'] for x in data.get('labels') or [])
 comments = tuple(data.get('comments') or [])
 view = IssueView(issue, data.get('state') or 'OPEN', labels, comments, data.get('body') or '')
-act = next_action(view)
+ladder = dev_model_ladder(os.environ.get('SQUAD_DEV_MODEL_LADDER'))
+forced = os.environ.get('SQUAD_DEV_MODEL_INPUT', '').strip() or None
+act = next_action(view, model_ladder=ladder, forced_model=forced)
 print(act.kind)
 print(act.agent or '')
+print('1' if act.needs_human else '0')
 print(act.reason)
 " "$REPO" "$ISSUE")"
 
   KIND="$(echo "$ACTION" | sed -n '1p')"
   AGENT="$(echo "$ACTION" | sed -n '2p')"
-  REASON="$(echo "$ACTION" | sed -n '3,$p' | head -1)"
+  NEEDS_HUMAN="$(echo "$ACTION" | sed -n '3p')"
+  REASON="$(echo "$ACTION" | sed -n '4,$p' | head -1)"
 
   echo "v2 #$ISSUE [step $step/$MAX_CHAIN]: kind=$KIND agent=$AGENT — $REASON"
 
@@ -93,9 +101,28 @@ print(act.reason)
       exit 0
       ;;
     failed)
-      BODY="$(python3 "$FORMAT" notice --message "**Squad v2:** $REASON" --repo "$REPO")"
-      gh issue comment "$ISSUE" --repo "$REPO" --body "$BODY"
-      gh issue edit "$ISSUE" --repo "$REPO" --add-label "blocked" 2>/dev/null || true
+      if [[ "$NEEDS_HUMAN" == "1" ]]; then
+        # The squad exhausted every model + retry and still can't pass QA. Post a
+        # clear human-assistance message (how many tries, which models, last
+        # blocker) and flag the issue needs-human so the dashboard surfaces it.
+        MSG="$(python3 -c "
+from ai_alpha_squad.squad_v2 import human_assistance_summary, dev_model_ladder
+import os, json, subprocess, sys
+repo, issue = sys.argv[1], int(sys.argv[2])
+data = json.loads(subprocess.check_output(
+    ['gh','issue','view',str(issue),'--repo',repo,'--json','comments'], text=True))
+comments = tuple(data.get('comments') or [])
+ladder = dev_model_ladder(os.environ.get('SQUAD_DEV_MODEL_LADDER'))
+print(human_assistance_summary(comments, ladder))
+" "$REPO" "$ISSUE")"
+        BODY="$(python3 "$FORMAT" notice --message "$MSG" --repo "$REPO")"
+        gh issue comment "$ISSUE" --repo "$REPO" --body "$BODY"
+        gh issue edit "$ISSUE" --repo "$REPO" --add-label "blocked" --add-label "needs-human" 2>/dev/null || true
+      else
+        BODY="$(python3 "$FORMAT" notice --message "**Squad v2:** $REASON" --repo "$REPO")"
+        gh issue comment "$ISSUE" --repo "$REPO" --body "$BODY"
+        gh issue edit "$ISSUE" --repo "$REPO" --add-label "blocked" 2>/dev/null || true
+      fi
       exit 1
       ;;
     *)

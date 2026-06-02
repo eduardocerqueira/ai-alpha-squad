@@ -47,6 +47,12 @@ MAX_RUN_ATTEMPTS = 3
 # treated as dead (orchestrator timeout is 90m, so this must stay above it).
 STALE_RUN_MINUTES = 120
 
+# Applied (alongside `blocked`) when the squad has exhausted every model in the
+# ladder and all retries without passing QA — i.e. the AI gave up and a human
+# must take over. Distinct from `blocked` (which is any pause) so the Director
+# dashboard can surface a clear "needs human assistance" state.
+NEEDS_HUMAN_LABEL = "needs-human"
+
 _TARGET_REPO_RE = re.compile(
     r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)",
 )
@@ -66,6 +72,9 @@ class NextAction:
     kind: str  # dispatch | gate | idle | done | failed
     agent: str | None = None
     reason: str = ""
+    # True when `failed` because the AI exhausted every model + retry and still
+    # couldn't pass QA → apply the needs-human label + a human-assistance message.
+    needs_human: bool = False
 
 
 def v2_enabled() -> bool:
@@ -204,6 +213,80 @@ def model_marker_comment(model: str) -> str:
         f"{RUN_MODEL_MARKER}{model} — developer model escalated after "
         f"{MAX_QA_ROUNDS} QA rejections; fresh attempts on this model."
     )
+
+
+def models_tried(comments: tuple[dict, ...], ladder: list[str] | None = None) -> list[str]:
+    """Distinct developer models used so far, in order: the ladder base (used
+    before any escalation marker) followed by each escalated/forced model."""
+    out: list[str] = []
+    if ladder:
+        out.append(ladder[0])
+    for c in comments:
+        m = _MODEL_RE.search(c.get("body") or "")
+        if m:
+            out.append(m.group(1))
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for m in out:
+        if m and m not in seen:
+            seen.add(m)
+            deduped.append(m)
+    return deduped
+
+
+def _latest_qa_blocker(comments: tuple[dict, ...]) -> str | None:
+    """The most actionable line from the latest QA report — the first BLOCKER /
+    fix item — so the human knows where the squad got stuck."""
+    qa_idx, _ = latest_qa_verdict(comments)
+    if qa_idx is None:
+        return None
+    body = comments[qa_idx].get("body") or ""
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    for ln in lines:
+        if "[BLOCKER]" in ln:
+            return ln.lstrip("-* ").strip()
+    # Fall back to the first numbered fix under "## Fixes required".
+    in_fixes = False
+    for ln in lines:
+        if ln.lower().startswith("## fixes"):
+            in_fixes = True
+            continue
+        if in_fixes and (ln[:2].rstrip(".").isdigit() or ln.startswith(("-", "*"))):
+            return ln.lstrip("-*0123456789. ").strip()
+    return None
+
+
+def human_assistance_summary(
+    comments: tuple[dict, ...], ladder: list[str] | None = None
+) -> str:
+    """Human-readable message posted when the squad gives up: how many times it
+    tried, on which models, and the last blocker — so a person can take over."""
+    attempts = sum(
+        1 for c in comments if DELIVERABLE_MARKERS["developer"] in (c.get("body") or "")
+    )
+    qa_rounds = sum(1 for c in comments if QA_FAIL_MARKER in (c.get("body") or "").lower())
+    models = models_tried(comments, ladder)
+    blocker = _latest_qa_blocker(comments)
+
+    model_phrase = (
+        f"{len(models)} model(s) ({', '.join(models)})" if models else "the available model(s)"
+    )
+    lines = [
+        "🚫 **This task needs human assistance.**",
+        "",
+        f"The AI Alpha Squad attempted this **{max(attempts, 1)} time(s)** across "
+        f"**{model_phrase}** over **{qa_rounds} QA review round(s)**, but could not "
+        "satisfy every acceptance criterion.",
+    ]
+    if blocker:
+        lines += ["", "**Last blocker from QA:**", f"> {blocker}"]
+    lines += [
+        "",
+        "👉 A human should review the open pull request and take over. After "
+        "addressing the blocker, re-run this issue from the Director dashboard "
+        "(or re-dispatch the orchestrator) to hand it back to the squad.",
+    ]
+    return "\n".join(lines)
 
 
 def qa_passed(comments: tuple[dict, ...]) -> bool:
@@ -390,7 +473,8 @@ def next_action(
         if dev_idx is None:
             if run_failures(view.comments, "developer") >= MAX_RUN_ATTEMPTS:
                 return NextAction(
-                    "failed", agent="developer", reason="Developer exceeded retry limit"
+                    "failed", agent="developer",
+                    reason="Developer exceeded retry limit", needs_human=True,
                 )
             return NextAction(
                 "dispatch",
@@ -434,10 +518,12 @@ def next_action(
                     f"QA rejected the deliverable {MAX_QA_ROUNDS} times"
                     + (" and the model ladder is exhausted" if model_ladder else "")
                 ),
+                needs_human=True,
             )
         if run_failures(view.comments, "developer") >= MAX_RUN_ATTEMPTS:
             return NextAction(
-                "failed", agent="developer", reason="Developer exceeded retry limit"
+                "failed", agent="developer",
+                reason="Developer exceeded retry limit", needs_human=True,
             )
         return NextAction(
             "dispatch",
