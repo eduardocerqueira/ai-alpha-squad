@@ -47,6 +47,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Resolve JDK from issue
+        id: issue_jdk
+        if: github.event.issue.number != '' || inputs.issue_number != ''
+        run: |
+          chmod +x ./scripts/squad-setup-issue-jdk.sh
+          ISSUE="${{ github.event.issue.number || inputs.issue_number }}"
+          ./scripts/squad-setup-issue-jdk.sh "$REPO" "$ISSUE" || true
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+
+      - uses: actions/setup-java@v4
+        if: steps.issue_jdk.outputs.java-version != ''
+        with:
+          distribution: temurin
+          java-version: ${{ steps.issue_jdk.outputs.java-version }}
+
       - name: Skip squad-internal comments
         if: github.event_name == 'issue_comment'
         id: comment_gate

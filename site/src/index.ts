@@ -444,6 +444,14 @@ async function handleDeliveryGate(
     headers,
     body: JSON.stringify({ labels: ["director-approved"] }),
   }).catch(() => {});
+  // A closed issue blocks the orchestrator (next_action → done). Reopen on reject.
+  if ((issue.state || "").toLowerCase() === "closed") {
+    await fetch(issueApi, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ state: "open" }),
+    });
+  }
   await postComment("squad-v2-run:reset:developer — failure count cleared; agent gets a fresh set of retry attempts.");
   await postComment("squad-v2-run:reset:qa — failure count cleared; agent gets a fresh set of retry attempts.");
   await postComment(

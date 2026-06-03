@@ -20,6 +20,24 @@ sync_labels() {
   "$SYNC" "$REPO" "$issue" || true
 }
 
+reopen_closed_squad_issue() {
+  local issue="$1"
+  python3 - "$REPO" "$issue" <<'PY' || true
+import json, subprocess, sys
+repo, issue = sys.argv[1], sys.argv[2]
+sys.path.insert(0, "src")
+from ai_alpha_squad.squad_v2 import squad_issue_needs_reopen, current_lifecycle
+
+data = json.loads(subprocess.check_output(
+    ["gh", "issue", "view", issue, "--repo", repo, "--json", "state,labels"], text=True))
+state = data.get("state") or "OPEN"
+labels = frozenset(x["name"] for x in data.get("labels") or [])
+if squad_issue_needs_reopen(state, labels):
+    subprocess.run(["gh", "issue", "reopen", issue, "--repo", repo], check=False)
+    print(f"reopened #{issue} (was closed during {current_lifecycle(labels)})")
+PY
+}
+
 # Recover an orphaned run: an in_progress marker with no terminal marker, older
 # than the stale threshold (a cancelled/timed-out run never posts a result).
 # Posting a failure marker clears the "active" state and counts as an attempt.
@@ -47,6 +65,7 @@ PY
 
 tick_issue() {
   local issue="$1"
+  reopen_closed_squad_issue "$issue"
   recover_stale_run "$issue"
   sync_labels "$issue"
   chmod +x "$DISPATCH"

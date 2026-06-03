@@ -43,6 +43,12 @@ def issue_expects_build(body: str) -> bool:
     return False
 
 
+def jdk_version_from_issue(body: str) -> str | None:
+    """Major JDK version from issue text (e.g. 'Java 25' → '25')."""
+    m = re.search(r"(?:java|jdk)\s*(\d+)", body or "", re.IGNORECASE)
+    return m.group(1) if m else None
+
+
 def issue_requires_package(body: str) -> bool:
     """True when success criteria / desired outcome require a full package (not compile-only)."""
     text = body or ""

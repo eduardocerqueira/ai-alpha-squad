@@ -544,10 +544,12 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
   // Priority: released is done; an active agent run shows In progress even if the
   // issue is closed; `blocked` outranks closed (Blocked tab); then closed → Done.
   const activeRun = runInProgress(comments) !== null;
+  const needsReopen = state === "CLOSED" && lc && ["new", "awaiting-approval", "director-approved", "release-candidate"].includes(lc);
   let bucket: string;
   if (lc === "released") bucket = "completed";
   else if (activeRun && !blocked) bucket = "in_progress";
   else if (blocked) bucket = "stuck";
+  else if (needsReopen) bucket = lc === "release-candidate" ? "needs_you" : "in_progress";
   else if (state === "CLOSED") bucket = "completed";
   else if (lc && GATE_LABELS.has(lc)) bucket = "needs_you";
   else if (failed) bucket = "stuck";

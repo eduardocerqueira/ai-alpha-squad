@@ -911,7 +911,9 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
         bucket = "in_progress"
     elif blocked:
         bucket = "stuck"
-    elif state.upper() == "CLOSED":
+    elif squad_v2.squad_issue_needs_reopen(state, label_set):
+        bucket = "needs_you" if lc == "release-candidate" else "in_progress"
+    elif squad_v2.squad_job_is_done(state, label_set):
         bucket = "completed"
     elif lc in _V2_DIRECTOR_GATES:
         bucket = "needs_you"
