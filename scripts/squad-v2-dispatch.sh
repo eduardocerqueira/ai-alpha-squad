@@ -151,93 +151,35 @@ Target repo (for context): ${TARGET}
 EOF
       ;;
     developer)
-      cat > "$INSTRUCTIONS" <<EOF
-You are the Developer for AI Alpha Squad (v2 — single issue, no sub-issues).
-
-Read .agents/agent-developer.md. Target repo: ${TARGET}
-
-Issue: https://github.com/${REPO}/issues/${ISSUE}
-
-1. Implement on ${TARGET} (branch + PR)
-2. Post on THIS issue (#${ISSUE}) — heading must include: # Developer Deliverable
-   Include the PR URL and summary of changes.
-3. If the issue has a "# QA Report" comment ending in \`squad-v2-qa:fail\`, this is a
-   REWORK on the EXISTING branch. The QA "## Fixes required" list gives you the EXACT
-   file path (and often line numbers) for each item. Work it ONE ITEM AT A TIME:
-   - Go STRAIGHT to the file each fix names and edit it — do NOT search or list_dir to
-     "explore the codebase" first; QA already told you where to go. Land your first
-     edit within a few turns.
-   - Fix BLOCKER items FIRST (compile errors, missing required files) — they gate
-     everything else. Then REQUIRED, then NICE-to-have.
-   - Use TARGETED edit_file (never rewrite a whole file — you will drop code). To
-     remove a DUPLICATE declaration, set old_string to the whole block containing all
-     the copies and new_string to the single line you want to keep (a bare duplicated
-     line is not unique, so edit_file will reject it otherwise). After each edit,
-     re-read that region to confirm it applied before moving on.
-   - Do NOT re-implement parts QA already marked ✅ — leave working code alone.
-   - Verify the project still builds (run the build/compile command if available)
-     before posting. Then post an updated # Developer Deliverable listing which
-     fix-list items you addressed.
-4. Do not create sub-issues.
-EOF
+      python3 -m ai_alpha_squad.squad_dispatch_instructions developer "$REPO" "$ISSUE" "$TARGET" > "$INSTRUCTIONS"
       ;;
     qa)
       PR_DIFF=""
       QA_CHANGED=""
-      QA_CHANGED_COUNT=0
       QA_TREE=""
       QA_PR="$(gh pr list --repo "$TARGET" --head "squad/developer-issue-${ISSUE}" --state open --json number -q '.[0].number' 2>/dev/null || true)"
       if [[ -n "$QA_PR" ]]; then
-        # Large budget so QA sees the WHOLE diff — a truncated diff makes QA think
-        # unshown files are missing and wrongly fail bulk/multi-file deliverables.
-        PR_DIFF="$(gh pr diff "$QA_PR" --repo "$TARGET" 2>/dev/null | head -c 60000)"
-        # Explicit changed-file list + count: a reliable completeness signal that
-        # doesn't depend on parsing a (possibly truncated) diff.
+        PR_DIFF="$(gh pr diff "$QA_PR" --repo "$TARGET" 2>/dev/null | head -c 60000 || true)"
         QA_CHANGED="$(gh pr view "$QA_PR" --repo "$TARGET" --json files -q '.files[].path' 2>/dev/null || true)"
-        QA_CHANGED_COUNT="$(printf '%s\n' "$QA_CHANGED" | grep -c . || true)"
       fi
-      # Files that exist in the base branch (so QA can judge "all existing X were touched").
       QA_TREE="$(gh api "repos/${TARGET}/git/trees/${SQUAD_TARGET_BASE_BRANCH:-main}?recursive=1" \
         --jq '[.tree[] | select(.type=="blob") | .path] | join("\n")' 2>/dev/null | head -c 16000 || true)"
-      cat > "$INSTRUCTIONS" <<EOF
-You are the QA engineer for AI Alpha Squad (v2). Read .agents/agent-qa.md.
-
-Issue: https://github.com/${REPO}/issues/${ISSUE}
-Target repo: ${TARGET}
-
-Evaluate whether the Developer's deliverable satisfies EVERY success criterion in
-the issue above (the criteria are in the issue body).
-
-## Files changed in this PR (${QA_CHANGED_COUNT})
-${QA_CHANGED:-(no open PR / no files changed — treat as not delivered)}
-
-## Files in the repository base branch (for completeness checks)
-${QA_TREE:-(unavailable)}
-
-Use the two lists above to judge **completeness** (e.g. "the task requires every
-existing file to be changed, but only N of M were"). Then review the actual changes:
-
-\`\`\`diff
-${PR_DIFF:-(no open PR diff found — treat as not delivered)}
-\`\`\`
-
-Be a strict but OBJECTIVE reviewer. The Developer is a code model that acts best on a
-short, concrete fix-list — not prose. Keep the report tight.
-
-Post ONE comment on THIS issue (#${ISSUE}) with heading: # QA Report
-- "## Criteria" — one line per success criterion: \`✅\` or \`❌ <≤12-word reason>\`.
-  For any count/coverage criterion, give numbers (e.g. "47/54 files changed").
-  Do NOT write paragraphs, code blocks, or restate the criteria text.
-- "## Fixes required" — ONLY if failing. A prioritized, numbered list the Developer
-  can act on directly. Each item EXACTLY: \`[BLOCKER|REQUIRED|NICE] <file path> — <the
-  concrete change to make>\`. Order BLOCKER (won't compile / missing required file)
-  first, then REQUIRED, then NICE. Be specific (name the file, function, and line if
-  known). No item should need interpretation.
-- End with EXACTLY one verdict line, nothing after it:
-  - \`squad-v2-qa:pass\` — if and only if every criterion is fully met.
-  - \`squad-v2-qa:fail\` — otherwise.
-Do not open PRs or sub-issues; review only.
-EOF
+      ISSUE_BODY_QA="$(gh issue view "$ISSUE" --repo "$REPO" --json body -q .body 2>/dev/null || true)"
+      QA_CTX_FILE="$(mktemp)"
+      export QA_PR_DIFF="$PR_DIFF" QA_CHANGED_FILES="$QA_CHANGED" QA_BASE_TREE="$QA_TREE" QA_ISSUE_BODY="$ISSUE_BODY_QA"
+      python3 <<'PY' > "$QA_CTX_FILE"
+import json, os
+payload = {
+    "pr_diff": os.environ.get("QA_PR_DIFF", ""),
+    "changed_files": [l for l in os.environ.get("QA_CHANGED_FILES", "").splitlines() if l.strip()],
+    "base_tree": os.environ.get("QA_BASE_TREE", ""),
+    "build_ok": True,
+    "issue_body": os.environ.get("QA_ISSUE_BODY", ""),
+}
+print(json.dumps(payload))
+PY
+      python3 -m ai_alpha_squad.squad_dispatch_instructions qa "$REPO" "$ISSUE" "$TARGET" < "$QA_CTX_FILE" > "$INSTRUCTIONS"
+      rm -f "$QA_CTX_FILE"
       ;;
     *)
       echo "Unknown agent: $AGENT" >&2
@@ -288,6 +230,19 @@ print(model_marker_comment(escalate_to) if escalate_to else '')
     ISSUE_BODY="$(gh issue view "$ISSUE" --repo "$REPO" --json body -q .body 2>/dev/null || true)"
     if ! python3 -m ai_alpha_squad.target_build_verify gate-pr "$REPO" "$ISSUE" "$TARGET" "$ISSUE_BODY"; then
       echo "v2 #$ISSUE: build verification failed — posted squad-v2-qa:fail; developer rework next"
+      "$SYNC" "$REPO" "$ISSUE" || true
+      [[ "${SQUAD_ACTIONS_INLINE:-}" == "1" ]] || exit 0
+      continue
+    fi
+    AUTO_QA="$(python3 -c "
+import sys
+sys.path.insert(0, 'src')
+from ai_alpha_squad.squad_v2 import auto_qa_pass_body
+print(auto_qa_pass_body(sys.argv[1], build_ok=True) or '')
+" "$ISSUE_BODY")"
+    if [[ -n "$AUTO_QA" ]]; then
+      gh issue comment "$ISSUE" --repo "$REPO" --body "$AUTO_QA"
+      echo "v2 #$ISSUE: compile-only job — deterministic QA pass (HF QA skipped)"
       "$SYNC" "$REPO" "$ISSUE" || true
       [[ "${SQUAD_ACTIONS_INLINE:-}" == "1" ]] || exit 0
       continue

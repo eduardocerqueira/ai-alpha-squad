@@ -29,48 +29,20 @@ elif [[ "$AGENT" == "developer" ]]; then
   fi
 fi
 
-if [[ "${SQUAD_V2:-}" == "1" ]]; then
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+if [[ "${SQUAD_V2:-}" == "1" && "$AGENT" == "developer" ]]; then
+  python3 -m ai_alpha_squad.squad_dispatch_instructions developer "$QUEUE_REPO" "$PARENT_ISSUE" "$TARGET_REPO" > "$OUT"
+elif [[ "${SQUAD_V2:-}" == "1" ]]; then
   cat > "$OUT" <<EOF
 You are the ${AGENT} agent for AI Alpha Squad v2 (single parent issue — no sub-issues).
 
 Parent issue: https://github.com/${QUEUE_REPO}/issues/${PARENT_ISSUE}
 Target repo: ${TARGET_REPO}
 
-Read the parent issue body and \`# Business Analysis\` comment. Implement exactly what the Director requested on the target repo (not the queue repo).
-Use one folder or file per language when applicable. Keep changes minimal.
-
-1. Use the repository layout in context; go to the file the task or QA fix list names — do NOT
-   crawl with repeated list_dir/read_file before your first edit_file.
-2. For REWORK after \`squad-v2-qa:fail\`: fix BLOCKER items first (compile errors, missing files),
-   one fix at a time with targeted edit_file (never rewrite whole files).
-3. Run the build/compile command (mvn compile, etc.) via run_command; finish is rejected if compile fails.
-4. Push to the stable branch; one PR per job (updates reuse the same PR)
-5. Use finish only when the tree compiles and required artifacts exist
-6. The workflow posts \`# Developer Deliverable\` on the parent issue when the PR is ready
-7. Do NOT modify ${QUEUE_REPO} except via the separate deliverable comment step
-8. Do NOT merge to main on the target repo
-
+Read the parent issue body and implement on the target repo (not the queue repo).
 Agent profile: .agents/agent-${AGENT}.md
 EOF
-  if [[ "$AGENT" == "developer" ]]; then
-    APPEND="$(python3 -c "
-import json, subprocess, sys
-sys.path.insert(0, '${ROOT}/src')
-from ai_alpha_squad.squad_v2 import developer_instruction_appendix
-repo, issue = sys.argv[1], int(sys.argv[2])
-data = json.loads(subprocess.check_output(
-    ['gh', 'issue', 'view', str(issue), '--repo', repo, '--json', 'comments'],
-    text=True,
-))
-comments = tuple(data.get('comments') or ())
-text = developer_instruction_appendix(comments)
-if text.strip():
-    print(text)
-" "$QUEUE_REPO" "$PARENT_ISSUE" 2>/dev/null || true)"
-    if [[ -n "${APPEND:-}" ]]; then
-      printf '\n%s\n' "$APPEND" >> "$OUT"
-    fi
-  fi
 else
   cat > "$OUT" <<EOF
 You are the ${AGENT} agent for AI Alpha Squad — implementation runs on the target product repo.

@@ -250,7 +250,7 @@ def test_resolve_target_repo_from_director_comment():
 def test_director_reject_after_qa_redispatches_developer():
     comments = (
         _DEV,
-        {"body": "# QA Report\n\nsquad-v2-qa:pass"},
+        _QA_PASS,
         {"body": "**Director:** Job rejected by director.\n\nsquad-v2-director:delivery-reject"},
     )
     from ai_alpha_squad.squad_v2 import qa_passed
@@ -308,6 +308,15 @@ _DEV_REWORK = {
     "body": "# Developer Deliverable\n\nfixed it\n\n**Pull request:** https://github.com/o/r/pull/1\n"
     + "y" * 200
 }
+_QA_PASS = {
+    "body": "# QA Report\n\n## Criteria\n- ✅ met\n\nsquad-v2-qa:pass\n",
+}
+_QA_FAIL = {
+    "body": (
+        "# QA Report\n\n## Criteria\n- ❌ gap\n\n## Fixes required\n"
+        "1. [BLOCKER] src/Foo.java — fix gap\n\nsquad-v2-qa:fail\n"
+    ),
+}
 
 
 def _dev_approved(comments):
@@ -320,13 +329,13 @@ def test_qa_dispatched_after_developer_deliverable():
 
 
 def test_qa_pass_advances_to_release_candidate():
-    comments = [_DEV, {"body": "# QA Report\n\nAll good.\n\nsquad-v2-qa:pass"}]
+    comments = [_DEV, _QA_PASS]
     act = next_action(_dev_approved(comments))
     assert act.kind == "idle" and "QA passed" in act.reason
 
 
 def test_qa_fail_redispatches_developer():
-    comments = [_DEV, {"body": "# QA Report\n\nGaps.\n\nsquad-v2-qa:fail\n- missing X"}]
+    comments = [_DEV, _QA_FAIL]
     act = next_action(_dev_approved(comments))
     assert act.kind == "dispatch" and act.agent == "developer"
     assert "QA requested changes" in act.reason
@@ -336,7 +345,7 @@ def test_qa_reviews_redelivered_work():
     # dev → qa:fail → dev again; QA must review the new deliverable.
     comments = [
         _DEV,
-        {"body": "# QA Report\n\nsquad-v2-qa:fail\n- gap"},
+        _QA_FAIL,
         _DEV_REWORK,
     ]
     act = next_action(_dev_approved(comments))
@@ -346,18 +355,16 @@ def test_qa_reviews_redelivered_work():
 def test_qa_fail_cap_escalates():
     comments = [_DEV]
     for _ in range(3):
-        comments.append({"body": "# QA Report\n\nsquad-v2-qa:fail\n- gap"})
+        comments.append(_QA_FAIL)
         comments.append(_DEV_REWORK)
-    # 3 fails recorded; latest is a fresh dev deliverable awaiting QA, but the cap
-    # is checked when QA next fails — simulate a 3rd fail as the latest verdict:
-    comments.append({"body": "# QA Report\n\nsquad-v2-qa:fail\n- still wrong"})
+    comments.append(_QA_FAIL)
     act = next_action(_dev_approved(comments))
     assert act.kind == "failed" and "QA rejected" in act.reason
 
 
 def test_qa_passed_helper():
     from ai_alpha_squad.squad_v2 import qa_passed
-    assert qa_passed((_DEV, {"body": "# QA Report\n\nsquad-v2-qa:pass"}))
+    assert qa_passed((_DEV, _QA_PASS))
     assert not qa_passed((_DEV,))
     # pass before the latest dev deliverable doesn't count
     assert not qa_passed((_DEV, {"body": "squad-v2-qa:pass"}, {"body": "# Developer Deliverable\n\nnew\n" + "x"*200}))
@@ -388,7 +395,7 @@ def test_current_and_next_model_base():
 
 def test_escalation_after_3_fails_dispatches_dev_on_next_model():
     # dev deliverable + 3 QA fails at base tier → escalate (still a dispatch, not failed)
-    comments = [_DEV] + [{"body": "squad-v2-qa:fail"} for _ in range(3)]
+    comments = [_DEV, _QA_FAIL, _QA_FAIL, _QA_FAIL]
     act = next_action(_dev_approved(comments), model_ladder=LADDER)
     assert act.kind == "dispatch" and act.agent == "developer"
     assert "escalating developer model to model-b" in act.reason
@@ -397,10 +404,10 @@ def test_escalation_after_3_fails_dispatches_dev_on_next_model():
 def test_fails_counted_since_escalation_marker():
     from ai_alpha_squad.squad_v2 import qa_fails_since_escalation, current_dev_model
     comments = (
-        {"body": "squad-v2-qa:fail"},
-        {"body": "squad-v2-qa:fail"},
+        _QA_FAIL,
+        _QA_FAIL,
         {"body": "squad-v2-model:model-b — escalated"},
-        {"body": "squad-v2-qa:fail"},
+        _QA_FAIL,
     )
     assert qa_fails_since_escalation(comments) == 1
     assert current_dev_model(comments, LADDER) == "model-b"
@@ -411,9 +418,9 @@ def test_ladder_exhausted_blocks():
     comments = [
         _DEV,
         {"body": "squad-v2-model:model-c — escalated"},
-        {"body": "squad-v2-qa:fail"},
-        {"body": "squad-v2-qa:fail"},
-        {"body": "squad-v2-qa:fail"},
+        _QA_FAIL,
+        _QA_FAIL,
+        _QA_FAIL,
     ]
     act = next_action(_dev_approved(comments), model_ladder=LADDER)
     assert act.kind == "failed" and "ladder is exhausted" in act.reason
@@ -448,10 +455,20 @@ def test_human_assistance_summary_content():
     from ai_alpha_squad.squad_v2 import human_assistance_summary
     comments = (
         _DEV,
-        {"body": "# QA Report\n## Fixes required\n1. [BLOCKER] Foo.java:7 — remove duplicate field\nsquad-v2-qa:fail"},
+        {
+            "body": (
+                "# QA Report\n\n## Criteria\n- ❌ dup\n\n## Fixes required\n"
+                "1. [BLOCKER] Foo.java — remove duplicate field\n\nsquad-v2-qa:fail\n"
+            )
+        },
         {"body": "squad-v2-model:model-b — escalated"},
         _DEV_REWORK,
-        {"body": "# QA Report\n## Fixes required\n1. [BLOCKER] Foo.java:7 — still duplicated\nsquad-v2-qa:fail"},
+        {
+            "body": (
+                "# QA Report\n\n## Criteria\n- ❌ dup\n\n## Fixes required\n"
+                "1. [BLOCKER] Foo.java — still duplicated\n\nsquad-v2-qa:fail\n"
+            )
+        },
     )
     msg = human_assistance_summary(comments, LADDER)
     assert "needs human assistance" in msg.lower()
@@ -461,7 +478,7 @@ def test_human_assistance_summary_content():
 
 
 def test_no_ladder_blocks_after_3_like_before():
-    comments = [_DEV] + [{"body": "squad-v2-qa:fail"} for _ in range(3)]
+    comments = [_DEV, _QA_FAIL, _QA_FAIL, _QA_FAIL]
     act = next_action(_dev_approved(comments), model_ladder=[])
     assert act.kind == "failed"
 
@@ -479,7 +496,7 @@ def test_model_marker_is_internal():
 def test_forced_model_bypasses_qa_cap_even_with_empty_ladder():
     # 3 QA fails, NO ladder, but the Director picked a model via the dropdown →
     # dispatch the developer on that model instead of blocking (the #140 dropdown bug).
-    comments = [_DEV] + [{"body": "squad-v2-qa:fail"} for _ in range(3)]
+    comments = [_DEV, _QA_FAIL, _QA_FAIL, _QA_FAIL]
     act = next_action(
         _dev_approved(comments), model_ladder=[], forced_model="Qwen/Qwen2.5-Coder-32B-Instruct"
     )
@@ -492,9 +509,9 @@ def test_forced_model_equal_to_current_does_not_loop():
     comments = [
         _DEV,
         {"body": "squad-v2-model:Qwen/Qwen2.5-Coder-32B-Instruct — escalated"},
-        {"body": "squad-v2-qa:fail"},
-        {"body": "squad-v2-qa:fail"},
-        {"body": "squad-v2-qa:fail"},
+        _QA_FAIL,
+        _QA_FAIL,
+        _QA_FAIL,
     ]
     act = next_action(
         _dev_approved(comments), model_ladder=[], forced_model="Qwen/Qwen2.5-Coder-32B-Instruct"

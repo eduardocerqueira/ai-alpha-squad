@@ -147,8 +147,18 @@ def _deliverable_has_pr_link(body: str) -> bool:
     return "pull request" in lower or bool(_DELIVERABLE_PR_RE.search(body))
 
 
+def _build_gate_failed_after(comments: tuple[dict, ...], after_index: int) -> bool:
+    for i in range(after_index + 1, len(comments)):
+        body = (comments[i].get("body") or "").lower()
+        if "build verification failed" in body and "developer" in body:
+            return True
+        if QA_FAIL_MARKER in body and "# qa report" in body and "deterministic" in body:
+            return True
+    return False
+
+
 def latest_trusted_developer_deliverable_index(comments: tuple[dict, ...]) -> int | None:
-    """Developer deliverable that survived Actions (PR link, no later run failure)."""
+    """Developer deliverable that survived Actions (PR link, no later run/build failure)."""
     idx = _latest_deliverable_index(comments, "developer")
     if idx is None:
         return None
@@ -156,6 +166,8 @@ def latest_trusted_developer_deliverable_index(comments: tuple[dict, ...]) -> in
     if not _deliverable_has_pr_link(body):
         return None
     if _developer_run_failed_after(comments, idx):
+        return None
+    if _build_gate_failed_after(comments, idx):
         return None
     return idx
 
@@ -178,16 +190,33 @@ def _latest_deliverable_index(comments: tuple[dict, ...], agent: str) -> int | N
 
 
 def latest_qa_verdict(comments: tuple[dict, ...]) -> tuple[int | None, str | None]:
-    """Index and verdict ('pass'|'fail') of the most recent QA verdict marker."""
-    idx: int | None = None
-    verdict: str | None = None
-    for i, comment in enumerate(comments):
-        body = (comment.get("body") or "").lower()
-        if QA_FAIL_MARKER in body:
-            idx, verdict = i, "fail"
-        elif QA_PASS_MARKER in body:
-            idx, verdict = i, "pass"
-    return idx, verdict
+    """Index and verdict ('pass'|'fail') of the most recent *valid* QA report."""
+    from ai_alpha_squad.squad_qa import validate_qa_report
+
+    for i in range(len(comments) - 1, -1, -1):
+        body = comments[i].get("body") or ""
+        lower = body.lower()
+        if QA_FAIL_MARKER not in lower and QA_PASS_MARKER not in lower:
+            continue
+        verdict = validate_qa_report(body)
+        if verdict:
+            return i, verdict
+    return None, None
+
+
+def latest_invalid_qa_report_index(comments: tuple[dict, ...]) -> int | None:
+    """Most recent comment that looks like QA but fails validation."""
+    from ai_alpha_squad.squad_qa import validate_qa_report
+
+    for i in range(len(comments) - 1, -1, -1):
+        body = comments[i].get("body") or ""
+        lower = body.lower()
+        if "# qa report" not in lower:
+            continue
+        if QA_FAIL_MARKER in lower or QA_PASS_MARKER in lower:
+            if validate_qa_report(body) is None:
+                return i
+    return None
 
 
 _CODE_FENCE_RE = re.compile(r"```(?:\w+)?\n(.*?)```", re.DOTALL)
@@ -238,11 +267,80 @@ def developer_instruction_appendix(comments: tuple[dict, ...]) -> str:
         )
     build = latest_build_failure_excerpt(comments)
     if build:
+        from ai_alpha_squad.compile_diagnostics import format_compile_fix_list
+
+        parsed = format_compile_fix_list(build)
         parts.append(
             "## Last build verification failure (must pass before finish)\n\n"
             f"```\n{build}\n```"
         )
+        if parsed.strip():
+            parts.append(parsed)
     return "\n\n".join(parts)
+
+
+def auto_qa_pass_body(issue_body: str, *, build_ok: bool) -> str | None:
+    """When compile-only and build passed, return deterministic QA pass comment body."""
+    from ai_alpha_squad.squad_qa import format_auto_qa_pass_comment, is_compile_only_job
+
+    if not build_ok or not is_compile_only_job(issue_body):
+        return None
+    return format_auto_qa_pass_comment(build_ok=True, compile_only=True)
+
+
+def stall_model_escalation_body(
+    comments: tuple[dict, ...], ladder: list[str]
+) -> str | None:
+    """After a stall abort, return model marker comment text if a stronger model exists."""
+    nxt = next_dev_model(comments, ladder)
+    cur = current_dev_model(comments, ladder)
+    if nxt and nxt != cur:
+        return model_marker_comment(nxt)
+    return None
+
+
+FAILURE_MODES = (
+    "retry_cap",
+    "qa_exhausted",
+    "build_gate",
+    "stall_abort",
+    "invalid_qa",
+    "needs_human",
+)
+
+
+def classify_failure_mode(
+    comments: tuple[dict, ...],
+    labels: frozenset[str],
+    *,
+    action_kind: str = "",
+    action_reason: str = "",
+) -> str | None:
+    """Short failure taxonomy for dashboard / debugging."""
+    if NEEDS_HUMAN_LABEL in labels:
+        return "needs_human"
+    reason = (action_reason or "").lower()
+    if action_kind == "failed":
+        if "retry limit" in reason or "exceeded retry" in reason:
+            if "developer" in reason:
+                return "retry_cap"
+            if "qa" in reason:
+                return "invalid_qa" if latest_invalid_qa_report_index(comments) is not None else "qa_exhausted"
+        if "model ladder is exhausted" in reason or "qa rejected" in reason:
+            return "qa_exhausted"
+    if latest_build_failure_excerpt(comments):
+        return "build_gate"
+    for c in reversed(comments):
+        body = (c.get("body") or "").lower()
+        if "squad actions agent result" in body and "developer" in body:
+            from ai_alpha_squad.squad_dev_summary import is_stall_abort_summary
+
+            if is_stall_abort_summary(c.get("body") or ""):
+                return "stall_abort"
+            break
+    if latest_invalid_qa_report_index(comments) is not None and latest_qa_verdict(comments)[0] is None:
+        return "invalid_qa"
+    return None
 
 
 def qa_fail_rounds(comments: tuple[dict, ...]) -> int:

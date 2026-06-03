@@ -900,6 +900,11 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
     director_action = _director_action_for_card(bucket, lc)
     issue_url = f"https://github.com/{repo}/issues/{number}"
     stuck_reasons: tuple[str, ...] = (action.reason,) if action.kind == "failed" else ()
+    failure_mode = squad_v2.classify_failure_mode(
+        tuple(comments), frozenset(labels), action_kind=action.kind, action_reason=action.reason
+    )
+    if failure_mode:
+        stuck_reasons = stuck_reasons + (f"failure_mode:{failure_mode}",)
 
     if bucket == "completed":
         headline = "This job is done."
