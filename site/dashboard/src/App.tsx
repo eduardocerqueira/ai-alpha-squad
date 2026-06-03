@@ -632,7 +632,7 @@ export default function App() {
                   <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Squad ({job.agents.length})
                   </h2>
-                  <AgentsPanel agents={job.agents} />
+                  <AgentsPanel agents={job.agents} activeAgent={job.active_agent} />
                 </div>
                 <div>
                   <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
