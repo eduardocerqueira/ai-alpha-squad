@@ -273,7 +273,7 @@ export default function App() {
       if (!res.ok) throw new Error(payload.error || "Could not update delivery gate.");
       toast.success(
         action === "accept"
-          ? "Delivery accepted — job marked released."
+          ? "Job accepted by Director — issue closed and marked released."
           : "Delivery rejected — developer and QA will rework.",
       );
       load(true);

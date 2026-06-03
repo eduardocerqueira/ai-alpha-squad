@@ -2,6 +2,7 @@
 
 from ai_alpha_squad.squad_v2 import (
     IssueView,
+    developer_instruction_appendix,
     extract_target_repo,
     find_stale_in_progress,
     has_deliverable,
@@ -78,6 +79,37 @@ def test_in_progress_ignored_after_actions_result():
         },
     )
     assert run_in_progress(comments) is None
+
+
+def test_in_progress_ignored_after_build_gate_comment():
+    comments = (
+        {"body": "squad-v2-run:in_progress:developer"},
+        {
+            "body": "**Squad developer — build verification failed.**\n\n```\n"
+            "[ERROR] cannot find symbol\n```"
+        },
+    )
+    assert run_in_progress(comments) is None
+
+
+def test_director_delivery_accept_comment_closes_narrative():
+    from ai_alpha_squad.squad_v2 import (
+        DIRECTOR_DELIVERY_ACCEPT_MARKER,
+        format_director_delivery_accept_comment,
+    )
+
+    body = format_director_delivery_accept_comment()
+    assert body.lower().startswith("released — job accepted by director")
+    assert DIRECTOR_DELIVERY_ACCEPT_MARKER in body
+
+
+def test_developer_instruction_appendix_includes_build_log():
+    comments = (
+        {"body": "**Squad developer — build verification failed.**\n\n```\nmvn error line\n```"},
+    )
+    text = developer_instruction_appendix(comments)
+    assert "build verification failure" in text.lower()
+    assert "mvn error line" in text
     act = next_action(
         IssueView(
             94,

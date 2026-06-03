@@ -190,6 +190,61 @@ def latest_qa_verdict(comments: tuple[dict, ...]) -> tuple[int | None, str | Non
     return idx, verdict
 
 
+_CODE_FENCE_RE = re.compile(r"```(?:\w+)?\n(.*?)```", re.DOTALL)
+
+
+def _extract_last_code_fence(body: str) -> str | None:
+    matches = _CODE_FENCE_RE.findall(body or "")
+    if not matches:
+        return None
+    return matches[-1].strip()
+
+
+def latest_qa_fail_excerpt(comments: tuple[dict, ...]) -> str | None:
+    """Fixes-required section from the latest QA fail, for developer rework instructions."""
+    idx, verdict = latest_qa_verdict(comments)
+    if idx is None or verdict != "fail":
+        return None
+    body = comments[idx].get("body") or ""
+    lower = body.lower()
+    if "## fixes required" in lower:
+        start = lower.index("## fixes required")
+        return body[start:][:5000].strip()
+    return body[:5000].strip() or None
+
+
+def latest_build_failure_excerpt(
+    comments: tuple[dict, ...], agent: str = "developer"
+) -> str | None:
+    """Compiler log from the latest deterministic build gate on the issue."""
+    slug = agent.replace("-", " ")
+    for comment in reversed(comments):
+        body = comment.get("body") or ""
+        lower = body.lower()
+        if "build verification failed" in lower and slug in lower:
+            return _extract_last_code_fence(body) or body[:5000].strip() or None
+    return None
+
+
+def developer_instruction_appendix(comments: tuple[dict, ...]) -> str:
+    """Deterministic rework context appended to Actions developer instructions."""
+    parts: list[str] = []
+    qa = latest_qa_fail_excerpt(comments)
+    if qa:
+        parts.append(
+            "## Prior QA rejection (address BLOCKER items first)\n\n"
+            + qa
+            + "\n\nGo straight to the named files — do not explore with list_dir first."
+        )
+    build = latest_build_failure_excerpt(comments)
+    if build:
+        parts.append(
+            "## Last build verification failure (must pass before finish)\n\n"
+            f"```\n{build}\n```"
+        )
+    return "\n\n".join(parts)
+
+
 def qa_fail_rounds(comments: tuple[dict, ...]) -> int:
     return sum(1 for c in comments if QA_FAIL_MARKER in (c.get("body") or "").lower())
 
@@ -355,7 +410,8 @@ def format_director_delivery_reject_comment(reason: str = "") -> str:
 
 def format_director_delivery_accept_comment() -> str:
     return (
-        "**Director:** Delivery accepted — job complete.\n\n"
+        "Released — job accepted by Director.\n\n"
+        "**Director:** Delivery accepted. Job complete.\n\n"
         f"{DIRECTOR_DELIVERY_ACCEPT_MARKER}"
     )
 
@@ -393,12 +449,10 @@ def _latest_marker_index(comments: tuple[dict, ...], needle: str) -> int | None:
 def _failure_after_in_progress(comments: tuple[dict, ...], agent: str) -> bool:
     """True if a failed marker appears after the latest in_progress marker for this agent."""
     needle_prog = f"{RUN_IN_PROGRESS_MARKER}{agent}"
-    needle_fail = f"{RUN_FAILED_MARKER}{agent}"
     in_progress_idx = _latest_marker_index(comments, needle_prog)
-    failure_idx = _latest_marker_index(comments, needle_fail)
-    if in_progress_idx is None or failure_idx is None:
+    if in_progress_idx is None:
         return False
-    return failure_idx > in_progress_idx
+    return _run_terminal_after_index(comments, agent, in_progress_idx)
 
 
 def _agent_run_completed_after_in_progress(comments: tuple[dict, ...], agent: str) -> bool:
@@ -417,20 +471,43 @@ def _agent_run_completed_after_in_progress(comments: tuple[dict, ...], agent: st
     return False
 
 
+def _run_terminal_after_index(
+    comments: tuple[dict, ...], agent: str, after_index: int
+) -> bool:
+    """True when the run that started at ``after_index`` has ended (success or failure)."""
+    needle_fail = f"{RUN_FAILED_MARKER}{agent}"
+    for i in range(after_index + 1, len(comments)):
+        body = (comments[i].get("body") or "").lower()
+        if needle_fail in body:
+            return True
+        if RUN_RESET_MARKER in body and (agent in body or f"{RUN_RESET_MARKER}all" in body):
+            return True
+        slug = agent.replace("-", " ")
+        if "squad actions agent result" in body and slug in body:
+            return True
+        if "squad hf agent result" in body and slug in body:
+            return True
+        if agent in ("developer", "devops") and "build verification failed" in body:
+            return True
+    if agent == "developer":
+        td = latest_trusted_developer_deliverable_index(comments)
+        if td is not None and td > after_index:
+            return True
+    else:
+        d_idx = _latest_deliverable_index(comments, agent)
+        if d_idx is not None and d_idx > after_index:
+            return True
+    return False
+
+
 def run_in_progress(comments: tuple[dict, ...]) -> str | None:
-    for comment in reversed(comments):
-        body = (comment.get("body") or "").lower()
+    """Return the agent whose latest in_progress marker has no terminal marker after it."""
+    for i in range(len(comments) - 1, -1, -1):
+        body = (comments[i].get("body") or "").lower()
         for agent in AGENTS_V2:
             if f"{RUN_IN_PROGRESS_MARKER}{agent}" not in body:
                 continue
-            if agent == "developer":
-                if latest_trusted_developer_deliverable_index(comments) is not None:
-                    continue
-            elif has_deliverable(comments, agent):
-                continue
-            if _failure_after_in_progress(comments, agent):
-                continue
-            if _agent_run_completed_after_in_progress(comments, agent):
+            if _run_terminal_after_index(comments, agent, i):
                 continue
             return agent
     return None

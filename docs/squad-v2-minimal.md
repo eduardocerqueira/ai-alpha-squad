@@ -107,8 +107,9 @@ Unchanged intent: **Your move** = gates; **Attention** = open jobs in active pha
 4. Developer runs → **one PR** on target repo (branch `squad/developer-issue-<n>`) + `# Developer Deliverable` with PR URL. Actions runs `mvn`/`gradle`/`npm` compile when detected; push retries on race.
 5. **Build gate** runs before HF QA (`target_build_verify`) — posts `squad-v2-qa:fail` if the PR does not compile.
 6. QA runs → reviews the PR against success criteria → `# QA Report` with `squad-v2-qa:pass`/`:fail`. On fail, Developer reworks until QA passes (cap 3) → `release-candidate` (only if build gate + trusted deliverable + QA pass).
-7. **Director delivery review** (`release-candidate`): **Accept** → `released` (job done). **Reject** → comment `squad-v2-director:delivery-reject`, back to `director-approved`, Developer + QA rework until Director accepts.
-8. Dashboard: **Accept delivery** / **Reject delivery** on the Open tab (or `approve` / `reject` on the issue).
+7. **Director delivery review** (`release-candidate`): **Accept** → `released`, issue **closed** with comment `Released — job accepted by Director.` **Reject** → comment `squad-v2-director:delivery-reject`, back to `director-approved`, Developer + QA rework until Director accepts.
+8. **Failed agent runs** trigger `squad-v2-run-followup.yml` (immediate tick) instead of waiting only on the 15m cron.
+9. Dashboard: **Accept delivery** / **Reject delivery** on the Open tab (or `approve` / `reject` on the issue).
 
 **Target repo URL** must appear in the issue **body** (e.g. `Target repo: https://github.com/org/product`) or a Director comment — not only in chat elsewhere.
 

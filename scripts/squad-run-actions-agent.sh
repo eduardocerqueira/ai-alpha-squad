@@ -80,6 +80,10 @@ if [[ -n "${GITHUB_ACTIONS:-}" && "${SQUAD_ACTIONS_INLINE:-}" != "1" ]]; then
     -f agent="$AGENT" \
     -f target_repo="$TARGET_REPO" \
     -f model="${SQUAD_AGENT_MODEL_OVERRIDE:-}" 2>/dev/null; then
+    if [[ "${SQUAD_V2:-}" == "1" ]]; then
+      MARKER="$(python3 -c "from ai_alpha_squad.squad_v2 import in_progress_comment; print(in_progress_comment('${AGENT}'))")"
+      gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "$MARKER" 2>/dev/null || true
+    fi
     echo "Triggered squad-actions-agent workflow for $AGENT on $QUEUE_REPO#$ISSUE"
     if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
       echo "dispatched=true" >> "$GITHUB_OUTPUT"
@@ -123,6 +127,11 @@ git clone --depth 1 -b "$BASE_BRANCH" "https://github.com/${TARGET_REPO}.git" "$
 
 checkout_work_branch "$WORKDIR"
 
+if [[ "${SQUAD_V2:-}" == "1" ]]; then
+  MARKER="$(python3 -c "from ai_alpha_squad.squad_v2 import in_progress_comment; print(in_progress_comment('${AGENT}'))")"
+  gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "$MARKER" 2>/dev/null || true
+fi
+
 export SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT=1
 python3 -m ai_alpha_squad.actions_agent run \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$TARGET_REPO" "$WORKDIR" "$INSTRUCTIONS_FILE"
@@ -130,9 +139,15 @@ python3 -m ai_alpha_squad.actions_agent run \
 # Mandatory compile gate for developer/devops when the repo has a build tool.
 if [[ "$AGENT" == "developer" || "$AGENT" == "devops" ]]; then
   ISSUE_BODY="$(gh issue view "$ISSUE" --repo "$QUEUE_REPO" --json body -q .body 2>/dev/null || true)"
-  if ! python3 -m ai_alpha_squad.target_build_verify workdir "$WORKDIR" "$ISSUE_BODY"; then
+  BUILD_LOG="${RUNNER_TEMP:-/tmp}/squad-build-verify-${ISSUE}.log"
+  if ! python3 -m ai_alpha_squad.target_build_verify workdir "$WORKDIR" "$ISSUE_BODY" 2>"$BUILD_LOG"; then
     echo "error: build verification failed on ${TARGET_REPO} before commit" >&2
-    gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "**Squad ${AGENT} — build verification failed.** The tree does not compile; no PR was finalized. Re-run after fixing compile errors." 2>/dev/null || true
+    COMMENT="$(python3 -c "
+from ai_alpha_squad.target_build_verify import format_build_failure_issue_comment
+import sys
+print(format_build_failure_issue_comment('${AGENT}', open(sys.argv[1], encoding='utf-8').read()))
+" "$BUILD_LOG")"
+    gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "$COMMENT" 2>/dev/null || true
     exit 1
   fi
 fi
@@ -157,6 +172,9 @@ Re-run after the agent makes a *targeted* change." 2>/dev/null || true
 INCOMPLETE_MSG="$(python3 -m ai_alpha_squad.actions_agent check-complete "$WORKDIR" "$QUEUE_REPO" "$ISSUE" 2>/dev/null)" && COMPLETE=1 || COMPLETE=0
 
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
+  # Drop ignored build artifacts (e.g. Maven target/) before staging — compile
+  # verification runs above but must not ship build output in the PR (#178).
+  git clean -fdX 2>/dev/null || true
   git add -A
   git -c 'user.name=github-actions[bot]' \
     -c 'user.email=github-actions[bot]@users.noreply.github.com' \

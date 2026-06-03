@@ -1,0 +1,63 @@
+# Re-dispatch v2 work immediately after a failed agent/orchestrator run (no 15m cron wait).
+name: Squad v2 run followup
+
+permissions:
+  issues: write
+  pull-requests: write
+  actions: write
+
+on:
+  workflow_run:
+    workflows:
+      - Squad Actions agent
+      - Squad v2 orchestrator
+    types: [completed]
+
+concurrency:
+  group: squad-v2-followup-${{ github.event.workflow_run.name }}
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      vars.SQUAD_V2 == '1' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event != 'pull_request'
+    env:
+      GH_TOKEN: ${{ secrets.SQUAD_ORCHESTRATOR_TOKEN || secrets.GITHUB_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SQUAD_V2: "1"
+      SQUAD_ACTIONS_INLINE: "1"
+      SQUAD_AI_PROVIDER: huggingface
+      SQUAD_CODE_RUNTIME: actions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Parse issue from workflow run name
+        id: issue
+        env:
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          DISPLAY_TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          ISSUE="$(printf '%s\n%s' "$RUN_NAME" "$DISPLAY_TITLE" | grep -Eo '#[0-9]+' | tail -1 | tr -d '#')"
+          if [[ -z "$ISSUE" ]]; then
+            echo "No issue number in run title — skip followup"
+            exit 0
+          fi
+          echo "number=$ISSUE" >> "$GITHUB_OUTPUT"
+
+      - name: Tick v2 pipeline for failed run
+        if: steps.issue.outputs.number != ''
+        run: |
+          chmod +x ./scripts/squad-v2-tick.sh ./scripts/squad-v2-dispatch.sh \
+            ./scripts/squad-sync-planning-labels.sh ./scripts/squad-dispatch-subissue.sh \
+            ./scripts/squad-run-actions-agent.sh ./scripts/squad-run-hf-agent.sh
+          ./scripts/squad-v2-tick.sh "$GITHUB_REPOSITORY" "${{ steps.issue.outputs.number }}"
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src

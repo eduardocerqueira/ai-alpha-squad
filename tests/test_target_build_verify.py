@@ -4,6 +4,7 @@ from pathlib import Path
 
 from ai_alpha_squad.target_build_verify import (
     detect_build_command,
+    format_build_failure_issue_comment,
     format_build_gate_qa_fail,
     issue_expects_build,
     should_verify_build,
@@ -31,3 +32,9 @@ def test_build_gate_qa_fail_marker():
     body = format_build_gate_qa_fail("error: symbol not found")
     assert "squad-v2-qa:fail" in body
     assert "[BLOCKER]" in body
+
+
+def test_build_failure_issue_comment_includes_log():
+    body = format_build_failure_issue_comment("developer", "cannot find symbol: AbstractBuild")
+    assert "build verification failed" in body.lower()
+    assert "AbstractBuild" in body
