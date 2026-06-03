@@ -16,6 +16,13 @@ _BUILD_CRITERIA_RE = re.compile(
     r"\b(compil\w*|build\s+pass|build\s+succeed|mvn\s|maven|gradle|npm\s+run\s+build)\b",
     re.IGNORECASE,
 )
+_PACKAGE_CRITERIA_RE = re.compile(
+    r"(?i)\b("
+    r"mvn\s+clean\s+package|mvn\s+[^\n]*\bpackage\b|"
+    r"\bclean\s+package\b|"
+    r"package\s+(?:run|build|succeed|success|work)s?"
+    r")"
+)
 _PR_URL_RE = re.compile(
     r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\d+)",
 )
@@ -36,15 +43,28 @@ def issue_expects_build(body: str) -> bool:
     return False
 
 
-def detect_build_command(workdir: Path) -> list[str] | None:
-    """Return a compile-only command for the repo, or None if unknown."""
+def issue_requires_package(body: str) -> bool:
+    """True when success criteria / desired outcome require a full package (not compile-only)."""
+    text = body or ""
+    if _PACKAGE_CRITERIA_RE.search(text):
+        return True
+    m = re.search(r"(?i)(success criteria|acceptance criteria|desired outcome)\s*:?\s*\n([\s\S]*)", text)
+    if m and re.search(r"(?i)\bpackage\b", m.group(2)[:4000]):
+        return True
+    return False
+
+
+def detect_build_command(workdir: Path, issue_body: str = "") -> list[str] | None:
+    """Return a build command for the repo, or None if unknown."""
+    package_goal = issue_requires_package(issue_body)
     if (workdir / "pom.xml").is_file():
         mvnw = workdir / "mvnw"
         mvn = shutil.which("mvn")
+        goal = "package" if package_goal else "compile"
         if mvnw.is_file():
-            return [str(mvnw), "-q", "-DskipTests", "compile"]
+            return [str(mvnw), "-q", "-DskipTests", goal]
         if mvn:
-            return [mvn, "-q", "-DskipTests", "compile"]
+            return [mvn, "-q", "-DskipTests", goal]
         return None
     if (workdir / "build.gradle").is_file() or (workdir / "build.gradle.kts").is_file():
         gradlew = workdir / "gradlew"
@@ -98,7 +118,7 @@ def verify_workdir(
     """Run compile/build in workdir. Skips when no build tool and issue does not require it."""
     if not force and not should_verify_build(workdir, issue_body):
         return True, "skipped (no build tool / not required)"
-    cmd = detect_build_command(workdir)
+    cmd = detect_build_command(workdir, issue_body)
     if cmd is None:
         return False, "No supported build tool detected (pom.xml, Gradle, package.json, Makefile)."
     return run_build_command(workdir, cmd)
@@ -172,6 +192,67 @@ def verify_pr_branch(
         shutil.rmtree(workdir, ignore_errors=True)
 
 
+def format_pr_quality_qa_fail(reason: str) -> str:
+    snippet = (reason or "invalid PR").strip()[:2000]
+    return (
+        "# QA Report\n\n"
+        "## Criteria\n"
+        "- ❌ PR quality gate — no meaningful source fix\n\n"
+        "## Fixes required\n"
+        f"1. [BLOCKER] project — {snippet}\n\n"
+        f"{QA_FAIL_MARKER}\n"
+    )
+
+
+def list_pr_changed_files(target_repo: str, issue: int) -> tuple[str, ...]:
+    """Paths changed in the open squad developer PR for this job."""
+    branch = squad_work_branch("developer", issue)
+    try:
+        proc = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                target_repo,
+                "--head",
+                branch,
+                "--state",
+                "open",
+                "--json",
+                "number",
+                "-q",
+                ".[0].number",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        pr_num = (proc.stdout or "").strip()
+        if not pr_num:
+            return ()
+        files_proc = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "view",
+                pr_num,
+                "--repo",
+                target_repo,
+                "--json",
+                "files",
+                "-q",
+                ".files[].path",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return tuple(p for p in (files_proc.stdout or "").splitlines() if p.strip())
+    except Exception:
+        return ()
+
+
 def gate_pr_before_qa(
     queue_repo: str,
     issue: int,
@@ -181,6 +262,17 @@ def gate_pr_before_qa(
     post_comment: bool = True,
 ) -> bool:
     """Verify squad developer PR builds. On failure optionally post QA fail comment."""
+    from ai_alpha_squad.squad_qa import validate_pr_changed_files
+
+    changed = list_pr_changed_files(target_repo, issue)
+    ok_files, reason = validate_pr_changed_files(changed)
+    if not ok_files:
+        if post_comment:
+            from ai_alpha_squad.hf_dispatch import post_issue_comment
+
+            post_issue_comment(queue_repo, issue, format_pr_quality_qa_fail(reason))
+        return False
+
     branch = squad_work_branch("developer", issue)
     ok, log = verify_pr_branch(target_repo, branch, issue_body=issue_body)
     if ok:

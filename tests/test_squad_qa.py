@@ -4,6 +4,7 @@ from ai_alpha_squad.squad_qa import (
     artifact_paths_in_changed,
     format_auto_qa_pass_comment,
     is_compile_only_job,
+    validate_pr_changed_files,
     validate_qa_report,
 )
 from ai_alpha_squad.squad_v2 import QA_FAIL_MARKER, QA_PASS_MARKER
@@ -51,6 +52,32 @@ def test_compile_only_job_detected():
 - mvn compile succeeds on Java 25
 """
     assert is_compile_only_job(body) is True
+
+
+def test_compile_only_false_when_package_required():
+    body = """
+### Success criteria
+mvn clean package run successfully
+"""
+    assert is_compile_only_job(body) is False
+
+
+def test_validate_pr_rejects_target_only():
+    ok, reason = validate_pr_changed_files(
+        ("target/classes/x.stapler", "target/maven-status/foo.lst")
+    )
+    assert not ok
+    assert "target/" in reason
+
+
+def test_validate_pr_accepts_pom_change():
+    ok, _ = validate_pr_changed_files(("pom.xml",))
+    assert ok
+
+
+def test_validate_pr_accepts_src_change():
+    ok, _ = validate_pr_changed_files(("src/main/java/Foo.java",))
+    assert ok
 
 
 def test_compile_only_false_when_tests_required():

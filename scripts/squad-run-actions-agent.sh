@@ -201,10 +201,30 @@ Re-run after the agent makes a *targeted* change." 2>/dev/null || true
 INCOMPLETE_MSG="$(python3 -m ai_alpha_squad.actions_agent check-complete "$WORKDIR" "$QUEUE_REPO" "$ISSUE" 2>/dev/null)" && COMPLETE=1 || COMPLETE=0
 
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --porcelain)" ]]; then
-  # Drop ignored build artifacts (e.g. Maven target/) before staging — compile
-  # verification runs above but must not ship build output in the PR (#178).
+  # Drop build output before staging — compile verification runs above but must not
+  # ship target/ in the PR (#178, #180). Also strip tracked target/ when upstream
+  # accidentally committed it.
   git clean -fdX 2>/dev/null || true
+  git rm -r --cached -f target 2>/dev/null || true
+  rm -rf target 2>/dev/null || true
   git add -A
+  STAGED="$(git diff --cached --name-only || true)"
+  if [[ -n "$STAGED" ]]; then
+    if ! python3 -c "
+import sys
+sys.path.insert(0, '${ROOT}/src')
+from ai_alpha_squad.squad_qa import validate_pr_changed_files
+files = tuple(l for l in '''${STAGED}'''.splitlines() if l.strip())
+ok, reason = validate_pr_changed_files(files)
+if not ok:
+    print(reason, file=sys.stderr)
+    sys.exit(1)
+"; then
+      echo "error: refusing to commit — staged changes are not a meaningful fix" >&2
+      gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "**Squad developer — change rejected.** Only build artifacts or non-source files would be committed. Fix \`pom.xml\` / \`src/\` on the target repo, not \`target/\` output." 2>/dev/null || true
+      exit 1
+    fi
+  fi
   git -c 'user.name=github-actions[bot]' \
     -c 'user.email=github-actions[bot]@users.noreply.github.com' \
     commit -m "feat(squad): ${AGENT} work for ${QUEUE_REPO}#${ISSUE}" || true
