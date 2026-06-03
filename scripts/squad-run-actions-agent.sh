@@ -136,7 +136,35 @@ export SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT=1
 python3 -m ai_alpha_squad.actions_agent run \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$TARGET_REPO" "$WORKDIR" "$INSTRUCTIONS_FILE"
 
+# Stall abort → escalate developer model before the compile gate (next run uses stronger model).
+if [[ "${SQUAD_V2:-}" == "1" && "$AGENT" == "developer" && -f "$SUMMARY_FILE" ]]; then
+  ESC_MARKER="$(python3 <<PY || true
+import json, os, subprocess, sys
+sys.path.insert(0, "${ROOT}/src")
+from ai_alpha_squad.squad_dev_summary import is_stall_abort_summary
+from ai_alpha_squad.squad_v2 import dev_model_ladder, stall_model_escalation_body
+
+summary = open("${SUMMARY_FILE}", encoding="utf-8").read()
+if not is_stall_abort_summary(summary):
+    raise SystemExit(0)
+data = json.loads(subprocess.check_output(
+    ["gh", "issue", "view", str(${ISSUE}), "--repo", "${QUEUE_REPO}", "--json", "comments"],
+    text=True,
+))
+comments = tuple(data.get("comments") or ())
+body = stall_model_escalation_body(comments, dev_model_ladder(os.environ.get("SQUAD_DEV_MODEL_LADDER")))
+if body:
+    print(body)
+PY
+)"
+  if [[ -n "${ESC_MARKER:-}" ]]; then
+    gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "$ESC_MARKER" 2>/dev/null || true
+    echo "Posted stall model escalation for developer on #${ISSUE}"
+  fi
+fi
+
 # Mandatory compile gate for developer/devops when the repo has a build tool.
+BUILD_VERIFIED=0
 if [[ "$AGENT" == "developer" || "$AGENT" == "devops" ]]; then
   ISSUE_BODY="$(gh issue view "$ISSUE" --repo "$QUEUE_REPO" --json body -q .body 2>/dev/null || true)"
   BUILD_LOG="${RUNNER_TEMP:-/tmp}/squad-build-verify-${ISSUE}.log"
@@ -150,6 +178,7 @@ print(format_build_failure_issue_comment('${AGENT}', open(sys.argv[1], encoding=
     gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "$COMMENT" 2>/dev/null || true
     exit 1
   fi
+  BUILD_VERIFIED=1
 fi
 
 # Safety gate: reject destructive rewrites (agent deleting most of a file / dropping
@@ -197,6 +226,17 @@ fi
 # THIS run added commits: an idempotent re-run on a branch that already has work
 # still has an open PR, and that PR is the deliverable.
 PR_URL="$(ensure_pull_request)"
+
+# Replace abort/churn summary when compile gate passed (#178).
+if [[ "$AGENT" == "developer" && "${BUILD_VERIFIED:-0}" == "1" && -f "$SUMMARY_FILE" ]]; then
+  python3 <<PY
+from ai_alpha_squad.squad_dev_summary import sanitize_developer_summary
+from pathlib import Path
+p = Path("${SUMMARY_FILE}")
+text = sanitize_developer_summary(p.read_text(encoding="utf-8"), build_verified=True, pr_url="${PR_URL:-}")
+p.write_text(text + "\n", encoding="utf-8")
+PY
+fi
 
 # If the work is incomplete, preserve progress on the branch but do NOT finalize —
 # posting no deliverable keeps the issue out of release-candidate. The failure is

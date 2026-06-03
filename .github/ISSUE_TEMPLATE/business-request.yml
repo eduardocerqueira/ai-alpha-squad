@@ -82,7 +82,11 @@ body:
     id: success_criteria
     attributes:
       label: Success criteria
-      description: How the Director will judge success (measurable if possible)
+      description: |
+        How the Director will judge success. Prefer machine-checkable lines, e.g.:
+        - Build: `mvn -q -DskipTests compile` (Java 25)
+        - File: `src/.../Foo.java` — method X uses type Y
+        Compile-only jobs skip HF QA when the build gate passes.
     validations:
       required: true
 

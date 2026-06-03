@@ -42,8 +42,13 @@ def test_v2_released_all_done():
 def test_v2_qa_fail_shows_rework():
     comments = [
         {"body": "# Business Analysis\nok"},
-        {"body": "# Developer Deliverable\nhttps://github.com/acme/target/pull/10"},
-        {"body": "# QA Report\nsquad-v2-qa:fail needs work"},
+        {"body": "# Developer Deliverable\n\nhttps://github.com/acme/target/pull/10\n" + "x" * 200},
+        {
+            "body": (
+                "# QA Report\n\n## Criteria\n- ❌ gap\n\n## Fixes required\n"
+                "1. [BLOCKER] src/Foo.java — fix\n\nsquad-v2-qa:fail\n"
+            )
+        },
     ]
     card = _load_job_card_v2("o/r", _v2_row(202, ["director-approved"], comments))
     assert card.bucket == "in_progress"

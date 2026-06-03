@@ -70,6 +70,8 @@ The pipeline is sequential and self-healing within these bounds:
   labelled `blocked`. Failures are counted **since the last reset marker**, not for
   the issue's whole lifetime, so historical failures from since-fixed bugs don't
   permanently wedge a job.
+- **Compile-only jobs** skip HF QA when the deterministic build gate passes on the PR branch.
+- **QA reports** must include `# QA Report`, structured criteria, and a valid `squad-v2-qa:pass|fail` line; malformed reports are re-run.
 - **Stale-run recovery** — an `in_progress` marker with no terminal marker, older
   than `SQUAD_V2_STALE_MINUTES` (120m; must stay above the 90m orchestrator
   timeout), is auto-recovered by the phase-watch tick (posts a failure marker so

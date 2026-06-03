@@ -26,6 +26,7 @@ from ai_alpha_squad.hf_dispatch import (
     fetch_issue_context_with_parent,
     post_issue_comment,
 )
+from ai_alpha_squad.squad_v2 import QA_FAIL_MARKER
 from ai_alpha_squad.target_build_verify import should_verify_build, verify_workdir
 
 MAX_TURNS = int(os.environ.get("SQUAD_ACTIONS_MAX_TURNS", "50"))
@@ -37,6 +38,7 @@ MAX_CONSECUTIVE_UNPARSED = int(os.environ.get("SQUAD_ACTIONS_MAX_UNPARSED", "8")
 MAX_TURNS_NO_PROGRESS = int(os.environ.get("SQUAD_ACTIONS_MAX_STALL", "60"))
 # Abort when the model reads/searches without ever editing (e.g. 20+ read_file turns).
 MAX_READ_ONLY_CHURN = int(os.environ.get("SQUAD_ACTIONS_MAX_READ_CHURN", "14"))
+MAX_READ_ONLY_CHURN_REWORK = int(os.environ.get("SQUAD_ACTIONS_MAX_READ_CHURN_REWORK", "8"))
 
 _TOOL_JSON_RE = re.compile(
     r"\{[^{}]*\"tool\"\s*:\s*\"[^\"]+\"[^{}]*\}",
@@ -535,6 +537,8 @@ Output only the JSON object."""
     turns_since_change = 0
     read_only_streak = 0
     made_a_change = False
+    is_rework = QA_FAIL_MARKER in (issue_context or "")
+    max_read_churn = MAX_READ_ONLY_CHURN_REWORK if is_rework else MAX_READ_ONLY_CHURN
     for _turn in range(MAX_TURNS):
         remaining = MAX_TURNS - _turn
         urgency = ""
@@ -638,10 +642,10 @@ Output only the JSON object."""
                 and not result.lower().startswith("error")
             ):
                 read_only_streak += 1
-                if read_only_streak >= MAX_READ_ONLY_CHURN:
+                if read_only_streak >= max_read_churn:
                     print(
                         f"[actions] ABORT: {read_only_streak} read-only turns "
-                        f"without any edit (>= {MAX_READ_ONLY_CHURN})",
+                        f"without any edit (>= {max_read_churn})",
                         file=sys.stderr,
                     )
                     return (
