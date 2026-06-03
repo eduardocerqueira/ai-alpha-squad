@@ -29,10 +29,17 @@ sys.path.insert(0, "src")
 from ai_alpha_squad.squad_v2 import squad_issue_needs_reopen, current_lifecycle
 
 data = json.loads(subprocess.check_output(
-    ["gh", "issue", "view", issue, "--repo", repo, "--json", "state,labels"], text=True))
+    ["gh", "issue", "view", issue, "--repo", repo,
+     "--json", "state,stateReason,labels,comments"], text=True))
 state = data.get("state") or "OPEN"
 labels = frozenset(x["name"] for x in data.get("labels") or [])
-if squad_issue_needs_reopen(state, labels):
+comments = tuple(data.get("comments") or ())
+if squad_issue_needs_reopen(
+    state,
+    labels,
+    comments=comments,
+    state_reason=data.get("stateReason"),
+):
     subprocess.run(["gh", "issue", "reopen", issue, "--repo", repo], check=False)
     print(f"reopened #{issue} (was closed during {current_lifecycle(labels)})")
 PY

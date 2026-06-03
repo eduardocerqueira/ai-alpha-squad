@@ -6,7 +6,7 @@ query($owner:String!, $repo:String!) {
   repository(owner:$owner, name:$repo) {
     issues(first:100, orderBy:{field:UPDATED_AT, direction:DESC}, states:[OPEN, CLOSED]) {
       nodes {
-        number title body state updatedAt
+        number title body state stateReason updatedAt closedAt
         labels(first:20) { nodes { name } }
         comments(first:100) { nodes { body createdAt } }
       }
@@ -19,6 +19,7 @@ interface GqlNode {
   title: string | null;
   body: string | null;
   state: string | null;
+  stateReason?: string | null;
   updatedAt: string | null;
   labels: { nodes: { name: string }[] };
   comments: { nodes: { body: string | null; createdAt: string | null }[] };
@@ -47,6 +48,7 @@ export async function fetchIssues(repo: string, token: string): Promise<RawIssue
     title: n.title,
     body: n.body,
     state: n.state,
+    stateReason: n.stateReason,
     updatedAt: n.updatedAt,
     labels: (n.labels?.nodes ?? []).map((l) => l.name),
     comments: (n.comments?.nodes ?? []).map((c) => ({ body: c.body, createdAt: c.createdAt })),

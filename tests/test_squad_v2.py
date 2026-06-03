@@ -411,6 +411,33 @@ def test_stale_qa_pass_redispatches_developer(monkeypatch):
     assert "Stale QA" in act.reason
 
 
+def test_closed_not_planned_is_done():
+    from ai_alpha_squad.squad_v2 import squad_closed_job_still_active, squad_job_is_done
+
+    comments = (
+        {"body": "**Director reset:** Closing this run.", "createdAt": "2026-06-01T02:00:00Z"},
+    )
+    labels = frozenset({"director-approved"})
+    assert not squad_closed_job_still_active("CLOSED", labels, comments, state_reason="NOT_PLANNED")
+    assert squad_job_is_done("CLOSED", labels, comments=comments, state_reason="NOT_PLANNED")
+
+
+def test_closed_stale_job_without_v2_activity_is_done():
+    from ai_alpha_squad.squad_v2 import squad_closed_job_still_active
+
+    comments = ({"body": "# Business Analysis\nold", "createdAt": "2026-05-31T12:00:00Z"},)
+    assert not squad_closed_job_still_active("CLOSED", frozenset({"new"}), comments)
+
+
+def test_closed_recent_v2_activity_still_active():
+    from ai_alpha_squad.squad_v2 import squad_closed_job_still_active
+
+    comments = (
+        {"body": "squad-v2-run:in_progress:developer", "createdAt": "2026-06-03T04:00:00Z"},
+    )
+    assert squad_closed_job_still_active("CLOSED", frozenset({"director-approved"}), comments)
+
+
 def test_qa_markers_are_internal():
     assert is_squad_internal_comment("squad-v2-qa:pass")
     assert is_squad_internal_comment("# QA Report\n\nsquad-v2-qa:fail\n- gap")

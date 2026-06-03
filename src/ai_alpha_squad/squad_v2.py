@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from ai_alpha_squad.nudge import issue_has_deliverable
@@ -22,6 +22,22 @@ LIFECYCLE_LABELS_V2: tuple[str, ...] = (
 GATE_LABELS = frozenset({"awaiting-approval", "release-candidate"})
 # Closed issues with these lifecycle labels are not finished — reopen before dispatch.
 ACTIVE_SQUAD_LIFECYCLES = frozenset({"new", "awaiting-approval", "director-approved", "release-candidate"})
+# Closed issues with recent v2 markers stay active; older closed jobs land in Done.
+CLOSED_SQUAD_ACTIVITY_DAYS = 21
+CLOSED_ISSUE_ARCHIVE_COMMENT_PATTERNS = (
+    "director reset:",
+    "closing this run",
+    "squad-v2-job:archived",
+    "continue job 1 on:",
+    "supersedes closed issue",
+)
+SQUAD_V2_ACTIVITY_MARKERS = (
+    "squad-v2-run:",
+    "squad actions agent result",
+    "squad hf agent result",
+    "squad-v2-qa:",
+    "squad-v2-director:",
+)
 AGENTS_V2 = ("business-owner", "developer", "qa")
 
 DELIVERABLE_MARKERS: dict[str, str] = {
@@ -74,6 +90,7 @@ class IssueView:
     labels: frozenset[str]
     comments: tuple[dict[str, Any], ...]
     body: str
+    state_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -729,18 +746,88 @@ def find_stale_in_progress(
     return agent if age_minutes >= max_age_minutes else None
 
 
-def squad_job_is_done(state: str, labels: frozenset[str] | set[str]) -> bool:
+def _closed_issue_archived(
+    state_reason: str | None,
+    comments: tuple[dict, ...],
+) -> bool:
+    """True when a closed issue was deliberately abandoned, not accidentally closed mid-run."""
+    if (state_reason or "").upper() == "NOT_PLANNED":
+        return True
+    for comment in comments:
+        body = (comment.get("body") or "").lower()
+        if any(pat in body for pat in CLOSED_ISSUE_ARCHIVE_COMMENT_PATTERNS):
+            return True
+    return False
+
+
+def _has_recent_squad_v2_activity(
+    comments: tuple[dict, ...],
+    *,
+    max_age_days: int = CLOSED_SQUAD_ACTIVITY_DAYS,
+    now: datetime | None = None,
+) -> bool:
+    if now is None:
+        now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=max_age_days)
+    for comment in comments:
+        body = (comment.get("body") or "").lower()
+        if not any(marker in body for marker in SQUAD_V2_ACTIVITY_MARKERS):
+            continue
+        ts = _comment_timestamp(comment)
+        if ts and ts >= cutoff:
+            return True
+    return False
+
+
+def squad_closed_job_still_active(
+    state: str,
+    labels: frozenset[str] | set[str],
+    comments: tuple[dict, ...],
+    *,
+    state_reason: str | None = None,
+) -> bool:
+    """True when a closed issue still belongs in the active pipeline (not Done)."""
+    if state.upper() != "CLOSED":
+        return False
+    if current_lifecycle(labels) not in ACTIVE_SQUAD_LIFECYCLES:
+        return False
+    if _closed_issue_archived(state_reason, comments):
+        return False
+    if run_in_progress(comments):
+        return True
+    return _has_recent_squad_v2_activity(comments)
+
+
+def squad_job_is_done(
+    state: str,
+    labels: frozenset[str] | set[str],
+    *,
+    comments: tuple[dict, ...] = (),
+    state_reason: str | None = None,
+) -> bool:
     """True when the issue belongs in the Done bucket / orchestrator should not run."""
     lc = current_lifecycle(labels)
     if lc == "released":
         return True
     if state.upper() == "CLOSED":
-        return lc not in ACTIVE_SQUAD_LIFECYCLES
+        if lc not in ACTIVE_SQUAD_LIFECYCLES:
+            return True
+        return not squad_closed_job_still_active(
+            state, labels, comments, state_reason=state_reason
+        )
     return False
 
 
-def squad_issue_needs_reopen(state: str, labels: frozenset[str] | set[str]) -> bool:
-    return state.upper() == "CLOSED" and current_lifecycle(labels) in ACTIVE_SQUAD_LIFECYCLES
+def squad_issue_needs_reopen(
+    state: str,
+    labels: frozenset[str] | set[str],
+    *,
+    comments: tuple[dict, ...] = (),
+    state_reason: str | None = None,
+) -> bool:
+    return squad_closed_job_still_active(
+        state, labels, comments, state_reason=state_reason
+    )
 
 
 def next_action(
@@ -752,9 +839,19 @@ def next_action(
         model_ladder = dev_model_ladder(os.environ.get("SQUAD_DEV_MODEL_LADDER"))
     if forced_model is None:
         forced_model = (os.environ.get("SQUAD_DEV_MODEL_INPUT") or "").strip() or None
-    if squad_job_is_done(view.state, view.labels):
+    if squad_job_is_done(
+        view.state,
+        view.labels,
+        comments=view.comments,
+        state_reason=view.state_reason,
+    ):
         return NextAction("done", reason="Issue closed" if view.state.upper() == "CLOSED" else "Released")
-    if squad_issue_needs_reopen(view.state, view.labels):
+    if squad_issue_needs_reopen(
+        view.state,
+        view.labels,
+        comments=view.comments,
+        state_reason=view.state_reason,
+    ):
         return NextAction("idle", reason="Issue closed while squad still active — reopen to continue")
 
     lc = current_lifecycle(view.labels)

@@ -12,10 +12,33 @@ export interface RawIssue {
   title?: string | null;
   body?: string | null;
   state?: string | null; // OPEN | CLOSED
+  stateReason?: string | null;
   labels: string[];
   updatedAt?: string | null;
   comments: RawComment[];
 }
+
+const ACTIVE_SQUAD_LIFECYCLES = new Set([
+  "new",
+  "awaiting-approval",
+  "director-approved",
+  "release-candidate",
+]);
+const CLOSED_SQUAD_ACTIVITY_DAYS = 21;
+const CLOSED_ISSUE_ARCHIVE_COMMENT_PATTERNS = [
+  "director reset:",
+  "closing this run",
+  "squad-v2-job:archived",
+  "continue job 1 on:",
+  "supersedes closed issue",
+];
+const SQUAD_V2_ACTIVITY_MARKERS = [
+  "squad-v2-run:",
+  "squad actions agent result",
+  "squad hf agent result",
+  "squad-v2-qa:",
+  "squad-v2-director:",
+];
 
 const LIFECYCLE_LABELS_V2 = [
   "released",
@@ -137,6 +160,48 @@ function runFailures(comments: RawComment[], agent: string): number {
     if (b.includes(resetAgent) || b.includes(resetAll)) resetIdx = i;
   });
   return comments.filter((c, i) => i > resetIdx && (c.body || "").toLowerCase().includes(fail)).length;
+}
+
+function commentTimestamp(c: RawComment): Date | null {
+  const raw = c.createdAt;
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function closedIssueArchived(stateReason: string | null | undefined, comments: RawComment[]): boolean {
+  if ((stateReason || "").toUpperCase() === "NOT_PLANNED") return true;
+  for (const c of comments) {
+    const body = (c.body || "").toLowerCase();
+    if (CLOSED_ISSUE_ARCHIVE_COMMENT_PATTERNS.some((pat) => body.includes(pat))) return true;
+  }
+  return false;
+}
+
+function hasRecentSquadV2Activity(comments: RawComment[], now = new Date()): boolean {
+  const cutoff = new Date(now.getTime() - CLOSED_SQUAD_ACTIVITY_DAYS * 86400000);
+  for (const c of comments) {
+    const body = (c.body || "").toLowerCase();
+    if (!SQUAD_V2_ACTIVITY_MARKERS.some((m) => body.includes(m))) continue;
+    const ts = commentTimestamp(c);
+    if (ts && ts >= cutoff) return true;
+  }
+  return false;
+}
+
+/** Closed issue still in the active pipeline (mirrors squad_v2.squad_closed_job_still_active). */
+function squadClosedJobStillActive(
+  state: string,
+  labels: Set<string>,
+  comments: RawComment[],
+  stateReason?: string | null,
+): boolean {
+  if (state !== "CLOSED") return false;
+  const lc = currentLifecycle(labels);
+  if (!lc || !ACTIVE_SQUAD_LIFECYCLES.has(lc)) return false;
+  if (closedIssueArchived(stateReason, comments)) return false;
+  if (runInProgress(comments) !== null) return true;
+  return hasRecentSquadV2Activity(comments);
 }
 
 function currentLifecycle(labels: Set<string>): string | null {
@@ -544,12 +609,13 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
   // Priority: released is done; an active agent run shows In progress even if the
   // issue is closed; `blocked` outranks closed (Blocked tab); then closed → Done.
   const activeRun = runInProgress(comments) !== null;
-  const needsReopen = state === "CLOSED" && lc && ["new", "awaiting-approval", "director-approved", "release-candidate"].includes(lc);
+  const stateReason = issue.stateReason ?? null;
   let bucket: string;
   if (lc === "released") bucket = "completed";
   else if (activeRun && !blocked) bucket = "in_progress";
   else if (blocked) bucket = "stuck";
-  else if (needsReopen) bucket = lc === "release-candidate" ? "needs_you" : "in_progress";
+  else if (squadClosedJobStillActive(state, labelSet, comments, stateReason))
+    bucket = lc === "release-candidate" ? "needs_you" : "in_progress";
   else if (state === "CLOSED") bucket = "completed";
   else if (lc && GATE_LABELS.has(lc)) bucket = "needs_you";
   else if (failed) bucket = "stuck";

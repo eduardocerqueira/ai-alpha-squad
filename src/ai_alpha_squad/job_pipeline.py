@@ -56,7 +56,7 @@ class SquadIssueIndex:
                     "--state",
                     "open",
                     "--json",
-                    "number,title,body,state,labels,updatedAt,comments",
+                    "number,title,body,state,stateReason,labels,updatedAt,comments",
                     "--limit",
                     "100",
                 ]
@@ -73,7 +73,7 @@ class SquadIssueIndex:
                         "--state",
                         "closed",
                         "--json",
-                        "number,title,body,state,labels,updatedAt,comments",
+                        "number,title,body,state,stateReason,labels,updatedAt,comments",
                         "--limit",
                         str(include_closed),
                     ]
