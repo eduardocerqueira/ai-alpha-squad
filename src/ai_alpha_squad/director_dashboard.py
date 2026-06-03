@@ -637,7 +637,13 @@ def _v2_agent_model(comments: tuple[dict, ...], role: str) -> str | None:
 
 
 def _v2_agents(
-    repo: str, number: int, comments: tuple[dict, ...], lc: str | None, pr_url: str | None
+    repo: str,
+    number: int,
+    comments: tuple[dict, ...],
+    lc: str | None,
+    pr_url: str | None,
+    *,
+    pending_agent: str | None = None,
 ) -> tuple[dict[str, Any], ...]:
     parent = f"https://github.com/{repo}/issues/{number}"
     dev_idx = squad_v2._latest_deliverable_index(comments, "developer")
@@ -664,6 +670,8 @@ def _v2_agents(
     else:
         bo = ("done", "Complete")
 
+    rounds = squad_v2.qa_fails_since_escalation(comments)
+
     # Developer
     pr_suffix = f" — {pr_url}" if pr_url else ""
     if done_phase:
@@ -674,18 +682,29 @@ def _v2_agents(
         and (qa_idx or 0) > dev_idx
         and squad_v2.director_delivery_rejected_after(comments, qa_idx or 0)
     ):
-        dev = ("active", f"Director rejected delivery — reworking{pr_suffix}")
+        dev = (
+            ("waiting", f"Queued — rework after Director rejection{pr_suffix}")
+            if pending_agent == "developer" and active != "developer"
+            else ("waiting", f"Director rejected delivery — awaiting rework{pr_suffix}")
+        )
     elif dev_idx is not None and qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
-        dev = ("active", f"QA requested changes — reworking{pr_suffix}")
+        dev = (
+            ("waiting", f"Queued — rework after QA (round {rounds}){pr_suffix}")
+            if pending_agent == "developer" and active != "developer"
+            else ("waiting", f"QA requested changes — awaiting developer{pr_suffix}")
+        )
     elif dev_idx is not None:
         dev = ("done", f"Deliverable posted{pr_suffix}")
     elif lc == "director-approved":
-        dev = ("active", "Implementing on the target repo")
+        dev = (
+            ("waiting", "Queued — implementing on the target repo")
+            if pending_agent == "developer" and active != "developer"
+            else ("waiting", "Awaiting developer implementation")
+        )
     else:
         dev = ("waiting", "After Director approves the analysis")
 
     # QA (acceptance gate)
-    rounds = squad_v2.qa_fails_since_escalation(comments)
     if done_phase:
         qa = ("done", "Passed")
     elif (
@@ -694,14 +713,18 @@ def _v2_agents(
         and (qa_idx or 0) > dev_idx
         and squad_v2.director_delivery_rejected_after(comments, qa_idx or 0)
     ):
-        qa = ("active", "Director rejected — re-review after developer rework")
+        qa = ("waiting", "Awaiting re-review after developer rework")
     elif dev_idx is not None and qa_verdict == "pass" and (qa_idx or 0) > dev_idx:
         qa = ("done", "Passed")
     elif dev_idx is not None and qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
-        state = "blocked" if rounds >= squad_v2.MAX_QA_ROUNDS else "active"
+        state = "blocked" if rounds >= squad_v2.MAX_QA_ROUNDS else "done"
         qa = (state, f"Requested changes (round {rounds}/{squad_v2.MAX_QA_ROUNDS})")
     elif dev_idx is not None:
-        qa = ("active", "Reviewing the deliverable")
+        qa = (
+            ("waiting", "Queued — QA review of deliverable")
+            if pending_agent == "qa" and active != "qa"
+            else ("waiting", "Awaiting QA review")
+        )
     else:
         qa = ("waiting", "After the developer delivers")
 
@@ -912,10 +935,13 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
         headline = _headline_for_card("needs_you", lc, (), False)
     elif bucket == "stuck":
         headline = action.reason or "This job needs attention."
+    elif action.kind == "dispatch" and not active_run:
+        headline = f"Queued — {action.reason or 'next agent dispatch'}"
     else:
         headline = action.reason or "Squad is working — nothing needed from you."
 
-    agents = _v2_agents(repo, number, comments, lc, pr_url)
+    pending = action.agent if action.kind == "dispatch" else None
+    agents = _v2_agents(repo, number, comments, lc, pr_url, pending_agent=pending)
     events = _v2_events(
         lc=lc,
         bucket=bucket,

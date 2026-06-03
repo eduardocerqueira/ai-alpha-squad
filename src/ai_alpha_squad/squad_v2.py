@@ -812,11 +812,14 @@ def next_action(
 
 
 def is_squad_internal_comment(body: str) -> bool:
-    """Comments that must not re-trigger phase watch (avoids feedback loops on #94)."""
+    """Comments that must not re-trigger phase watch (avoids feedback loops on #94).
+
+    ``failed`` markers are *not* internal — phase watch must tick immediately so
+    a dispatch error can retry without waiting for the 15m cron.
+    """
     text = (body or "").lower()
     if (
         RUN_IN_PROGRESS_MARKER in text
-        or RUN_FAILED_MARKER in text
         or RUN_RESET_MARKER in text
         or RUN_SETUP_FAILED_MARKER in text
         or RUN_MODEL_MARKER in text

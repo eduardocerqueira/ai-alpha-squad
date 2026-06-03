@@ -30,6 +30,7 @@ import { Timeline } from "@/components/Timeline";
 import { AgentsPanel } from "@/components/AgentsPanel";
 import { ModelHistory } from "@/components/ModelHistory";
 import { Login } from "@/components/Login";
+import { ConfirmDialog, PromptDialog } from "@/components/DirectorDialog";
 
 // Live endpoint (Worker fetches fresh data); static jobs.json is the fallback
 // when served without the Worker (plain static host).
@@ -261,6 +262,11 @@ export default function App() {
   const canDeliveryGate = !!job && job.lifecycle === "release-candidate" && job.bucket === "needs_you";
 
   const [deliveryBusy, setDeliveryBusy] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [stopOpen, setStopOpen] = useState(false);
+  const [rerunOpen, setRerunOpen] = useState(false);
+
   async function deliveryGate(n: number, action: "accept" | "reject", reason?: string) {
     setDeliveryBusy(true);
     try {
@@ -416,14 +422,7 @@ export default function App() {
                         <Button
                           size="sm"
                           disabled={deliveryBusy}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Accept delivery for #${job.number}? The job will be marked released and complete.`,
-                              )
-                            )
-                              deliveryGate(job.number, "accept");
-                          }}
+                          onClick={() => setAcceptOpen(true)}
                           title="Accept developer + QA delivery"
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -434,41 +433,61 @@ export default function App() {
                           size="sm"
                           disabled={deliveryBusy}
                           className="border-brand-danger/50 text-brand-danger hover:bg-brand-danger/10"
-                          onClick={() => {
-                            const reason = window.prompt(
-                              `Reject delivery for #${job.number}? Optional note for the squad (quality, not working, etc.):`,
-                              "",
-                            );
-                            if (reason === null) return;
-                            deliveryGate(job.number, "reject", reason.trim() || undefined);
-                          }}
+                          onClick={() => setRejectOpen(true)}
                           title="Reject delivery and send developer + QA for another round"
                         >
                           <X className="h-3.5 w-3.5" />
                           Reject delivery
                         </Button>
+                        <ConfirmDialog
+                          open={acceptOpen}
+                          onOpenChange={setAcceptOpen}
+                          title={`Accept delivery for #${job.number}?`}
+                          description="The job will be marked released and the issue will be closed."
+                          confirmLabel="Accept delivery"
+                          loading={deliveryBusy}
+                          onConfirm={() => deliveryGate(job.number, "accept")}
+                        />
+                        <PromptDialog
+                          open={rejectOpen}
+                          onOpenChange={setRejectOpen}
+                          title={`Reject delivery for #${job.number}?`}
+                          description="Developer and QA will rework. Add an optional note for the squad (quality, not working, etc.)."
+                          confirmLabel="Reject delivery"
+                          fieldLabel="Note for the squad"
+                          placeholder="What should developer and QA fix?"
+                          loading={deliveryBusy}
+                          onConfirm={(reason) =>
+                            deliveryGate(job.number, "reject", reason || undefined)
+                          }
+                        />
                       </>
                     )}
                     {canStop && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Stop #${job.number}? This cancels the in-flight run and holds the job in Blocked. Use Retry to resume.`,
-                            )
-                          )
-                            stopJob(job.number);
-                        }}
-                        disabled={stopping}
-                        title="Cancel the running Actions run and halt this job"
-                      >
-                        <Square
-                          className={cn("h-3.5 w-3.5 text-brand-danger", stopping && "animate-pulse")}
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setStopOpen(true)}
+                          disabled={stopping}
+                          title="Cancel the running Actions run and halt this job"
+                        >
+                          <Square
+                            className={cn("h-3.5 w-3.5 text-brand-danger", stopping && "animate-pulse")}
+                          />
+                          {stopping ? "Stopping…" : "Stop execution"}
+                        </Button>
+                        <ConfirmDialog
+                          open={stopOpen}
+                          onOpenChange={setStopOpen}
+                          title={`Stop #${job.number}?`}
+                          description="This cancels the in-flight Actions run and holds the job in Blocked. Use Retry to resume."
+                          confirmLabel="Stop execution"
+                          variant="destructive"
+                          loading={stopping}
+                          onConfirm={() => stopJob(job.number)}
                         />
-                        {stopping ? "Stopping…" : "Stop execution"}
-                      </Button>
+                      </>
                     )}
                     {canRetry && modelLadder.length > 0 && (
                       <Select value={chosenModel} onValueChange={setChosenModel} disabled={retrying}>
@@ -486,35 +505,53 @@ export default function App() {
                       </Select>
                     )}
                     {canRetry && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (
-                            job.bucket === "completed" &&
-                            !window.confirm(
-                              `Re-open and re-run #${job.number}? It will reopen the issue, reset it to director-approved, and re-run the developer → QA flow.`,
-                            )
-                          )
-                            return;
-                          retryJob(job.number, chosenModel === "default" ? undefined : chosenModel);
-                        }}
-                        disabled={retrying}
-                        title={
-                          job.bucket === "completed"
-                            ? "Reopen this issue and re-run the squad"
-                            : "Re-run the orchestrator (clears the failure count + removes the blocked label)"
-                        }
-                      >
-                        <RotateCcw className={retrying ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-                        {retrying
-                          ? job.bucket === "completed"
-                            ? "Re-opening…"
-                            : "Retrying…"
-                          : job.bucket === "completed"
-                            ? "Re-open & re-run"
-                            : "Retry job"}
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (job.bucket === "completed") setRerunOpen(true);
+                            else
+                              retryJob(
+                                job.number,
+                                chosenModel === "default" ? undefined : chosenModel,
+                              );
+                          }}
+                          disabled={retrying}
+                          title={
+                            job.bucket === "completed"
+                              ? "Reopen this issue and re-run the squad"
+                              : "Re-run the orchestrator (clears the failure count + removes the blocked label)"
+                          }
+                        >
+                          <RotateCcw
+                            className={retrying ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
+                          />
+                          {retrying
+                            ? job.bucket === "completed"
+                              ? "Re-opening…"
+                              : "Retrying…"
+                            : job.bucket === "completed"
+                              ? "Re-open & re-run"
+                              : "Retry job"}
+                        </Button>
+                        {job.bucket === "completed" && (
+                          <ConfirmDialog
+                            open={rerunOpen}
+                            onOpenChange={setRerunOpen}
+                            title={`Re-open and re-run #${job.number}?`}
+                            description="The issue will reopen, reset to director-approved, and re-run the developer → QA flow."
+                            confirmLabel="Re-open & re-run"
+                            loading={retrying}
+                            onConfirm={() =>
+                              retryJob(
+                                job.number,
+                                chosenModel === "default" ? undefined : chosenModel,
+                              )
+                            }
+                          />
+                        )}
+                      </>
                     )}
                     {job.target_pr_url && (
                       <a
