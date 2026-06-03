@@ -111,10 +111,10 @@ from ai_alpha_squad.squad_v2 import human_assistance_summary, dev_model_ladder
 import os, json, subprocess, sys
 repo, issue = sys.argv[1], int(sys.argv[2])
 data = json.loads(subprocess.check_output(
-    ['gh','issue','view',str(issue),'--repo',repo,'--json','comments'], text=True))
-comments = tuple(data.get('comments') or [])
+    ['gh','issue','view',str(issue),'--repo',repo,'--json','comments,body'], text=True))
+comments = tuple(data.get('comments') or ())
 ladder = dev_model_ladder(os.environ.get('SQUAD_DEV_MODEL_LADDER'))
-print(human_assistance_summary(comments, ladder))
+print(human_assistance_summary(comments, ladder, issue_body=data.get('body') or ''))
 " "$REPO" "$ISSUE")"
         BODY="$(python3 "$FORMAT" notice --message "$MSG" --repo "$REPO")"
         gh issue comment "$ISSUE" --repo "$REPO" --body "$BODY"
@@ -137,18 +137,7 @@ print(human_assistance_summary(comments, ladder))
   INSTRUCTIONS="$(mktemp)"
   case "$AGENT" in
     business-owner)
-      cat > "$INSTRUCTIONS" <<EOF
-You are the Business Owner for AI Alpha Squad (v2 — single issue, no sub-issues).
-
-Read .agents/agent-business-owner.md and .agents/templates/business-analysis-template.md
-
-Issue: https://github.com/${REPO}/issues/${ISSUE}
-Target repo (for context): ${TARGET}
-
-1. Post the full Business Analysis on THIS issue (#${ISSUE}) — heading must include: # Business Analysis
-2. Do not open sub-issues. Do not open PRs on ${REPO}.
-3. When complete, the orchestrator will add label awaiting-approval.
-EOF
+      python3 -m ai_alpha_squad.squad_dispatch_instructions business-owner "$REPO" "$ISSUE" "$TARGET" > "$INSTRUCTIONS"
       ;;
     developer)
       python3 -m ai_alpha_squad.squad_dispatch_instructions developer "$REPO" "$ISSUE" "$TARGET" > "$INSTRUCTIONS"

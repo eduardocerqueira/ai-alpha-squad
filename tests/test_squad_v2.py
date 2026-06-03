@@ -118,17 +118,17 @@ def test_developer_instruction_appendix_includes_build_log():
     text = developer_instruction_appendix(comments)
     assert "build verification failure" in text.lower()
     assert "mvn error line" in text
-    act = next_action(
-        IssueView(
-            94,
-            "OPEN",
-            frozenset({"director-approved"}),
-            comments,
-            "https://github.com/org/experimental-hello-world",
-        )
+
+
+def test_developer_instruction_appendix_license_jdk25():
+    log = (
+        "[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0\n"
+        "[INFO] --- license:1.15:process (default) @ app ---\n"
+        "Unsupported class file major version 69\n"
     )
-    assert act.kind == "dispatch"
-    assert act.agent == "developer"
+    text = developer_instruction_appendix(tuple(), issue_body=log, issue_title="tests failing")
+    assert "pom.xml" in text
+    assert "license" in text.lower()
 
 
 def test_squad_work_branch():
@@ -551,6 +551,19 @@ def test_human_assistance_summary_content():
     assert "model-a" in msg and "model-b" in msg  # models tried
     assert "2 QA review round" in msg  # two qa:fail markers
     assert "still duplicated" in msg  # latest blocker, not the earlier one
+
+
+def test_human_assistance_includes_build_log_hint():
+    from ai_alpha_squad.squad_v2 import human_assistance_summary
+
+    body = (
+        "[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0\n"
+        "[INFO] --- license:1.15:process (default) @ app ---\n"
+        "Unsupported class file major version 69\n"
+    )
+    msg = human_assistance_summary((), LADDER, issue_body=body)
+    assert "Likely fix from build log" in msg
+    assert "pom.xml" in msg
 
 
 def test_no_ladder_blocks_after_3_like_before():

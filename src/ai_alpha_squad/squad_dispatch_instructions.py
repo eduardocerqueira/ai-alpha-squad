@@ -8,7 +8,7 @@ import subprocess
 import sys
 from typing import Any
 
-from ai_alpha_squad.compile_diagnostics import format_compile_fix_list
+from ai_alpha_squad.build_failure_diagnosis import format_issue_diagnosis_section
 from ai_alpha_squad.squad_qa import format_qa_prechecks_section
 from ai_alpha_squad.squad_v2 import (
     QA_FAIL_MARKER,
@@ -25,14 +25,16 @@ _BLOCKER_FILE_RE = re.compile(
 )
 
 
-def _fetch_issue_comments(repo: str, issue: int) -> tuple[tuple[dict[str, Any], ...], str]:
+def _fetch_issue_comments(
+    repo: str, issue: int,
+) -> tuple[tuple[dict[str, Any], ...], str, str]:
     data = json.loads(
         subprocess.check_output(
-            ["gh", "issue", "view", str(issue), "--repo", repo, "--json", "comments,body"],
+            ["gh", "issue", "view", str(issue), "--repo", repo, "--json", "comments,body,title"],
             text=True,
         )
     )
-    return tuple(data.get("comments") or []), data.get("body") or ""
+    return tuple(data.get("comments") or []), data.get("body") or "", data.get("title") or ""
 
 
 def _first_blocker_path(qa_fail_body: str | None) -> str | None:
@@ -87,7 +89,10 @@ def developer_dispatch_instructions(
     issue_body: str = "",
 ) -> str:
     if comments is None:
-        comments, issue_body = _fetch_issue_comments(queue_repo, issue)
+        comments, issue_body, issue_title = _fetch_issue_comments(queue_repo, issue)
+    elif not issue_body:
+        _, issue_body, fetched_title = _fetch_issue_comments(queue_repo, issue)
+        issue_title = issue_title or fetched_title
     _, qa_verdict = latest_qa_verdict(comments)
     is_rework = qa_verdict == "fail"
     qa_excerpt = latest_qa_fail_excerpt(comments) if is_rework else None
@@ -122,11 +127,22 @@ def developer_dispatch_instructions(
             "5. Use finish only when the tree compiles and required artifacts exist.",
             "6. Do not create sub-issues.",
             "",
+            "## Squad coding rules (mandatory)",
+            "- Never commit `target/` or other build output — edit `pom.xml`, `src/`, or config only.",
+            "- Use the JDK version named in the issue when running Maven/Gradle.",
+            "- When success criteria require `mvn clean package`, compile-only is not enough.",
+            "",
             f"Agent profile: .agents/agent-developer.md",
         ]
     )
 
-    appendix = developer_instruction_appendix(comments)
+    issue_diag = format_issue_diagnosis_section(issue_body, issue_title=issue_title)
+    if issue_diag.strip():
+        lines.extend(["", issue_diag.strip()])
+
+    appendix = developer_instruction_appendix(
+        comments, issue_body=issue_body, issue_title=issue_title
+    )
     if appendix.strip():
         lines.extend(["", appendix.strip()])
 
@@ -148,6 +164,34 @@ def developer_dispatch_instructions(
             )
 
     return "\n".join(lines)
+
+
+def business_owner_dispatch_instructions(
+    queue_repo: str,
+    issue: int,
+    target_repo: str,
+    *,
+    issue_body: str = "",
+    issue_title: str = "",
+) -> str:
+    from ai_alpha_squad.build_failure_diagnosis import format_business_owner_log_hints
+
+    if not issue_body:
+        _, issue_body, issue_title = _fetch_issue_comments(queue_repo, issue)
+    hints = format_business_owner_log_hints(issue_body, issue_title=issue_title)
+    return f"""You are the Business Owner for AI Alpha Squad (v2 — single issue, no sub-issues).
+
+Read .agents/agent-business-owner.md and .agents/templates/business-analysis-template.md
+
+Issue: https://github.com/{queue_repo}/issues/{issue}
+Target repo (for context): {target_repo}
+
+1. Post the full Business Analysis on THIS issue (#{issue}) — heading must include: # Business Analysis
+2. Do not open sub-issues. Do not open PRs on {queue_repo}.
+3. When the request includes build logs, state the **actual** failing phase (tests vs Maven plugin vs compile) — do not copy a misleading issue title.
+4. Success criteria must name the exact command (e.g. `mvn clean package`) and JDK if mentioned in the request.
+5. When complete, the orchestrator will add label awaiting-approval.{hints}
+"""
 
 
 def qa_dispatch_instructions(
@@ -225,6 +269,9 @@ def main(argv: list[str] | None = None) -> int:
     agent, repo, issue_s, target = argv[0], argv[1], int(argv[2]), argv[3]
     if agent == "developer":
         print(developer_dispatch_instructions(repo, issue_s, target))
+        return 0
+    if agent == "business-owner":
+        print(business_owner_dispatch_instructions(repo, issue_s, target))
         return 0
     if agent == "qa":
         # Optional JSON context on stdin: pr_diff, changed_files, base_tree, build_ok, build_log, issue_body
