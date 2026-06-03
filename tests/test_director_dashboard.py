@@ -136,6 +136,35 @@ def test_v2_closed_stale_new_label_is_done():
     assert card.bucket == "completed"
 
 
+def test_v2_developer_running_during_rework():
+    """Rework after an existing deliverable must show Developer as running, not done."""
+    comments = [
+        {"body": "# Business Analysis\nok", "createdAt": "2026-06-03T04:00:00Z"},
+        {
+            "body": "# Developer Deliverable\n\nhttps://github.com/acme/target/pull/10\n" + "x" * 200,
+            "createdAt": "2026-06-03T04:01:00Z",
+        },
+        {"body": "squad-v2-run:in_progress:developer", "createdAt": "2026-06-03T04:02:00Z"},
+    ]
+    card = _load_job_card_v2("o/r", _v2_row(209, ["director-approved"], comments))
+    dev = next(a for a in card.agents if a["role"] == "developer")
+    assert dev["status"] == "running"
+    assert card.active_agent == "developer"
+    assert "running now" in card.headline.lower()
+
+
+def test_v2_developer_last_run_failed_shows_blocked():
+    comments = [
+        {"body": "# Developer Deliverable\n\nhttps://github.com/acme/target/pull/10\n" + "x" * 200},
+        {"body": "squad-v2-run:in_progress:developer"},
+        {"body": "squad-v2-run:failed:developer — timeout"},
+    ]
+    card = _load_job_card_v2("o/r", _v2_row(210, ["director-approved"], comments))
+    dev = next(a for a in card.agents if a["role"] == "developer")
+    assert dev["status"] == "blocked"
+    assert "Last run failed" in dev["detail"]
+
+
 def test_v2_active_run_on_closed_shows_in_progress():
     # An agent actively running (in_progress marker, no terminal) shows In
     # progress even if the issue is closed.

@@ -24,15 +24,14 @@ export function normalizeAgentStatus(status: AgentStatus | string, detail = ""):
 
 const COLORS: Record<NormStatus, string> = {
   done: "hsl(var(--brand-green))",
-  running: "hsl(var(--brand-green))",
+  running: "hsl(var(--brand-amber))",
   review: "hsl(var(--brand-amber))",
   progress: "hsl(var(--brand-amber))",
   idle: "hsl(var(--muted-foreground))",
   blocked: "hsl(var(--brand-danger))",
 };
 
-/** Static SVG status indicator for an agent — no spinner (the dashboard can't
- *  see live Action runs, so it never implies one). */
+/** Static SVG status indicator for an agent. ``running`` uses an amber spinner. */
 export function AgentStatusIcon({ status }: { status: NormStatus }) {
   const color = COLORS[status];
   return (
