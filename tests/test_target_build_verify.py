@@ -7,6 +7,7 @@ from ai_alpha_squad.target_build_verify import (
     format_build_failure_issue_comment,
     format_build_gate_qa_fail,
     issue_expects_build,
+    issue_requires_package,
     should_verify_build,
 )
 
@@ -21,6 +22,20 @@ def test_detect_maven_command(tmp_path: Path):
     cmd = detect_build_command(tmp_path)
     assert cmd is not None
     assert "compile" in " ".join(cmd)
+
+
+def test_detect_maven_package_when_criteria_require(tmp_path: Path):
+    (tmp_path / "pom.xml").write_text("<project/>", encoding="utf-8")
+    body = "### Success criteria\nmvn clean package run successfully\n"
+    cmd = detect_build_command(tmp_path, body)
+    assert cmd is not None
+    assert "package" in " ".join(cmd)
+
+
+def test_issue_requires_package_from_success_criteria():
+    body = "### Success criteria\nmvn clean package run successfully\n"
+    assert issue_requires_package(body)
+    assert not issue_requires_package("### Success criteria\nmvn compile succeeds\n")
 
 
 def test_should_verify_when_pom_present(tmp_path: Path):

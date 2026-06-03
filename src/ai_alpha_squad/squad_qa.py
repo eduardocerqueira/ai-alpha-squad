@@ -33,10 +33,12 @@ _ARTIFACT_PATH_RE = re.compile(r"^target/", re.MULTILINE)
 
 def is_compile_only_job(issue_body: str) -> bool:
     """True when success criteria are build/compile focused (no subjective QA needed)."""
-    from ai_alpha_squad.target_build_verify import issue_expects_build
+    from ai_alpha_squad.target_build_verify import issue_expects_build, issue_requires_package
 
     body = issue_body or ""
     if not issue_expects_build(body):
+        return False
+    if issue_requires_package(body):
         return False
     # Focus on the success criteria section when present.
     section = body
@@ -117,3 +119,37 @@ def format_qa_prechecks_section(
 
 def artifact_paths_in_changed(changed_files: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(p for p in changed_files if p.startswith("target/") or "/target/" in p)
+
+
+_MEANINGFUL_CHANGE_PATHS = (
+    "src/",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "package.json",
+    "Makefile",
+    "README",
+    "docs/",
+)
+
+
+def validate_pr_changed_files(changed_files: tuple[str, ...]) -> tuple[bool, str]:
+    """Reject PRs that only touch build artifacts or have no changes."""
+    if not changed_files:
+        return False, "PR has no file changes — deliver a source or build-config fix."
+    if all(p.startswith("target/") or "/target/" in p for p in changed_files):
+        return (
+            False,
+            "PR only modifies build artifacts (target/) — commit source or pom.xml changes, "
+            "not Maven output.",
+        )
+    if not any(
+        p == prefix.rstrip("/") or p.startswith(prefix)
+        for p in changed_files
+        for prefix in _MEANINGFUL_CHANGE_PATHS
+    ):
+        return (
+            False,
+            "PR has no meaningful source or build-config changes (expected src/, pom.xml, etc.).",
+        )
+    return True, ""
