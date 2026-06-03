@@ -254,7 +254,7 @@ def _headline_for_card(
         if lc == "awaiting-approval":
             return "Approve the Business Analysis."
         if lc == "release-candidate":
-            return "Approve or reject the release."
+            return "Accept or reject the developer + QA delivery."
         return "Your approval is required."
     if bucket == "stuck":
         if stuck_reasons:
@@ -283,7 +283,10 @@ def _director_action_for_card(bucket: str, lifecycle: str | None) -> str:
     if lc == "awaiting-approval":
         return "Open the issue and reply APPROVE (or REQUEST CHANGES)."
     if lc == "release-candidate":
-        return "Open the issue and reply APPROVE or REJECT."
+        return (
+            "Accept delivery to complete the job, or Reject to send "
+            "developer and QA for another round."
+        )
     return "Open the issue and follow the Director gate instructions."
 
 
@@ -558,7 +561,7 @@ TIMELINE_PHASES_V2: tuple[tuple[str, str, str], ...] = (
     ("awaiting-approval", "Business analysis ready", "Director"),
     ("implementation", "Implementation — PR on target repo", "developer"),
     ("qa", "QA review", "qa"),
-    ("release-candidate", "Release candidate", "Director"),
+    ("release-candidate", "Delivery review", "Director"),
     ("released", "Released", "Done"),
 )
 
@@ -665,6 +668,13 @@ def _v2_agents(
     pr_suffix = f" — {pr_url}" if pr_url else ""
     if done_phase:
         dev = ("done", f"Delivered{pr_suffix}")
+    elif (
+        dev_idx is not None
+        and qa_verdict == "pass"
+        and (qa_idx or 0) > dev_idx
+        and squad_v2.director_delivery_rejected_after(comments, qa_idx or 0)
+    ):
+        dev = ("active", f"Director rejected delivery — reworking{pr_suffix}")
     elif dev_idx is not None and qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
         dev = ("active", f"QA requested changes — reworking{pr_suffix}")
     elif dev_idx is not None:
@@ -678,6 +688,13 @@ def _v2_agents(
     rounds = squad_v2.qa_fails_since_escalation(comments)
     if done_phase:
         qa = ("done", "Passed")
+    elif (
+        dev_idx is not None
+        and qa_verdict == "pass"
+        and (qa_idx or 0) > dev_idx
+        and squad_v2.director_delivery_rejected_after(comments, qa_idx or 0)
+    ):
+        qa = ("active", "Director rejected — re-review after developer rework")
     elif dev_idx is not None and qa_verdict == "pass" and (qa_idx or 0) > dev_idx:
         qa = ("done", "Passed")
     elif dev_idx is not None and qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
@@ -776,9 +793,22 @@ def _v2_events(
             if at_or_past("release-candidate"):
                 status = "done"
             elif dev_idx is not None:
-                status = "done" if qa_verdict != "fail" or (qa_idx or 0) <= dev_idx else "current"
+                dir_reject = (
+                    qa_verdict == "pass"
+                    and (qa_idx or 0) > dev_idx
+                    and squad_v2.director_delivery_rejected_after(comments, qa_idx or 0)
+                )
+                status = (
+                    "current"
+                    if dir_reject or (qa_verdict == "fail" and (qa_idx or 0) > dev_idx)
+                    else "done"
+                )
                 if pr_url:
-                    detail = "PR open" if not at_or_past("release-candidate") else "PR merged"
+                    detail = (
+                        "Director rejected — reworking"
+                        if dir_reject
+                        else ("PR open" if not at_or_past("release-candidate") else "PR merged")
+                    )
             elif lc == "director-approved":
                 status = "current"
                 detail = "Developer implementing on the target repo"
@@ -788,7 +818,11 @@ def _v2_events(
             elif dev_idx is None:
                 status = "pending"
             elif qa_verdict == "pass" and (qa_idx or 0) > dev_idx:
-                status = "done"
+                if squad_v2.director_delivery_rejected_after(comments, qa_idx or 0):
+                    status = "current"
+                    detail = "Director rejected — waiting for developer rework"
+                else:
+                    status = "done"
             elif qa_verdict == "fail" and (qa_idx or 0) > dev_idx:
                 status = "blocked" if rounds >= squad_v2.MAX_QA_ROUNDS else "current"
                 detail = (
@@ -895,7 +929,7 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
         bucket=bucket,
         blocked=blocked,
         updated_at=updated_at,
-        target_repo=squad_v2.extract_target_repo(body),
+        target_repo=squad_v2.resolve_target_repo(body, tuple(comments)),
         target_pr_url=pr_url,
         target_pr_merged=lc in ("release-candidate", "released") and pr_url is not None,
         summary=headline,

@@ -148,6 +148,13 @@ export default {
       return handleStop(request, env);
     }
 
+    // Director accepts or rejects dev+QA delivery (release-candidate gate).
+    if (url.pathname === "/api/director/delivery-gate" && request.method === "POST") {
+      const email = await sessionEmail(env, request);
+      if (!email) return json({ error: "unauthorized" }, 401);
+      return handleDeliveryGate(request, env, ctx);
+    }
+
     // Authenticated dashboards open a WebSocket here; the hub pushes "refresh"
     // when CI publishes new data, so the UI updates without polling.
     if (url.pathname === "/api/director/live") {
@@ -272,11 +279,15 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
     if (res.ok) {
       const issue = (await res.json()) as { labels?: { name: string }[]; state?: string };
       const labels = (issue.labels ?? []).map((l) => l.name);
-      lifecycleLabel = labels.includes("director-approved")
-        ? "director-approved"
-        : labels.includes("new")
-          ? "new"
-          : "director-approved";
+      if (labels.includes("release-candidate")) {
+        lifecycleLabel = "director-approved";
+      } else {
+        lifecycleLabel = labels.includes("director-approved")
+          ? "director-approved"
+          : labels.includes("new")
+            ? "new"
+            : "director-approved";
+      }
       closed = (issue.state || "").toLowerCase() === "closed";
     }
   } catch {
@@ -296,7 +307,7 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
   // Clear terminal/overlay labels and ensure the resume phase is set, so the
   // orchestrator (which reads the issue's live labels) actually re-runs it —
   // a `released` or `blocked` label would otherwise short-circuit to "done".
-  for (const label of ["released", "blocked"]) {
+  for (const label of ["released", "blocked", "release-candidate"]) {
     await fetch(`${issueApi}/labels/${label}`, { method: "DELETE", headers }).catch(() => {});
   }
   await fetch(`${issueApi}/labels`, {
@@ -329,6 +340,131 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
     { error: `Could not start the re-run (GitHub ${dispatch.status}).`, status: dispatch.status },
     502,
   );
+}
+
+const DIRECTOR_DELIVERY_REJECT_MARKER = "squad-v2-director:delivery-reject";
+const DIRECTOR_DELIVERY_ACCEPT_MARKER = "squad-v2-director:delivery-accept";
+
+/** Accept or reject dev+QA delivery when the issue is at release-candidate. */
+async function handleDeliveryGate(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  if (!env.GITHUB_READ_TOKEN) return json({ error: "GitHub token not configured" }, 503);
+  let body: { number?: number; action?: string; reason?: string };
+  try {
+    body = (await request.json()) as { number?: number; action?: string; reason?: string };
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  const number = Number(body.number);
+  const action = (body.action || "").trim().toLowerCase();
+  const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+  if (!Number.isInteger(number) || number <= 0) return json({ error: "Invalid issue number" }, 400);
+  if (action !== "accept" && action !== "reject") {
+    return json({ error: 'action must be "accept" or "reject"' }, 400);
+  }
+
+  const headers = {
+    Authorization: `Bearer ${env.GITHUB_READ_TOKEN}`,
+    Accept: "application/vnd.github+json",
+    "User-Agent": "ai-alpha-squad-dashboard",
+    "Content-Type": "application/json",
+  };
+  const issueApi = `https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`;
+
+  const issueRes = await fetch(`${issueApi}?labels=1`, { headers });
+  if (!issueRes.ok) return json({ error: "Could not load issue" }, 502);
+  const issue = (await issueRes.json()) as { labels?: { name: string }[]; state?: string };
+  const labels = (issue.labels ?? []).map((l) => l.name);
+  if (!labels.includes("release-candidate")) {
+    return json({ error: "Issue is not awaiting delivery approval (release-candidate)" }, 409);
+  }
+
+  const postComment = async (text: string) => {
+    await fetch(`${issueApi}/comments`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ body: text }),
+    });
+  };
+
+  if (action === "accept") {
+    await fetch(`${issueApi}/labels/release-candidate`, { method: "DELETE", headers }).catch(() => {});
+    await fetch(`${issueApi}/labels`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ labels: ["released"] }),
+    }).catch(() => {});
+    await postComment(
+      `**Director:** Delivery accepted — job complete.\n\n${DIRECTOR_DELIVERY_ACCEPT_MARKER}`,
+    );
+    await postComment(
+      "**Squad orchestrator:** Director accepted delivery — `released` applied. Job complete.",
+    );
+    ctx.waitUntil(
+      (async () => {
+        try {
+          await recomputeDashboard(env);
+          await broadcastRefresh(env);
+        } catch {
+          /* ignore */
+        }
+      })(),
+    );
+    return json({ ok: true, action: "accept" });
+  }
+
+  // reject — rework dev + QA
+  const rejectBody = [
+    "**Director:** Job rejected by director.",
+    reason ? `\n${reason}` : "",
+    `\n${DIRECTOR_DELIVERY_REJECT_MARKER}`,
+  ].join("");
+  await postComment(rejectBody);
+  await fetch(`${issueApi}/labels/release-candidate`, { method: "DELETE", headers }).catch(() => {});
+  await fetch(`${issueApi}/labels`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ labels: ["director-approved"] }),
+  }).catch(() => {});
+  await postComment("squad-v2-run:reset:developer — failure count cleared; agent gets a fresh set of retry attempts.");
+  await postComment("squad-v2-run:reset:qa — failure count cleared; agent gets a fresh set of retry attempts.");
+  await postComment(
+    "**Squad orchestrator:** Director rejected delivery — developer and QA will rework.",
+  );
+
+  const dispatch = await fetch(
+    `https://api.github.com/repos/${DASHBOARD_REPO}/actions/workflows/${ORCHESTRATOR_WORKFLOW}/dispatches`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ref: "main",
+        inputs: { issue_number: String(number), lifecycle_label: "director-approved" },
+      }),
+    },
+  );
+  if (dispatch.status !== 204) {
+    const detail = await dispatch.text();
+    console.error("delivery-gate reject dispatch failed:", dispatch.status, detail);
+    return json(
+      { error: `Rejected on issue, but orchestrator dispatch failed (${dispatch.status}).` },
+      502,
+    );
+  }
+  ctx.waitUntil(
+    (async () => {
+      try {
+        await recomputeDashboard(env);
+        await broadcastRefresh(env);
+      } catch {
+        /* ignore */
+      }
+    })(),
+  );
+  return json({ ok: true, action: "reject" });
 }
 
 interface GhComment {

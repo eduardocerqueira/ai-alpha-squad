@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertCircle,
+  Check,
   ExternalLink,
   GitPullRequest,
   RefreshCw,
   RotateCcw,
   Square,
+  X,
 } from "lucide-react";
 import type { Dashboard, JobCard } from "@/types";
 import { GROUPS, isTabKey, jobsInGroup, type TabKey } from "@/lib/jobs";
@@ -256,6 +258,31 @@ export default function App() {
   const groupLabel = GROUPS.find((g) => g.key === activeTab)?.label ?? "Jobs";
   const canRetry = !!job && (job.bucket === "stuck" || job.blocked || job.bucket === "completed");
   const canStop = !!job && job.bucket === "in_progress";
+  const canDeliveryGate = !!job && job.lifecycle === "release-candidate" && job.bucket === "needs_you";
+
+  const [deliveryBusy, setDeliveryBusy] = useState(false);
+  async function deliveryGate(n: number, action: "accept" | "reject", reason?: string) {
+    setDeliveryBusy(true);
+    try {
+      const res = await fetch("/api/director/delivery-gate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: n, action, ...(reason ? { reason } : {}) }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(payload.error || "Could not update delivery gate.");
+      toast.success(
+        action === "accept"
+          ? "Delivery accepted — job marked released."
+          : "Delivery rejected — developer and QA will rework.",
+      );
+      load(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delivery gate failed.");
+    } finally {
+      setDeliveryBusy(false);
+    }
+  }
 
   if (authEmail === null) {
     return (
@@ -382,8 +409,46 @@ export default function App() {
                     )}
                   </div>
 
-                  {(canRetry || canStop || job.target_pr_url) && (
+                  {(canDeliveryGate || canRetry || canStop || job.target_pr_url) && (
                   <div className="flex flex-wrap items-center gap-2">
+                    {canDeliveryGate && (
+                      <>
+                        <Button
+                          size="sm"
+                          disabled={deliveryBusy}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Accept delivery for #${job.number}? The job will be marked released and complete.`,
+                              )
+                            )
+                              deliveryGate(job.number, "accept");
+                          }}
+                          title="Accept developer + QA delivery"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          {deliveryBusy ? "Working…" : "Accept delivery"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={deliveryBusy}
+                          className="border-brand-danger/50 text-brand-danger hover:bg-brand-danger/10"
+                          onClick={() => {
+                            const reason = window.prompt(
+                              `Reject delivery for #${job.number}? Optional note for the squad (quality, not working, etc.):`,
+                              "",
+                            );
+                            if (reason === null) return;
+                            deliveryGate(job.number, "reject", reason.trim() || undefined);
+                          }}
+                          title="Reject delivery and send developer + QA for another round"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Reject delivery
+                        </Button>
+                      </>
+                    )}
                     {canStop && (
                       <Button
                         variant="outline"

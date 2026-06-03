@@ -127,6 +127,16 @@ export SQUAD_ACTIONS_SKIP_DISPATCH_COMMENT=1
 python3 -m ai_alpha_squad.actions_agent run \
   "$QUEUE_REPO" "$ISSUE" "$AGENT" "$TARGET_REPO" "$WORKDIR" "$INSTRUCTIONS_FILE"
 
+# Mandatory compile gate for developer/devops when the repo has a build tool.
+if [[ "$AGENT" == "developer" || "$AGENT" == "devops" ]]; then
+  ISSUE_BODY="$(gh issue view "$ISSUE" --repo "$QUEUE_REPO" --json body -q .body 2>/dev/null || true)"
+  if ! python3 -m ai_alpha_squad.target_build_verify workdir "$WORKDIR" "$ISSUE_BODY"; then
+    echo "error: build verification failed on ${TARGET_REPO} before commit" >&2
+    gh issue comment "$ISSUE" --repo "$QUEUE_REPO" --body "**Squad ${AGENT} — build verification failed.** The tree does not compile; no PR was finalized. Re-run after fixing compile errors." 2>/dev/null || true
+    exit 1
+  fi
+fi
+
 # Safety gate: reject destructive rewrites (agent deleting most of a file / dropping
 # public functions) before they become a PR. Retryable failure so the cap applies.
 SAFETY_VIOLATIONS="$(cd "$WORKDIR" && python3 -m ai_alpha_squad.actions_agent check-changes "$WORKDIR" 2>/dev/null)" || {
@@ -152,9 +162,16 @@ if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git status --po
     -c 'user.email=github-actions[bot]@users.noreply.github.com' \
     commit -m "feat(squad): ${AGENT} work for ${QUEUE_REPO}#${ISSUE}" || true
   if ! git push -u origin "$BRANCH"; then
-    echo "error: git push failed for ${TARGET_REPO} branch ${BRANCH}" >&2
-    echo "Ensure SQUAD_ORCHESTRATOR_TOKEN has repo scope + contents:write on ${TARGET_REPO}." >&2
-    exit 128
+    git fetch origin "$BRANCH" 2>/dev/null || true
+    if ! git pull --rebase origin "$BRANCH" 2>/dev/null && ! git pull origin "$BRANCH" 2>/dev/null; then
+      echo "error: git push failed for ${TARGET_REPO} branch ${BRANCH} (rebase/pull also failed)" >&2
+      echo "Ensure SQUAD_ORCHESTRATOR_TOKEN has repo scope + contents:write on ${TARGET_REPO}." >&2
+      exit 128
+    fi
+    if ! git push -u origin "$BRANCH"; then
+      echo "error: git push failed for ${TARGET_REPO} branch ${BRANCH} after rebase" >&2
+      exit 128
+    fi
   fi
 fi
 

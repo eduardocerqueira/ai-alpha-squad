@@ -30,6 +30,15 @@ body:
       label: Target date (optional)
       placeholder: YYYY-MM-DD
 
+  - type: input
+    id: target_repo
+    attributes:
+      label: Target repo
+      description: Product repository URL where Developer opens the PR (required for Squad v2)
+      placeholder: https://github.com/org/product-repo
+    validations:
+      required: true
+
   - type: textarea
     id: summary
     attributes:

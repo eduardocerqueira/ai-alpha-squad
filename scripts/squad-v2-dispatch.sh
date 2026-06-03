@@ -39,14 +39,15 @@ MAX_REOPEN="${SQUAD_V2_MAX_REOPEN:-6}"
 reopens=0
 
 TARGET="$(python3 -c "
-import subprocess, sys
-from ai_alpha_squad.squad_v2 import extract_target_repo
+import json, subprocess, sys
+from ai_alpha_squad.squad_v2 import resolve_target_repo
 repo, issue = sys.argv[1], sys.argv[2]
-body = subprocess.check_output(
-    ['gh', 'issue', 'view', issue, '--repo', repo, '--json', 'body', '-q', '.body'],
+data = json.loads(subprocess.check_output(
+    ['gh', 'issue', 'view', issue, '--repo', repo, '--json', 'body,comments'],
     text=True,
-)
-print(extract_target_repo(body) or repo)
+))
+comments = tuple(data.get('comments') or [])
+print(resolve_target_repo(data.get('body') or '', comments) or repo)
 " "$REPO" "$ISSUE")"
 
 for ((step = 1; step <= MAX_CHAIN; step++)); do
@@ -293,6 +294,17 @@ print(model_marker_comment(escalate_to) if escalate_to else '')
     if [[ -n "$MODEL_LINE" ]]; then
       export SQUAD_AGENT_MODEL_OVERRIDE="$MODEL_LINE"
       echo "developer model: $MODEL_LINE"
+    fi
+  fi
+
+  # Deterministic compile gate before HF QA — catches incomplete PRs (e.g. import-only).
+  if [[ "$AGENT" == "qa" ]]; then
+    ISSUE_BODY="$(gh issue view "$ISSUE" --repo "$REPO" --json body -q .body 2>/dev/null || true)"
+    if ! python3 -m ai_alpha_squad.target_build_verify gate-pr "$REPO" "$ISSUE" "$TARGET" "$ISSUE_BODY"; then
+      echo "v2 #$ISSUE: build verification failed — posted squad-v2-qa:fail; developer rework next"
+      "$SYNC" "$REPO" "$ISSUE" || true
+      [[ "${SQUAD_ACTIONS_INLINE:-}" == "1" ]] || exit 0
+      continue
     fi
   fi
 
