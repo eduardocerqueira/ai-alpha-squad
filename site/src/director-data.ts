@@ -35,6 +35,7 @@ const DELIVERABLE_MARKERS: Record<string, string> = {
 };
 const QA_PASS = "squad-v2-qa:pass";
 const QA_FAIL = "squad-v2-qa:fail";
+const DIRECTOR_DELIVERY_REJECT = "squad-v2-director:delivery-reject";
 const RUN_FAILED = "squad-v2-run:failed:";
 const RUN_RESET = "squad-v2-run:reset:";
 const MAX_QA_ROUNDS = 3;
@@ -78,6 +79,13 @@ function latestDeliverableIndex(comments: RawComment[], agent: string): number |
     if (hasHeadingMarker(body, marker)) idx = i;
   });
   return idx;
+}
+
+function directorRejectedAfter(comments: RawComment[], afterIndex: number): boolean {
+  for (let i = afterIndex + 1; i < comments.length; i++) {
+    if ((comments[i].body || "").toLowerCase().includes(DIRECTOR_DELIVERY_REJECT)) return true;
+  }
+  return false;
 }
 
 function latestQaVerdict(comments: RawComment[]): { idx: number | null; verdict: "pass" | "fail" | null } {
@@ -210,7 +218,7 @@ const TIMELINE_PHASES_V2: [string, string, string][] = [
   ["awaiting-approval", "Business analysis ready", "Director"],
   ["implementation", "Implementation — PR on target repo", "developer"],
   ["qa", "QA review", "qa"],
-  ["release-candidate", "Release candidate", "Director"],
+  ["release-candidate", "Delivery review", "Director"],
   ["released", "Released", "Done"],
 ];
 
@@ -306,7 +314,9 @@ function releasedAt(comments: RawComment[]): string {
 function directorAction(bucket: string, lc: string | null): string {
   if (bucket !== "needs_you") return "";
   if (lc === "awaiting-approval") return "Open the issue and reply APPROVE (or REQUEST CHANGES).";
-  if (lc === "release-candidate") return "Open the issue and reply APPROVE or REJECT.";
+  if (lc === "release-candidate") {
+    return "Accept delivery to complete the job, or Reject to send developer and QA for another round.";
+  }
   return "Open the issue and follow the Director gate instructions.";
 }
 
@@ -341,12 +351,26 @@ function buildAgents(
   if (donePhase) dev = ["done", `Delivered${prSuffix}`];
   else if (devIdx !== null && verdict === "fail" && (qaIdx ?? 0) > devIdx)
     dev = ["active", `QA requested changes — reworking${prSuffix}`];
+  else if (
+    devIdx !== null &&
+    verdict === "pass" &&
+    (qaIdx ?? 0) > devIdx &&
+    directorRejectedAfter(comments, qaIdx ?? 0)
+  )
+    dev = ["active", `Director rejected delivery — reworking${prSuffix}`];
   else if (devIdx !== null) dev = ["done", `Deliverable posted${prSuffix}`];
   else if (lc === "director-approved") dev = ["active", "Implementing on the target repo"];
   else dev = ["waiting", "After Director approves the analysis"];
 
   let qa: [string, string];
   if (donePhase) qa = ["done", "Passed"];
+  else if (
+    devIdx !== null &&
+    verdict === "pass" &&
+    (qaIdx ?? 0) > devIdx &&
+    directorRejectedAfter(comments, qaIdx ?? 0)
+  )
+    qa = ["active", "Director rejected — re-review after developer rework"];
   else if (devIdx !== null && verdict === "pass" && (qaIdx ?? 0) > devIdx) qa = ["done", "Passed"];
   else if (devIdx !== null && verdict === "fail" && (qaIdx ?? 0) > devIdx)
     qa = [rounds >= MAX_QA_ROUNDS ? "blocked" : "active", `Requested changes (round ${rounds}/${MAX_QA_ROUNDS})`];
@@ -406,8 +430,10 @@ function buildEvents(
         status = "done";
         if (prUrl) detail = "PR merged";
       } else if (devIdx !== null) {
-        status = verdict === "fail" && (qaIdx ?? 0) > devIdx ? "current" : "done";
-        if (prUrl) detail = "PR open";
+        const dirReject =
+          verdict === "pass" && (qaIdx ?? 0) > devIdx && directorRejectedAfter(comments, qaIdx ?? 0);
+        status = dirReject || (verdict === "fail" && (qaIdx ?? 0) > devIdx) ? "current" : "done";
+        if (prUrl) detail = dirReject ? "Director rejected — reworking" : "PR open";
       } else if (lc === "director-approved") {
         status = "current";
         detail = "Developer implementing on the target repo";
@@ -415,7 +441,12 @@ function buildEvents(
     } else if (key === "qa") {
       if (atOrPast("release-candidate")) status = "done";
       else if (devIdx === null) status = "pending";
-      else if (verdict === "pass" && (qaIdx ?? 0) > devIdx) status = "done";
+      else if (verdict === "pass" && (qaIdx ?? 0) > devIdx) {
+        status = directorRejectedAfter(comments, qaIdx ?? 0) ? "current" : "done";
+        if (directorRejectedAfter(comments, qaIdx ?? 0)) {
+          detail = "Director rejected — waiting for developer rework";
+        }
+      }
       else if (verdict === "fail" && (qaIdx ?? 0) > devIdx) {
         status = rounds >= MAX_QA_ROUNDS ? "blocked" : "current";
         detail = `QA requested changes — developer reworking (${rounds}/${MAX_QA_ROUNDS})`;
@@ -486,7 +517,12 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
   let headline: string;
   if (bucket === "completed") headline = "This job is done.";
   else if (bucket === "needs_you")
-    headline = lc === "awaiting-approval" ? "Approve the Business Analysis." : lc === "release-candidate" ? "Approve or reject the release." : "Your approval is required.";
+    headline =
+      lc === "awaiting-approval"
+        ? "Approve the Business Analysis."
+        : lc === "release-candidate"
+          ? "Accept or reject the developer + QA delivery."
+          : "Your approval is required.";
   else if (bucket === "stuck")
     headline = needsHuman
       ? "Needs human assistance — the AI squad exhausted all attempts."

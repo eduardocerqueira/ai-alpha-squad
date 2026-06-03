@@ -109,14 +109,21 @@ sync_release_candidate() {
 import json, subprocess, sys
 repo, issue = sys.argv[1], sys.argv[2]
 sys.path.insert(0, "src")
-from ai_alpha_squad.squad_v2 import qa_passed
+from ai_alpha_squad.squad_v2 import qa_passed, resolve_target_repo
+from ai_alpha_squad.target_build_verify import gate_pr_before_qa
 
 proc = subprocess.run(
-    ["gh", "issue", "view", issue, "--repo", repo, "--json", "comments"],
+    ["gh", "issue", "view", issue, "--repo", repo, "--json", "comments,body"],
     capture_output=True, text=True, check=True,
 )
-comments = tuple(json.loads(proc.stdout)["comments"])
-raise SystemExit(0 if qa_passed(comments) else 1)
+data = json.loads(proc.stdout)
+comments = tuple(data.get("comments") or [])
+if not qa_passed(comments):
+    raise SystemExit(1)
+target = resolve_target_repo(data.get("body") or "", comments)
+if target and not gate_pr_before_qa(repo, int(issue), target, issue_body=data.get("body") or "", post_comment=False):
+    raise SystemExit(1)
+raise SystemExit(0)
 PY
   then
     gh issue edit "$ISSUE" --repo "$REPO" \

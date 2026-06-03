@@ -32,6 +32,9 @@ DELIVERABLE_MARKERS: dict[str, str] = {
 # so the orchestrator never interprets prose.
 QA_PASS_MARKER = "squad-v2-qa:pass"
 QA_FAIL_MARKER = "squad-v2-qa:fail"
+# Director delivery gate (after dev + QA): reject re-opens dev⇄QA; accept completes the job.
+DIRECTOR_DELIVERY_REJECT_MARKER = "squad-v2-director:delivery-reject"
+DIRECTOR_DELIVERY_ACCEPT_MARKER = "squad-v2-director:delivery-accept"
 # Max Developer⇄QA rework rounds before escalating to the Director.
 MAX_QA_ROUNDS = 3
 
@@ -55,6 +58,10 @@ NEEDS_HUMAN_LABEL = "needs-human"
 
 _TARGET_REPO_RE = re.compile(
     r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)",
+)
+_DELIVERABLE_PR_RE = re.compile(
+    r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+",
+    re.IGNORECASE,
 )
 
 
@@ -105,11 +112,52 @@ def extract_target_repo(body: str) -> str | None:
     return None
 
 
+def resolve_target_repo(body: str, comments: tuple[dict, ...] = ()) -> str | None:
+    """Target repo from issue body, else newest Director comment with a product-repo URL."""
+    found = extract_target_repo(body)
+    if found:
+        return found
+    for comment in reversed(comments):
+        body_text = comment.get("body") or ""
+        if not body_text.strip():
+            continue
+        found = extract_target_repo(body_text)
+        if found:
+            return found
+    return None
+
+
 def has_deliverable(comments: tuple[dict, ...], agent: str) -> bool:
     marker = DELIVERABLE_MARKERS.get(agent, "")
     if not marker:
         return False
     return issue_has_deliverable(list(comments), marker)
+
+
+def _developer_run_failed_after(comments: tuple[dict, ...], after_index: int) -> bool:
+    needle = f"{RUN_FAILED_MARKER}developer"
+    for i, comment in enumerate(comments):
+        if i > after_index and needle in (comment.get("body") or "").lower():
+            return True
+    return False
+
+
+def _deliverable_has_pr_link(body: str) -> bool:
+    lower = body.lower()
+    return "pull request" in lower or bool(_DELIVERABLE_PR_RE.search(body))
+
+
+def latest_trusted_developer_deliverable_index(comments: tuple[dict, ...]) -> int | None:
+    """Developer deliverable that survived Actions (PR link, no later run failure)."""
+    idx = _latest_deliverable_index(comments, "developer")
+    if idx is None:
+        return None
+    body = comments[idx].get("body") or ""
+    if not _deliverable_has_pr_link(body):
+        return None
+    if _developer_run_failed_after(comments, idx):
+        return None
+    return idx
 
 
 def _latest_deliverable_index(comments: tuple[dict, ...], agent: str) -> int | None:
@@ -289,16 +337,43 @@ def human_assistance_summary(
     return "\n".join(lines)
 
 
-def qa_passed(comments: tuple[dict, ...]) -> bool:
-    """True when the latest developer deliverable has since been QA-approved."""
-    dev_idx = _latest_deliverable_index(comments, "developer")
-    qa_idx, verdict = latest_qa_verdict(comments)
+def director_delivery_rejected_after(comments: tuple[dict, ...], after_index: int) -> bool:
+    needle = DIRECTOR_DELIVERY_REJECT_MARKER.lower()
+    for i, comment in enumerate(comments):
+        if i > after_index and needle in (comment.get("body") or "").lower():
+            return True
+    return False
+
+
+def format_director_delivery_reject_comment(reason: str = "") -> str:
+    lines = ["**Director:** Job rejected by director."]
+    if reason.strip():
+        lines.extend(["", reason.strip()])
+    lines.extend(["", DIRECTOR_DELIVERY_REJECT_MARKER])
+    return "\n".join(lines)
+
+
+def format_director_delivery_accept_comment() -> str:
     return (
+        "**Director:** Delivery accepted — job complete.\n\n"
+        f"{DIRECTOR_DELIVERY_ACCEPT_MARKER}"
+    )
+
+
+def qa_passed(comments: tuple[dict, ...]) -> bool:
+    """True when the latest trusted developer deliverable has since been QA-approved."""
+    dev_idx = latest_trusted_developer_deliverable_index(comments)
+    qa_idx, verdict = latest_qa_verdict(comments)
+    if not (
         dev_idx is not None
         and qa_idx is not None
         and qa_idx > dev_idx
         and verdict == "pass"
-    )
+    ):
+        return False
+    if director_delivery_rejected_after(comments, qa_idx):
+        return False
+    return True
 
 
 def squad_work_branch(agent: str, issue: int) -> str:
@@ -348,7 +423,10 @@ def run_in_progress(comments: tuple[dict, ...]) -> str | None:
         for agent in AGENTS_V2:
             if f"{RUN_IN_PROGRESS_MARKER}{agent}" not in body:
                 continue
-            if has_deliverable(comments, agent):
+            if agent == "developer":
+                if latest_trusted_developer_deliverable_index(comments) is not None:
+                    continue
+            elif has_deliverable(comments, agent):
                 continue
             if _failure_after_in_progress(comments, agent):
                 continue
@@ -466,24 +544,42 @@ def next_action(
         return NextAction("gate", reason="Director must approve BA")
 
     if lc == "director-approved":
-        if not extract_target_repo(view.body):
-            return NextAction("failed", reason="Missing target repo URL in issue body")
+        if not resolve_target_repo(view.body, view.comments):
+            return NextAction(
+                "failed",
+                reason="Missing target repo URL in issue body or Director comment",
+            )
 
-        dev_idx = _latest_deliverable_index(view.comments, "developer")
+        dev_idx = latest_trusted_developer_deliverable_index(view.comments)
+        stale_deliverable = (
+            dev_idx is None and _latest_deliverable_index(view.comments, "developer") is not None
+        )
         if dev_idx is None:
             if run_failures(view.comments, "developer") >= MAX_RUN_ATTEMPTS:
                 return NextAction(
                     "failed", agent="developer",
                     reason="Developer exceeded retry limit", needs_human=True,
                 )
-            return NextAction(
-                "dispatch",
-                agent="developer",
-                reason="Implement on target repo; post # Developer Deliverable",
+            reason = (
+                "Prior developer deliverable invalid (missing PR or Actions run failed) — rework"
+                if stale_deliverable
+                else "Implement on target repo; post # Developer Deliverable"
             )
+            return NextAction("dispatch", agent="developer", reason=reason)
 
         # Developer deliverable exists → QA gates it before release-candidate.
         qa_idx, verdict = latest_qa_verdict(view.comments)
+        if (
+            qa_idx is not None
+            and qa_idx > dev_idx
+            and verdict == "pass"
+            and director_delivery_rejected_after(view.comments, qa_idx)
+        ):
+            return NextAction(
+                "dispatch",
+                agent="developer",
+                reason="Director rejected delivery — developer and QA must rework",
+            )
         if qa_idx is None or qa_idx < dev_idx:
             # Latest developer deliverable has not been QA-reviewed yet.
             if run_failures(view.comments, "qa") >= MAX_RUN_ATTEMPTS:
@@ -532,7 +628,10 @@ def next_action(
         )
 
     if lc == "release-candidate":
-        return NextAction("gate", reason="Director release approval")
+        return NextAction(
+            "gate",
+            reason="Director must accept or reject the dev+QA delivery",
+        )
 
     return NextAction("idle", reason=f"Unhandled phase {lc}")
 
@@ -549,6 +648,8 @@ def is_squad_internal_comment(body: str) -> bool:
     ):
         return True
     if QA_PASS_MARKER in text or QA_FAIL_MARKER in text:
+        return True
+    if DIRECTOR_DELIVERY_REJECT_MARKER in text or DIRECTOR_DELIVERY_ACCEPT_MARKER in text:
         return True
     if "squad hf agent" in text or "squad actions agent" in text:
         return True

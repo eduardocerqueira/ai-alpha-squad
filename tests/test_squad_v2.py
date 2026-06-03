@@ -6,7 +6,9 @@ from ai_alpha_squad.squad_v2 import (
     find_stale_in_progress,
     has_deliverable,
     is_squad_internal_comment,
+    latest_trusted_developer_deliverable_index,
     next_action,
+    resolve_target_repo,
     run_failures,
     run_in_progress,
 )
@@ -200,6 +202,61 @@ def test_extract_target_repo_skips_self():
     assert extract_target_repo(body) is None
 
 
+def test_resolve_target_repo_from_director_comment():
+    body = "Summary\nstill not working\n"
+    comments = (
+        {"body": "approve"},
+        {
+            "body": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote",
+        },
+    )
+    assert resolve_target_repo(body, comments) == (
+        "eduardocerqueira/experimental-jenkins-plugin-quote"
+    )
+
+
+def test_director_reject_after_qa_redispatches_developer():
+    comments = (
+        _DEV,
+        {"body": "# QA Report\n\nsquad-v2-qa:pass"},
+        {"body": "**Director:** Job rejected by director.\n\nsquad-v2-director:delivery-reject"},
+    )
+    from ai_alpha_squad.squad_v2 import qa_passed
+
+    assert not qa_passed(comments)
+    act = next_action(_dev_approved(comments))
+    assert act.kind == "dispatch" and act.agent == "developer"
+    assert "Director rejected" in act.reason
+
+
+def test_trusted_deliverable_invalid_after_actions_failure():
+    comments = (
+        _DEV,
+        {"body": "squad-v2-run:failed:developer — push rejected"},
+    )
+    assert latest_trusted_developer_deliverable_index(comments) is None
+    act = next_action(_dev_approved(comments))
+    assert act.kind == "dispatch" and act.agent == "developer"
+    assert "invalid" in act.reason.lower() or "rework" in act.reason.lower()
+
+
+def test_director_approved_dispatches_when_repo_only_in_comment():
+    view = IssueView(
+        number=178,
+        state="OPEN",
+        labels=frozenset({"director-approved"}),
+        comments=(
+            {
+                "body": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote",
+            },
+        ),
+        body="Summary\nproject does not compile\n",
+    )
+    action = next_action(view)
+    assert action.kind == "dispatch"
+    assert action.agent == "developer"
+
+
 def test_developer_deliverable_requires_heading_not_inline_mention():
     ba_plan = (
         "# Business Analysis\n\n"
@@ -215,6 +272,10 @@ def test_developer_deliverable_requires_heading_not_inline_mention():
 # --- QA gate (Developer⇄QA rework loop) ---
 
 _DEV = {"body": "# Developer Deliverable\n\nPR: https://github.com/o/r/pull/1\n" + "x" * 200}
+_DEV_REWORK = {
+    "body": "# Developer Deliverable\n\nfixed it\n\n**Pull request:** https://github.com/o/r/pull/1\n"
+    + "y" * 200
+}
 
 
 def _dev_approved(comments):
@@ -244,7 +305,7 @@ def test_qa_reviews_redelivered_work():
     comments = [
         _DEV,
         {"body": "# QA Report\n\nsquad-v2-qa:fail\n- gap"},
-        {"body": "# Developer Deliverable\n\nfixed it\n" + "y" * 200},
+        _DEV_REWORK,
     ]
     act = next_action(_dev_approved(comments))
     assert act.kind == "dispatch" and act.agent == "qa"
@@ -254,7 +315,7 @@ def test_qa_fail_cap_escalates():
     comments = [_DEV]
     for _ in range(3):
         comments.append({"body": "# QA Report\n\nsquad-v2-qa:fail\n- gap"})
-        comments.append({"body": "# Developer Deliverable\n\nattempt\n" + "z" * 200})
+        comments.append(_DEV_REWORK)
     # 3 fails recorded; latest is a fresh dev deliverable awaiting QA, but the cap
     # is checked when QA next fails — simulate a 3rd fail as the latest verdict:
     comments.append({"body": "# QA Report\n\nsquad-v2-qa:fail\n- still wrong"})
@@ -357,7 +418,7 @@ def test_human_assistance_summary_content():
         _DEV,
         {"body": "# QA Report\n## Fixes required\n1. [BLOCKER] Foo.java:7 — remove duplicate field\nsquad-v2-qa:fail"},
         {"body": "squad-v2-model:model-b — escalated"},
-        {"body": "# Developer Deliverable\n\nattempt 2\n" + "z" * 200},
+        _DEV_REWORK,
         {"body": "# QA Report\n## Fixes required\n1. [BLOCKER] Foo.java:7 — still duplicated\nsquad-v2-qa:fail"},
     )
     msg = human_assistance_summary(comments, LADDER)
