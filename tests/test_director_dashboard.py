@@ -90,14 +90,50 @@ def test_v2_blocked_closed_goes_to_blocked_not_done():
 
 def test_v2_closed_director_approved_not_done():
     comments = [
-        {"body": "# Business Analysis\nok"},
-        {"body": "# Developer Deliverable\n\nhttps://github.com/acme/target/pull/10\n" + "x" * 200},
+        {"body": "# Business Analysis\nok", "createdAt": "2026-06-03T04:00:00Z"},
+        {
+            "body": "# Developer Deliverable\n\nhttps://github.com/acme/target/pull/10\n" + "x" * 200,
+            "createdAt": "2026-06-03T04:01:00Z",
+        },
+        {"body": "squad-v2-run:in_progress:developer", "createdAt": "2026-06-03T04:02:00Z"},
     ]
     card = _load_job_card_v2(
-        "o/r", _v2_row(208, ["director-approved"], comments, state="CLOSED")
+        "o/r",
+        _v2_row(208, ["director-approved"], comments, state="CLOSED"),
     )
     assert card.bucket == "in_progress"
     assert card.bucket != "completed"
+
+
+def test_v2_closed_not_planned_is_done():
+    comments = [
+        {
+            "body": "**Director reset:** Closing this run.\n\nContinue on #57",
+            "createdAt": "2026-06-01T02:00:00Z",
+        },
+    ]
+    card = _load_job_card_v2(
+        "o/r",
+        {
+            **_v2_row(17, ["director-approved"], comments, state="CLOSED"),
+            "stateReason": "NOT_PLANNED",
+        },
+    )
+    assert card.bucket == "completed"
+
+
+def test_v2_closed_stale_new_label_is_done():
+    """Old closed intake jobs without recent v2 activity belong in Done."""
+    card = _load_job_card_v2(
+        "o/r",
+        _v2_row(
+            15,
+            ["new", "business-owner"],
+            [{"body": "# Business Analysis\nold", "createdAt": "2026-05-31T12:00:00Z"}],
+            state="CLOSED",
+        ),
+    )
+    assert card.bucket == "completed"
 
 
 def test_v2_active_run_on_closed_shows_in_progress():

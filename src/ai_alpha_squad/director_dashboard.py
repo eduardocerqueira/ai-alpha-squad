@@ -890,6 +890,7 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
     number = int(row["number"])
     labels = tuple(item["name"] for item in row.get("labels") or [])
     state = str(row.get("state") or "OPEN")
+    state_reason = str(row.get("stateReason") or "") or None
     updated_at = str(row.get("updatedAt") or "")
     comments = tuple(row.get("comments") or [])
 
@@ -898,7 +899,7 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
     # `blocked` is an overlay, not a phase — derive the real phase from the
     # other labels so the timeline/agents still reflect progress.
     lc = squad_v2.current_lifecycle(label_set - {"blocked"} if blocked else label_set)
-    view = squad_v2.IssueView(number, state, frozenset(labels), comments, body)
+    view = squad_v2.IssueView(number, state, frozenset(labels), comments, body, state_reason)
     action = squad_v2.next_action(view)
     pr_url = _v2_dev_pr(comments)
 
@@ -911,9 +912,13 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
         bucket = "in_progress"
     elif blocked:
         bucket = "stuck"
-    elif squad_v2.squad_issue_needs_reopen(state, label_set):
+    elif squad_v2.squad_closed_job_still_active(
+        state, label_set, tuple(comments), state_reason=state_reason
+    ):
         bucket = "needs_you" if lc == "release-candidate" else "in_progress"
-    elif squad_v2.squad_job_is_done(state, label_set):
+    elif squad_v2.squad_job_is_done(
+        state, label_set, comments=tuple(comments), state_reason=state_reason
+    ):
         bucket = "completed"
     elif lc in _V2_DIRECTOR_GATES:
         bucket = "needs_you"
