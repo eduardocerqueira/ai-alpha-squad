@@ -274,9 +274,27 @@ def latest_build_failure_excerpt(
     return None
 
 
-def developer_instruction_appendix(comments: tuple[dict, ...]) -> str:
+def developer_instruction_appendix(
+    comments: tuple[dict, ...],
+    *,
+    issue_body: str = "",
+    issue_title: str = "",
+) -> str:
     """Deterministic rework context appended to Actions developer instructions."""
     parts: list[str] = []
+    from ai_alpha_squad.build_failure_diagnosis import (
+        diagnose_build_log,
+        diagnose_issue_body,
+        format_developer_playbook,
+        format_issue_diagnosis_section,
+    )
+
+    issue_diag = format_issue_diagnosis_section(
+        issue_body, issue_title=issue_title
+    )
+    if issue_diag.strip():
+        parts.append(issue_diag.strip())
+
     qa = latest_qa_fail_excerpt(comments)
     if qa:
         parts.append(
@@ -287,6 +305,10 @@ def developer_instruction_appendix(comments: tuple[dict, ...]) -> str:
     build = latest_build_failure_excerpt(comments)
     if build:
         from ai_alpha_squad.compile_diagnostics import format_compile_fix_list
+
+        log_diag = diagnose_build_log(build) or diagnose_issue_body(build)
+        if log_diag and log_diag.has_actionable_fix():
+            parts.append(format_developer_playbook(log_diag, issue_title=issue_title))
 
         parsed = format_compile_fix_list(build)
         parts.append(
@@ -477,7 +499,10 @@ def _latest_qa_blocker(comments: tuple[dict, ...]) -> str | None:
 
 
 def human_assistance_summary(
-    comments: tuple[dict, ...], ladder: list[str] | None = None
+    comments: tuple[dict, ...],
+    ladder: list[str] | None = None,
+    *,
+    issue_body: str = "",
 ) -> str:
     """Human-readable message posted when the squad gives up: how many times it
     tried, on which models, and the last blocker — so a person can take over."""
@@ -500,6 +525,16 @@ def human_assistance_summary(
     ]
     if blocker:
         lines += ["", "**Last blocker from QA:**", f"> {blocker}"]
+    from ai_alpha_squad.build_failure_diagnosis import format_human_fix_hint
+
+    hint = format_human_fix_hint(issue_body)
+    if not hint:
+        for c in reversed(comments):
+            hint = format_human_fix_hint(c.get("body") or "")
+            if hint:
+                break
+    if hint:
+        lines += ["", "**Likely fix from build log (deterministic):**", f"> {hint}"]
     lines += [
         "",
         "👉 A human should review the open pull request and take over. After "
