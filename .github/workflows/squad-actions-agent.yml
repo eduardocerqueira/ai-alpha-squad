@@ -59,6 +59,20 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Resolve JDK from issue
+        id: issue_jdk
+        run: |
+          chmod +x ./scripts/squad-setup-issue-jdk.sh
+          ./scripts/squad-setup-issue-jdk.sh "${{ inputs.queue_repo }}" "${{ inputs.issue_number }}" || true
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+
+      - uses: actions/setup-java@v4
+        if: steps.issue_jdk.outputs.java-version != ''
+        with:
+          distribution: temurin
+          java-version: ${{ steps.issue_jdk.outputs.java-version }}
+
       - name: Run Squad Actions agent
         run: |
           chmod +x ./scripts/squad-run-actions-agent.sh \

@@ -88,6 +88,18 @@ def test_v2_blocked_closed_goes_to_blocked_not_done():
     assert rel.bucket == "completed"
 
 
+def test_v2_closed_director_approved_not_done():
+    comments = [
+        {"body": "# Business Analysis\nok"},
+        {"body": "# Developer Deliverable\n\nhttps://github.com/acme/target/pull/10\n" + "x" * 200},
+    ]
+    card = _load_job_card_v2(
+        "o/r", _v2_row(208, ["director-approved"], comments, state="CLOSED")
+    )
+    assert card.bucket == "in_progress"
+    assert card.bucket != "completed"
+
+
 def test_v2_active_run_on_closed_shows_in_progress():
     # An agent actively running (in_progress marker, no terminal) shows In
     # progress even if the issue is closed.

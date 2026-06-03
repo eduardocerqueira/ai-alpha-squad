@@ -20,6 +20,8 @@ LIFECYCLE_LABELS_V2: tuple[str, ...] = (
 )
 
 GATE_LABELS = frozenset({"awaiting-approval", "release-candidate"})
+# Closed issues with these lifecycle labels are not finished — reopen before dispatch.
+ACTIVE_SQUAD_LIFECYCLES = frozenset({"new", "awaiting-approval", "director-approved", "release-candidate"})
 AGENTS_V2 = ("business-owner", "developer", "qa")
 
 DELIVERABLE_MARKERS: dict[str, str] = {
@@ -675,6 +677,20 @@ def find_stale_in_progress(
     return agent if age_minutes >= max_age_minutes else None
 
 
+def squad_job_is_done(state: str, labels: frozenset[str] | set[str]) -> bool:
+    """True when the issue belongs in the Done bucket / orchestrator should not run."""
+    lc = current_lifecycle(labels)
+    if lc == "released":
+        return True
+    if state.upper() == "CLOSED":
+        return lc not in ACTIVE_SQUAD_LIFECYCLES
+    return False
+
+
+def squad_issue_needs_reopen(state: str, labels: frozenset[str] | set[str]) -> bool:
+    return state.upper() == "CLOSED" and current_lifecycle(labels) in ACTIVE_SQUAD_LIFECYCLES
+
+
 def next_action(
     view: IssueView,
     model_ladder: list[str] | None = None,
@@ -684,8 +700,10 @@ def next_action(
         model_ladder = dev_model_ladder(os.environ.get("SQUAD_DEV_MODEL_LADDER"))
     if forced_model is None:
         forced_model = (os.environ.get("SQUAD_DEV_MODEL_INPUT") or "").strip() or None
-    if view.state.upper() == "CLOSED":
-        return NextAction("done", reason="Issue closed")
+    if squad_job_is_done(view.state, view.labels):
+        return NextAction("done", reason="Issue closed" if view.state.upper() == "CLOSED" else "Released")
+    if squad_issue_needs_reopen(view.state, view.labels):
+        return NextAction("idle", reason="Issue closed while squad still active — reopen to continue")
 
     lc = current_lifecycle(view.labels)
     if lc is None:

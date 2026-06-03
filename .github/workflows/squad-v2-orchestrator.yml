@@ -63,6 +63,20 @@ jobs:
       - name: Install HF runner deps
         run: python -m pip install -e ".[dev]" 2>/dev/null || python -m pip install httpx pyyaml
 
+      - name: Resolve JDK from issue
+        id: issue_jdk
+        run: |
+          chmod +x ./scripts/squad-setup-issue-jdk.sh
+          ./scripts/squad-setup-issue-jdk.sh "$REPO" "$ISSUE" || true
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+
+      - uses: actions/setup-java@v4
+        if: steps.issue_jdk.outputs.java-version != ''
+        with:
+          distribution: temurin
+          java-version: ${{ steps.issue_jdk.outputs.java-version }}
+
       - name: Resolve trigger label
         id: lc
         run: |

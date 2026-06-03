@@ -8,6 +8,7 @@ from ai_alpha_squad.target_build_verify import (
     format_build_gate_qa_fail,
     issue_expects_build,
     issue_requires_package,
+    jdk_version_from_issue,
     should_verify_build,
 )
 
@@ -32,7 +33,10 @@ def test_detect_maven_package_when_criteria_require(tmp_path: Path):
     assert "package" in " ".join(cmd)
 
 
-def test_issue_requires_package_from_success_criteria():
+def test_jdk_version_from_issue():
+    assert jdk_version_from_issue("running with java 25, mvn clean package fails") == "25"
+    assert jdk_version_from_issue("JDK 21") == "21"
+    assert jdk_version_from_issue("no java here") is None
     body = "### Success criteria\nmvn clean package run successfully\n"
     assert issue_requires_package(body)
     assert not issue_requires_package("### Success criteria\nmvn compile succeeds\n")

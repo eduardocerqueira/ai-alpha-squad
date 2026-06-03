@@ -104,6 +104,7 @@ print(format_director_delivery_reject_comment(reason))
   gh issue edit "$ISSUE" --repo "$REPO" \
     --remove-label "release-candidate" \
     --add-label "director-approved" 2>/dev/null || true
+  gh issue reopen "$ISSUE" --repo "$REPO" 2>/dev/null || true
   gh issue comment "$ISSUE" --repo "$REPO" --body "$(python3 -c "from ai_alpha_squad.squad_v2 import reset_comment; print(reset_comment('developer'))")"
   gh issue comment "$ISSUE" --repo "$REPO" --body "$(python3 -c "from ai_alpha_squad.squad_v2 import reset_comment; print(reset_comment('qa'))")"
   local msg="**Director gate:** Delivery rejected (${source}). Developer and QA will rework."
