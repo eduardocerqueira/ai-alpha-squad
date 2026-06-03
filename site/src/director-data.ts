@@ -219,28 +219,83 @@ function latestMarkerIndex(comments: RawComment[], needle: string): number | nul
   return idx;
 }
 
-/** Agent with a live run: an in_progress marker not followed by a deliverable,
- *  a failure, or a result comment. Mirrors squad_v2.run_in_progress. */
-function runInProgress(comments: RawComment[]): string | null {
-  for (const agent of AGENTS_V2) {
-    const progIdx = latestMarkerIndex(comments, `${RUN_IN_PROGRESS}${agent}`);
-    if (progIdx === null) continue;
-    if (hasDeliverable(comments, agent)) continue;
-    const failIdx = latestMarkerIndex(comments, `${RUN_FAILED}${agent}`);
-    if (failIdx !== null && failIdx > progIdx) continue;
-    const slug = agent.replace(/-/g, " ");
-    let completed = false;
-    for (let i = progIdx + 1; i < comments.length; i++) {
-      const b = (comments[i].body || "").toLowerCase();
-      if ((b.includes("squad actions agent result") || b.includes("squad hf agent result")) && b.includes(slug)) {
-        completed = true;
-        break;
-      }
+function developerRunFailedAfter(comments: RawComment[], afterIndex: number): boolean {
+  const needle = `${RUN_FAILED}developer`;
+  for (let i = afterIndex + 1; i < comments.length; i++) {
+    if ((comments[i].body || "").toLowerCase().includes(needle)) return true;
+  }
+  return false;
+}
+
+function deliverableHasPrLink(body: string): boolean {
+  const lower = body.toLowerCase();
+  return lower.includes("pull request") || /github\.com\/\S+\/pull\/\d+/i.test(body);
+}
+
+function latestTrustedDeveloperDeliverableIndex(comments: RawComment[]): number | null {
+  const idx = latestDeliverableIndex(comments, "developer");
+  if (idx === null) return null;
+  const body = comments[idx].body || "";
+  if (!deliverableHasPrLink(body)) return null;
+  if (developerRunFailedAfter(comments, idx)) return null;
+  return idx;
+}
+
+/** True when the run that started at ``afterIndex`` has ended. Mirrors squad_v2._run_terminal_after_index. */
+function runTerminalAfterIndex(comments: RawComment[], agent: string, afterIndex: number): boolean {
+  const needleFail = `${RUN_FAILED}${agent}`;
+  const slug = agent.replace(/-/g, " ");
+  for (let i = afterIndex + 1; i < comments.length; i++) {
+    const b = (comments[i].body || "").toLowerCase();
+    if (b.includes(needleFail)) return true;
+    if (b.includes(RUN_RESET) && (b.includes(`${RUN_RESET}${agent}`) || b.includes(`${RUN_RESET}all`)))
+      return true;
+    if ((b.includes("squad actions agent result") || b.includes("squad hf agent result")) && b.includes(slug))
+      return true;
+    if (agent === "developer" && b.includes("build verification failed")) return true;
+  }
+  if (agent === "developer") {
+    const td = latestTrustedDeveloperDeliverableIndex(comments);
+    if (td !== null && td > afterIndex) return true;
+  } else {
+    const dIdx = latestDeliverableIndex(comments, agent);
+    if (dIdx !== null && dIdx > afterIndex) return true;
+  }
+  return false;
+}
+
+/** Agent with a live run: latest in_progress marker with no terminal marker after it. */
+export function runInProgress(comments: RawComment[]): string | null {
+  for (let i = comments.length - 1; i >= 0; i--) {
+    const body = (comments[i].body || "").toLowerCase();
+    for (const agent of AGENTS_V2) {
+      if (!body.includes(`${RUN_IN_PROGRESS}${agent}`)) continue;
+      if (runTerminalAfterIndex(comments, agent, i)) continue;
+      return agent;
     }
-    if (completed) continue;
-    return agent;
   }
   return null;
+}
+
+const AGENT_ROLE_LABELS: Record<string, string> = {
+  "business-owner": "Business Owner",
+  developer: "Developer",
+  qa: "QA",
+};
+
+/** Latest developer run ended in failure and has not been reset or superseded. */
+function developerLastRunFailed(comments: RawComment[]): boolean {
+  let last: "in_progress" | "failed" | null = null;
+  for (const c of comments) {
+    const b = (c.body || "").toLowerCase();
+    if (b.includes(`${RUN_RESET}developer`) || b.includes(`${RUN_RESET}all`)) {
+      last = null;
+      continue;
+    }
+    if (b.includes(`${RUN_IN_PROGRESS}developer`)) last = "in_progress";
+    if (b.includes(`${RUN_FAILED}developer`)) last = "failed";
+  }
+  return last === "failed";
 }
 
 function parentRef(body: string): boolean {
@@ -414,12 +469,13 @@ function buildAgents(
   comments: RawComment[],
   lc: string | null,
   prUrl: string | null,
+  activeAgent: string | null = null,
 ): AgentRow[] {
   const devIdx = latestDeliverableIndex(comments, "developer");
   const { idx: qaIdx, verdict } = latestQaVerdict(comments);
   const donePhase = lc === "release-candidate" || lc === "released";
   const rounds = qaFailRounds(comments);
-  const active = runInProgress(comments);
+  const active = activeAgent ?? runInProgress(comments);
   const row = (role: string, status: string, detail: string): AgentRow => ({
     role,
     status,
@@ -466,6 +522,10 @@ function buildAgents(
         ? ["waiting", "Awaiting developer implementation"]
         : ["waiting", "Queued — implementing on the target repo"];
   else dev = ["waiting", "After Director approves the analysis"];
+
+  if (active !== "developer" && developerLastRunFailed(comments) && !donePhase) {
+    dev = ["blocked", `Last run failed — waiting for retry${prSuffix}`];
+  }
 
   let qa: [string, string];
   if (donePhase) qa = ["done", "Passed"];
@@ -577,7 +637,11 @@ function buildEvents(
   });
 }
 
-function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | null {
+function buildCard(
+  repo: string,
+  issue: RawIssue,
+  liveRuns?: Map<number, string>,
+): Record<string, unknown> | null {
   const title = issue.title || "";
   const body = issue.body || "";
   if (!isParentJob(title, body)) return null;
@@ -608,7 +672,11 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
 
   // Priority: released is done; an active agent run shows In progress even if the
   // issue is closed; `blocked` outranks closed (Blocked tab); then closed → Done.
-  const activeRun = runInProgress(comments) !== null;
+  // Comment markers first; fall back to live GitHub Actions when comments lag.
+  const commentActive = runInProgress(comments);
+  const liveActive = liveRuns?.get(number) ?? null;
+  const activeAgent = commentActive ?? liveActive;
+  const activeRun = activeAgent !== null;
   const stateReason = issue.stateReason ?? null;
   let bucket: string;
   if (lc === "released") bucket = "completed";
@@ -637,7 +705,10 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
       : blocked
         ? "This job is blocked."
         : "This job needs attention.";
-  else headline = pendingHeadline(comments, lc) || "Squad is working — nothing needed from you.";
+  else if (activeAgent) {
+    const label = AGENT_ROLE_LABELS[activeAgent] ?? activeAgent;
+    headline = `${label} running now — check GitHub Actions for live progress.`;
+  } else headline = pendingHeadline(comments, lc) || "Squad is working — nothing needed from you.";
 
   // Surface the human-assistance message the squad posted, so the dashboard shows
   // why it gave up without opening the issue.
@@ -657,7 +728,7 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
     title,
     url: issueUrl,
     lifecycle: lc,
-    active_agent: "",
+    active_agent: activeAgent ?? "",
     bucket,
     blocked,
     updated_at: issue.updatedAt || "",
@@ -671,12 +742,17 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
     needs_human: needsHuman,
     stuck_reasons: stuckReasons,
     suggested_action: "",
-    agents: buildAgents(issueUrl, number, comments, lc, prUrl),
+    agents: buildAgents(issueUrl, number, comments, lc, prUrl, activeAgent),
     events: buildEvents(lc, comments, action, issueUrl, prUrl),
   };
 }
 
-export function computeDashboard(repo: string, issues: RawIssue[], generatedAt: string): Record<string, unknown> {
+export function computeDashboard(
+  repo: string,
+  issues: RawIssue[],
+  generatedAt: string,
+  liveRuns?: Map<number, string>,
+): Record<string, unknown> {
   const buckets: Record<string, Record<string, unknown>[]> = {
     needs_you: [],
     in_progress: [],
@@ -684,7 +760,7 @@ export function computeDashboard(repo: string, issues: RawIssue[], generatedAt: 
     completed: [],
   };
   for (const issue of issues) {
-    const card = buildCard(repo, issue);
+    const card = buildCard(repo, issue, liveRuns);
     if (card) buckets[card.bucket as string].push(card);
   }
   for (const k of Object.keys(buckets)) {

@@ -9,8 +9,8 @@ import {
 } from "./auth";
 
 export { DashboardHub } from "./dashboard-hub";
-import { computeDashboard } from "./director-data";
-import { fetchIssues } from "./github";
+import { computeDashboard, runInProgress } from "./director-data";
+import { fetchIssues, fetchLiveAgentRuns } from "./github";
 
 export interface Env {
   EMAIL: SendEmail;
@@ -193,8 +193,12 @@ async function broadcastRefresh(env: Env): Promise<void> {
 
 /** Recompute the dashboard live from GitHub and cache it in KV. */
 async function recomputeDashboard(env: Env): Promise<string> {
-  const issues = await fetchIssues(DASHBOARD_REPO, env.GITHUB_READ_TOKEN!);
-  const snapshot = computeDashboard(DASHBOARD_REPO, issues, new Date().toISOString());
+  const token = env.GITHUB_READ_TOKEN!;
+  const [issues, liveRuns] = await Promise.all([
+    fetchIssues(DASHBOARD_REPO, token),
+    fetchLiveAgentRuns(DASHBOARD_REPO, token),
+  ]);
+  const snapshot = computeDashboard(DASHBOARD_REPO, issues, new Date().toISOString(), liveRuns);
   const body = JSON.stringify(snapshot);
   if (env.DASHBOARD_KV) await env.DASHBOARD_KV.put(KV_SNAPSHOT_KEY, body);
   return body;
@@ -500,20 +504,9 @@ interface GhRun {
   status?: string;
 }
 
-/** The agent whose run is currently in progress on the issue (latest
- *  `squad-v2-run:in_progress:<agent>` marker with no terminal marker after). */
+/** The agent whose run is currently in progress on the issue (comment markers). */
 function activeRunAgent(comments: GhComment[]): string | null {
-  let agent: string | null = null;
-  for (const c of comments) {
-    const body = (c.body || "").toLowerCase();
-    for (const a of RUN_AGENTS_V2) {
-      if (body.includes(`squad-v2-run:in_progress:${a}`)) agent = a;
-      if (body.includes(`squad-v2-run:failed:${a}`) || body.includes(`squad-v2-run:reset:${a}`)) {
-        if (agent === a) agent = null; // a terminal marker came after — no longer running
-      }
-    }
-  }
-  return agent;
+  return runInProgress(comments as { body?: string | null; createdAt?: string | null }[]);
 }
 
 /** Stop a running job: cancel its in-flight Actions runs, clear the in-progress

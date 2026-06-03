@@ -71,6 +71,14 @@ def test_in_progress_active_when_failure_before_latest_marker():
     assert run_in_progress(comments) == "developer"
 
 
+def test_in_progress_when_reworking_after_deliverable():
+    comments = (
+        {"body": "# Developer Deliverable\n\nPR: https://github.com/o/r/pull/1\n" + "x" * 200},
+        {"body": "squad-v2-run:in_progress:developer"},
+    )
+    assert run_in_progress(comments) == "developer"
+
+
 def test_in_progress_ignored_after_actions_result():
     comments = (
         {"body": "squad-v2-run:in_progress:developer"},

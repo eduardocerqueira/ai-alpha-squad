@@ -636,6 +636,21 @@ def _v2_agent_model(comments: tuple[dict, ...], role: str) -> str | None:
     return history[-1]["model"] if history else None
 
 
+def _developer_last_run_failed(comments: tuple[dict, ...]) -> bool:
+    """True when the latest developer run marker is a failure (not reset since)."""
+    last: str | None = None
+    for comment in comments:
+        body = (comment.get("body") or "").lower()
+        if f"{squad_v2.RUN_RESET_MARKER}developer" in body or f"{squad_v2.RUN_RESET_MARKER}all" in body:
+            last = None
+            continue
+        if f"{squad_v2.RUN_IN_PROGRESS_MARKER}developer" in body:
+            last = "in_progress"
+        if f"{squad_v2.RUN_FAILED_MARKER}developer" in body:
+            last = "failed"
+    return last == "failed"
+
+
 def _v2_agents(
     repo: str,
     number: int,
@@ -644,11 +659,12 @@ def _v2_agents(
     pr_url: str | None,
     *,
     pending_agent: str | None = None,
+    active_agent: str | None = None,
 ) -> tuple[dict[str, Any], ...]:
     parent = f"https://github.com/{repo}/issues/{number}"
     dev_idx = squad_v2._latest_deliverable_index(comments, "developer")
     qa_idx, qa_verdict = squad_v2.latest_qa_verdict(comments)
-    active = squad_v2.run_in_progress(comments)
+    active = active_agent or squad_v2.run_in_progress(comments)
     done_phase = lc in ("release-candidate", "released")
 
     def row(role: str, status: str, detail: str) -> dict[str, Any]:
@@ -704,6 +720,9 @@ def _v2_agents(
     else:
         dev = ("waiting", "After Director approves the analysis")
 
+    if active != "developer" and _developer_last_run_failed(comments) and not done_phase:
+        dev = ("blocked", f"Last run failed — waiting for retry{pr_suffix}")
+
     # QA (acceptance gate)
     if done_phase:
         qa = ("done", "Passed")
@@ -734,7 +753,6 @@ def _v2_agents(
         row("qa", qa[0], qa[1]),
     ]
     # A live run marker means this agent is executing now — surface "running".
-    active = squad_v2.run_in_progress(tuple(comments))
     if active:
         for r in rows:
             if r["role"] == active:
@@ -936,6 +954,9 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
     if failure_mode:
         stuck_reasons = stuck_reasons + (f"failure_mode:{failure_mode}",)
 
+    pending = action.agent if action.kind == "dispatch" else None
+    active_agent = squad_v2.run_in_progress(tuple(comments)) or ""
+
     if bucket == "completed":
         headline = "This job is done."
     elif bucket == "needs_you":
@@ -944,11 +965,15 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
         headline = action.reason or "This job needs attention."
     elif action.kind == "dispatch" and not active_run:
         headline = f"Queued — {action.reason or 'next agent dispatch'}"
+    elif active_agent:
+        label = active_agent.replace("-", " ").title()
+        headline = f"{label} running now — check GitHub Actions for live progress."
     else:
         headline = action.reason or "Squad is working — nothing needed from you."
 
-    pending = action.agent if action.kind == "dispatch" else None
-    agents = _v2_agents(repo, number, comments, lc, pr_url, pending_agent=pending)
+    agents = _v2_agents(
+        repo, number, comments, lc, pr_url, pending_agent=pending, active_agent=active_agent or None
+    )
     events = _v2_events(
         lc=lc,
         bucket=bucket,
@@ -963,7 +988,7 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
         title=title,
         url=issue_url,
         lifecycle=lc,
-        active_agent=(action.agent or ""),
+        active_agent=active_agent,
         bucket=bucket,
         blocked=blocked,
         updated_at=updated_at,
