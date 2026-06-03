@@ -148,6 +148,10 @@ def test_internal_comment_detection():
     assert not is_squad_internal_comment("approve")
 
 
+def test_failed_comment_triggers_phase_watch():
+    assert not is_squad_internal_comment("squad-v2-run:failed:qa — dispatch failed for qa")
+
+
 def test_run_failures_counts_all_without_reset():
     comments = (
         {"body": "squad-v2-run:failed:developer — a"},

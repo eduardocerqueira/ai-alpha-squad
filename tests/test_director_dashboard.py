@@ -52,10 +52,29 @@ def test_v2_qa_fail_shows_rework():
     ]
     card = _load_job_card_v2("o/r", _v2_row(202, ["director-approved"], comments))
     assert card.bucket == "in_progress"
+    assert "Queued" in card.headline
     qa = next(a for a in card.agents if a["role"] == "qa")
     dev = next(a for a in card.agents if a["role"] == "developer")
-    assert qa["status"] == "active" and "round 1/3" in qa["detail"]
-    assert dev["status"] == "active" and "pull/10" in dev["detail"]
+    assert qa["status"] == "done" and "round 1/3" in qa["detail"]
+    assert dev["status"] == "waiting" and "pull/10" in dev["detail"]
+
+
+def test_v2_invalid_qa_fail_does_not_show_rework():
+    comments = [
+        {"body": "# Business Analysis\nok"},
+        {"body": "# Developer Deliverable\n\nhttps://github.com/acme/target/pull/10\n" + "x" * 200},
+        {
+            "body": (
+                "# QA Report\n\n## Criteria\n- ❌ gap\n\n"
+                "- [REQUIRED] src/Foo.java — fix\n\nsquad-v2-qa:fail\n"
+            )
+        },
+    ]
+    card = _load_job_card_v2("o/r", _v2_row(207, ["director-approved"], comments))
+    qa = next(a for a in card.agents if a["role"] == "qa")
+    dev = next(a for a in card.agents if a["role"] == "developer")
+    assert qa["status"] == "waiting" and "Queued" in qa["detail"]
+    assert dev["status"] == "done"
 
 
 def test_v2_blocked_closed_goes_to_blocked_not_done():

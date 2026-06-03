@@ -88,20 +88,30 @@ function directorRejectedAfter(comments: RawComment[], afterIndex: number): bool
   return false;
 }
 
+function validateQaReport(body: string): "pass" | "fail" | null {
+  const text = body || "";
+  if (!/#\s*QA Report\b/i.test(text)) return null;
+  const lower = text.toLowerCase();
+  if (!lower.includes(QA_PASS) && !lower.includes(QA_FAIL)) return null;
+  const verdictLine = new RegExp(`^\\s*(${QA_PASS}|${QA_FAIL})\\s*$`, "m");
+  if (!verdictLine.test(text)) return null;
+  const verdict = lower.includes(QA_FAIL) ? "fail" : "pass";
+  if (verdict === "fail") {
+    if (!lower.includes("## fixes required")) return null;
+    if (!/^\s*\d+\.\s*\[(BLOCKER|REQUIRED|NICE)\]\s*.+/im.test(text)) return null;
+  }
+  return verdict;
+}
+
 function latestQaVerdict(comments: RawComment[]): { idx: number | null; verdict: "pass" | "fail" | null } {
-  let idx: number | null = null;
-  let verdict: "pass" | "fail" | null = null;
-  comments.forEach((c, i) => {
-    const body = (c.body || "").toLowerCase();
-    if (body.includes(QA_FAIL)) {
-      idx = i;
-      verdict = "fail";
-    } else if (body.includes(QA_PASS)) {
-      idx = i;
-      verdict = "pass";
-    }
-  });
-  return { idx, verdict };
+  for (let i = comments.length - 1; i >= 0; i--) {
+    const body = comments[i].body || "";
+    const lower = body.toLowerCase();
+    if (!lower.includes(QA_FAIL) && !lower.includes(QA_PASS)) continue;
+    const verdict = validateQaReport(body);
+    if (verdict) return { idx: i, verdict };
+  }
+  return { idx: null, verdict: null };
 }
 
 const RUN_MODEL = "squad-v2-model:";
@@ -320,6 +330,19 @@ function directorAction(bucket: string, lc: string | null): string {
   return "Open the issue and follow the Director gate instructions.";
 }
 
+/** Headline when no agent run marker is live but work is queued for dispatch. */
+function pendingHeadline(comments: RawComment[], lc: string | null): string {
+  if (runInProgress(comments)) return "";
+  const devIdx = latestDeliverableIndex(comments, "developer");
+  const { idx: qaIdx, verdict } = latestQaVerdict(comments);
+  if (lc === "director-approved" && devIdx === null) return "Queued — implement on target repo";
+  if (devIdx !== null && (verdict === null || (qaIdx ?? 0) < devIdx))
+    return "Queued — QA review of the developer deliverable";
+  if (devIdx !== null && verdict === "fail" && (qaIdx ?? 0) > devIdx)
+    return "Queued — developer rework after QA rejection";
+  return "";
+}
+
 function buildAgents(
   parentUrl: string,
   number: number,
@@ -331,6 +354,7 @@ function buildAgents(
   const { idx: qaIdx, verdict } = latestQaVerdict(comments);
   const donePhase = lc === "release-candidate" || lc === "released";
   const rounds = qaFailRounds(comments);
+  const active = runInProgress(comments);
   const row = (role: string, status: string, detail: string): AgentRow => ({
     role,
     status,
@@ -347,19 +371,35 @@ function buildAgents(
   else bo = ["done", "Complete"];
 
   const prSuffix = prUrl ? ` — ${prUrl}` : "";
+  const pendingQa =
+    devIdx !== null &&
+    (verdict === null || (qaIdx ?? 0) < devIdx) &&
+    active !== "qa";
+  const pendingDev =
+    devIdx !== null &&
+    verdict === "fail" &&
+    (qaIdx ?? 0) > devIdx &&
+    active !== "developer";
+
   let dev: [string, string];
   if (donePhase) dev = ["done", `Delivered${prSuffix}`];
   else if (devIdx !== null && verdict === "fail" && (qaIdx ?? 0) > devIdx)
-    dev = ["active", `QA requested changes — reworking${prSuffix}`];
+    dev = pendingDev
+      ? ["waiting", `Queued — rework after QA (round ${rounds})${prSuffix}`]
+      : ["waiting", `QA requested changes — awaiting developer${prSuffix}`];
   else if (
     devIdx !== null &&
     verdict === "pass" &&
     (qaIdx ?? 0) > devIdx &&
     directorRejectedAfter(comments, qaIdx ?? 0)
   )
-    dev = ["active", `Director rejected delivery — reworking${prSuffix}`];
+    dev = ["waiting", `Director rejected delivery — awaiting rework${prSuffix}`];
   else if (devIdx !== null) dev = ["done", `Deliverable posted${prSuffix}`];
-  else if (lc === "director-approved") dev = ["active", "Implementing on the target repo"];
+  else if (lc === "director-approved")
+    dev =
+      active !== "developer"
+        ? ["waiting", "Awaiting developer implementation"]
+        : ["waiting", "Queued — implementing on the target repo"];
   else dev = ["waiting", "After Director approves the analysis"];
 
   let qa: [string, string];
@@ -370,11 +410,14 @@ function buildAgents(
     (qaIdx ?? 0) > devIdx &&
     directorRejectedAfter(comments, qaIdx ?? 0)
   )
-    qa = ["active", "Director rejected — re-review after developer rework"];
+    qa = ["waiting", "Awaiting re-review after developer rework"];
   else if (devIdx !== null && verdict === "pass" && (qaIdx ?? 0) > devIdx) qa = ["done", "Passed"];
   else if (devIdx !== null && verdict === "fail" && (qaIdx ?? 0) > devIdx)
-    qa = [rounds >= MAX_QA_ROUNDS ? "blocked" : "active", `Requested changes (round ${rounds}/${MAX_QA_ROUNDS})`];
-  else if (devIdx !== null) qa = ["active", "Reviewing the deliverable"];
+    qa = [rounds >= MAX_QA_ROUNDS ? "blocked" : "done", `Requested changes (round ${rounds}/${MAX_QA_ROUNDS})`];
+  else if (devIdx !== null)
+    qa = pendingQa
+      ? ["waiting", "Queued — QA review of deliverable"]
+      : ["waiting", "Awaiting QA review"];
   else qa = ["waiting", "After the developer delivers"];
 
   const rows = [
@@ -382,9 +425,6 @@ function buildAgents(
     row("developer", dev[0], dev[1]),
     row("qa", qa[0], qa[1]),
   ];
-  // A live run marker (no terminal yet) means this agent is executing *now* —
-  // surface it as "running" so the squad column lights up via the webhook.
-  const active = runInProgress(comments);
   if (active) {
     const r = rows.find((x) => x.role === active);
     if (r) {
@@ -529,7 +569,7 @@ function buildCard(repo: string, issue: RawIssue): Record<string, unknown> | nul
       : blocked
         ? "This job is blocked."
         : "This job needs attention.";
-  else headline = "Squad is working — nothing needed from you.";
+  else headline = pendingHeadline(comments, lc) || "Squad is working — nothing needed from you.";
 
   // Surface the human-assistance message the squad posted, so the dashboard shows
   // why it gave up without opening the issue.
