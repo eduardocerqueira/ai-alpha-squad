@@ -516,7 +516,50 @@ def format_director_delivery_accept_comment() -> str:
     )
 
 
-def qa_passed(comments: tuple[dict, ...]) -> bool:
+def _qa_pass_still_valid(
+    comments: tuple[dict, ...],
+    *,
+    issue_body: str,
+    queue_repo: str,
+    issue_number: int,
+    target_repo: str | None,
+) -> bool:
+    """Re-check PR quality + build gate so stale auto-QA passes cannot idle the job."""
+    qa_idx, verdict = latest_qa_verdict(comments)
+    if verdict != "pass" or qa_idx is None:
+        return False
+    qa_body = comments[qa_idx].get("body") or ""
+    from ai_alpha_squad.squad_qa import validate_pr_changed_files
+    from ai_alpha_squad.target_build_verify import (
+        gate_pr_before_qa,
+        issue_requires_package,
+        list_pr_changed_files,
+    )
+
+    if "compile-only job" in qa_body.lower() and issue_requires_package(issue_body):
+        return False
+    if not target_repo:
+        return True
+    changed = list_pr_changed_files(target_repo, issue_number)
+    if not changed:
+        # No open squad PR or gh unavailable — do not invalidate on ambiguity.
+        return True
+    ok, _ = validate_pr_changed_files(changed)
+    if not ok:
+        return False
+    return gate_pr_before_qa(
+        queue_repo, issue_number, target_repo, issue_body=issue_body, post_comment=False
+    )
+
+
+def qa_passed(
+    comments: tuple[dict, ...],
+    *,
+    issue_body: str = "",
+    queue_repo: str = "",
+    issue_number: int = 0,
+    target_repo: str | None = None,
+) -> bool:
     """True when the latest trusted developer deliverable has since been QA-approved."""
     dev_idx = latest_trusted_developer_deliverable_index(comments)
     qa_idx, verdict = latest_qa_verdict(comments)
@@ -529,6 +572,15 @@ def qa_passed(comments: tuple[dict, ...]) -> bool:
         return False
     if director_delivery_rejected_after(comments, qa_idx):
         return False
+    if target_repo and queue_repo and issue_number:
+        if not _qa_pass_still_valid(
+            comments,
+            issue_body=issue_body,
+            queue_repo=queue_repo,
+            issue_number=issue_number,
+            target_repo=target_repo,
+        ):
+            return False
     return True
 
 
@@ -781,6 +833,24 @@ def next_action(
                 "dispatch", agent="qa", reason="QA review of the developer deliverable"
             )
         if verdict == "pass":
+            target = resolve_target_repo(view.body, view.comments)
+            repo = os.environ.get("GITHUB_REPOSITORY", "")
+            if (
+                target
+                and repo
+                and not _qa_pass_still_valid(
+                    view.comments,
+                    issue_body=view.body,
+                    queue_repo=repo,
+                    issue_number=view.number,
+                    target_repo=target,
+                )
+            ):
+                return NextAction(
+                    "dispatch",
+                    agent="developer",
+                    reason="Stale QA pass — PR or build gate failed on re-check",
+                )
             return NextAction(
                 "idle", reason="QA passed — sync should add release-candidate"
             )

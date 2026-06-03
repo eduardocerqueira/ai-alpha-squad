@@ -118,10 +118,17 @@ proc = subprocess.run(
 )
 data = json.loads(proc.stdout)
 comments = tuple(data.get("comments") or [])
-if not qa_passed(comments):
+body = data.get("body") or ""
+target = resolve_target_repo(body, comments)
+if not qa_passed(
+    comments,
+    issue_body=body,
+    queue_repo=repo,
+    issue_number=int(issue),
+    target_repo=target,
+):
     raise SystemExit(1)
-target = resolve_target_repo(data.get("body") or "", comments)
-if target and not gate_pr_before_qa(repo, int(issue), target, issue_body=data.get("body") or "", post_comment=False):
+if target and not gate_pr_before_qa(repo, int(issue), target, issue_body=body, post_comment=False):
     raise SystemExit(1)
 raise SystemExit(0)
 PY
