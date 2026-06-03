@@ -20,12 +20,18 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 /** Back-compat: older snapshots only carry the latest `model`. */
-function historyOf(agent: Agent): ModelUse[] {
+export function historyOf(agent: Agent): ModelUse[] {
   if (agent.model_history && agent.model_history.length) return agent.model_history;
   return agent.model ? [{ model: agent.model, at: "", kind: "result" }] : [];
 }
 
-function ModelChip({ use, escalated }: { use: ModelUse; escalated: boolean }) {
+/** Latest model this agent used or is running on (last hand-off in the timeline). */
+export function currentModelUse(agent: Agent): ModelUse | null {
+  const h = historyOf(agent);
+  return h.length ? h[h.length - 1]! : null;
+}
+
+export function ModelChip({ use, escalated }: { use: ModelUse; escalated: boolean }) {
   return (
     <HoverCard openDelay={120} closeDelay={60}>
       <HoverCardTrigger asChild>
