@@ -682,6 +682,13 @@ function buildCard(
   if (lc === "released") bucket = "completed";
   else if (activeRun && !blocked) bucket = "in_progress";
   else if (blocked) bucket = "stuck";
+  else if (
+    state === "CLOSED" &&
+    (stateReason || "").toUpperCase() === "COMPLETED" &&
+    lc !== "release-candidate" &&
+    !activeRun
+  )
+    bucket = "completed";
   else if (squadClosedJobStillActive(state, labelSet, comments, stateReason))
     bucket = lc === "release-candidate" ? "needs_you" : "in_progress";
   else if (state === "CLOSED") bucket = "completed";

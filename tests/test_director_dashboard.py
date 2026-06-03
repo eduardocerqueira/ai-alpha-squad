@@ -122,7 +122,22 @@ def test_v2_closed_not_planned_is_done():
     assert card.bucket == "completed"
 
 
-def test_v2_closed_stale_new_label_is_done():
+def test_v2_closed_completed_without_active_run_is_done():
+    """Closed GitHub issues (stateReason COMPLETED) with stale labels belong in Done."""
+    card = _load_job_card_v2(
+        "o/r",
+        {
+            **_v2_row(
+                177,
+                ["director-approved", "developer"],
+                [{"body": "# Developer Deliverable\n\nhttps://github.com/x/pull/1\n" + "x" * 200}],
+                state="CLOSED",
+            ),
+            "stateReason": "COMPLETED",
+        },
+    )
+    assert card.bucket == "completed"
+
     """Old closed intake jobs without recent v2 activity belong in Done."""
     card = _load_job_card_v2(
         "o/r",

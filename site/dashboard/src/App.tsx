@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertCircle,
+  BadgeCheck,
   Check,
   ExternalLink,
   GitPullRequest,
@@ -260,10 +261,14 @@ export default function App() {
   const canRetry = !!job && (job.bucket === "stuck" || job.blocked || job.bucket === "completed");
   const canStop = !!job && job.bucket === "in_progress";
   const canDeliveryGate = !!job && job.lifecycle === "release-candidate" && job.bucket === "needs_you";
+  const canMarkDone =
+    !!job && job.lifecycle !== "released" && job.bucket !== "completed";
 
   const [deliveryBusy, setDeliveryBusy] = useState(false);
+  const [markDoneBusy, setMarkDoneBusy] = useState(false);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [markDoneOpen, setMarkDoneOpen] = useState(false);
   const [stopOpen, setStopOpen] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
 
@@ -287,6 +292,25 @@ export default function App() {
       toast.error(e instanceof Error ? e.message : "Delivery gate failed.");
     } finally {
       setDeliveryBusy(false);
+    }
+  }
+
+  async function markDone(n: number, note?: string) {
+    setMarkDoneBusy(true);
+    try {
+      const res = await fetch("/api/director/mark-done", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: n, ...(note ? { note } : {}) }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(payload.error || "Could not mark job done.");
+      toast.success("Job marked done — moved to Done tab.");
+      load(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Mark done failed.");
+    } finally {
+      setMarkDoneBusy(false);
     }
   }
 
@@ -415,8 +439,33 @@ export default function App() {
                     )}
                   </div>
 
-                  {(canDeliveryGate || canRetry || canStop || job.target_pr_url) && (
+                  {(canDeliveryGate || canMarkDone || canRetry || canStop || job.target_pr_url) && (
                   <div className="flex flex-wrap items-center gap-2">
+                    {canMarkDone && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={markDoneBusy}
+                          onClick={() => setMarkDoneOpen(true)}
+                          title="Mark this job done and remove it from In progress"
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5" />
+                          {markDoneBusy ? "Working…" : "Mark done"}
+                        </Button>
+                        <PromptDialog
+                          open={markDoneOpen}
+                          onOpenChange={setMarkDoneOpen}
+                          title={`Mark #${job.number} done?`}
+                          description="Adds the released label, clears active lifecycle labels, and closes the issue. Use when the PR is merged or work finished outside the normal delivery gate."
+                          confirmLabel="Mark done"
+                          fieldLabel="Note (optional)"
+                          placeholder="e.g. PR merged manually"
+                          loading={markDoneBusy}
+                          onConfirm={(note) => markDone(job.number, note || undefined)}
+                        />
+                      </>
+                    )}
                     {canDeliveryGate && (
                       <>
                         <Button
