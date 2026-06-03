@@ -930,6 +930,13 @@ def _load_job_card_v2(repo: str, row: dict) -> JobCard | None:
         bucket = "in_progress"
     elif blocked:
         bucket = "stuck"
+    elif (
+        state.upper() == "CLOSED"
+        and (state_reason or "").upper() == "COMPLETED"
+        and lc != "release-candidate"
+        and not active_run
+    ):
+        bucket = "completed"
     elif squad_v2.squad_closed_job_still_active(
         state, label_set, tuple(comments), state_reason=state_reason
     ):

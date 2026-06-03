@@ -155,6 +155,14 @@ export default {
       return handleDeliveryGate(request, env, ctx);
     }
 
+    // Director marks a finished job Done (released) when work shipped outside the
+    // release-candidate gate — e.g. PR merged but lifecycle labels were never cleared.
+    if (url.pathname === "/api/director/mark-done" && request.method === "POST") {
+      const email = await sessionEmail(env, request);
+      if (!email) return json({ error: "unauthorized" }, 401);
+      return handleMarkDone(request, env, ctx);
+    }
+
     // Authenticated dashboards open a WebSocket here; the hub pushes "refresh"
     // when CI publishes new data, so the UI updates without polling.
     if (url.pathname === "/api/director/live") {
@@ -348,6 +356,107 @@ async function handleRetry(request: Request, env: Env): Promise<Response> {
 
 const DIRECTOR_DELIVERY_REJECT_MARKER = "squad-v2-director:delivery-reject";
 const DIRECTOR_DELIVERY_ACCEPT_MARKER = "squad-v2-director:delivery-accept";
+const SQUAD_JOB_ARCHIVED_MARKER = "squad-v2-job:archived";
+const LIFECYCLE_LABELS_TO_CLEAR = [
+  "new",
+  "awaiting-approval",
+  "director-approved",
+  "release-candidate",
+  "blocked",
+  "needs-human",
+];
+
+/** Mark a job Done: `released` label, clear active lifecycle labels, close issue. */
+async function handleMarkDone(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  if (!env.GITHUB_READ_TOKEN) return json({ error: "GitHub token not configured" }, 503);
+  let body: { number?: number; note?: string };
+  try {
+    body = (await request.json()) as { number?: number; note?: string };
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  const number = Number(body.number);
+  const note = typeof body.note === "string" ? body.note.trim() : "";
+  if (!Number.isInteger(number) || number <= 0) return json({ error: "Invalid issue number" }, 400);
+
+  const headers = {
+    Authorization: `Bearer ${env.GITHUB_READ_TOKEN}`,
+    Accept: "application/vnd.github+json",
+    "User-Agent": "ai-alpha-squad-dashboard",
+    "Content-Type": "application/json",
+  };
+  const issueApi = `https://api.github.com/repos/${DASHBOARD_REPO}/issues/${number}`;
+
+  const issueRes = await fetch(`${issueApi}?labels=1`, { headers });
+  if (!issueRes.ok) return json({ error: "Could not load issue" }, 502);
+  const issue = (await issueRes.json()) as { labels?: { name: string }[]; state?: string };
+  const labels = (issue.labels ?? []).map((l) => l.name);
+  if (labels.includes("released")) {
+    return json({ error: "Issue is already marked released" }, 409);
+  }
+
+  for (const label of LIFECYCLE_LABELS_TO_CLEAR) {
+    if (labels.includes(label)) {
+      await fetch(`${issueApi}/labels/${encodeURIComponent(label)}`, {
+        method: "DELETE",
+        headers,
+      }).catch(() => {});
+    }
+  }
+
+  await fetch(`${issueApi}/labels`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ labels: ["released"] }),
+  }).catch(() => {});
+
+  const comment = [
+    "Released — job marked done by Director.",
+    note ? `\n${note}` : "",
+    "",
+    "**Director:** Job complete — removed from the active queue.",
+    "",
+    DIRECTOR_DELIVERY_ACCEPT_MARKER,
+    SQUAD_JOB_ARCHIVED_MARKER,
+  ].join("\n");
+  await fetch(`${issueApi}/comments`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ body: comment }),
+  });
+
+  if ((issue.state || "").toLowerCase() !== "closed") {
+    const closeRes = await fetch(issueApi, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ state: "closed", state_reason: "completed" }),
+    });
+    if (!closeRes.ok) {
+      const detail = await closeRes.text();
+      console.error("mark-done close issue failed:", closeRes.status, detail);
+      return json(
+        { error: "Marked released, but could not close the issue." },
+        502,
+      );
+    }
+  }
+
+  ctx.waitUntil(
+    (async () => {
+      try {
+        await recomputeDashboard(env);
+        await broadcastRefresh(env);
+      } catch {
+        /* ignore */
+      }
+    })(),
+  );
+  return json({ ok: true });
+}
 
 /** Accept or reject dev+QA delivery when the issue is at release-candidate. */
 async function handleDeliveryGate(
