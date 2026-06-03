@@ -374,6 +374,43 @@ def test_qa_passed_helper():
     assert not qa_passed((_DEV, {"body": "squad-v2-qa:pass"}, {"body": "# Developer Deliverable\n\nnew\n" + "x"*200}))
 
 
+def test_stale_compile_only_qa_invalid_for_package_job():
+    from ai_alpha_squad.squad_v2 import qa_passed
+    compile_only_pass = {
+        "body": "# QA Report\n\nsquad-v2-qa:pass\n(compile-only job — auto pass)\n",
+    }
+    body = "### Success criteria\nmvn clean package run successfully\n"
+    assert not qa_passed(
+        (_DEV, compile_only_pass),
+        issue_body=body,
+        queue_repo="org/queue",
+        issue_number=180,
+        target_repo="org/target",
+    )
+
+
+def test_stale_qa_pass_redispatches_developer(monkeypatch):
+    monkeypatch.setenv("GITHUB_REPOSITORY", "eduardocerqueira/ai-alpha-squad")
+    compile_only_pass = {
+        "body": "# QA Report\n\nsquad-v2-qa:pass\n(compile-only job — auto pass)\n",
+    }
+    body = (
+        "### Success criteria\nmvn clean package run successfully\n"
+        "Target: https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote"
+    )
+    view = IssueView(
+        180,
+        "OPEN",
+        frozenset({"director-approved"}),
+        (_DEV, compile_only_pass),
+        body,
+    )
+    act = next_action(view)
+    assert act.kind == "dispatch"
+    assert act.agent == "developer"
+    assert "Stale QA" in act.reason
+
+
 def test_qa_markers_are_internal():
     assert is_squad_internal_comment("squad-v2-qa:pass")
     assert is_squad_internal_comment("# QA Report\n\nsquad-v2-qa:fail\n- gap")
