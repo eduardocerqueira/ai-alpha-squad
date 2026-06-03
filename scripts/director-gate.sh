@@ -123,11 +123,12 @@ accept_delivery() {
   export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
   local accept_body
   accept_body="$(python3 -c "from ai_alpha_squad.squad_v2 import format_director_delivery_accept_comment; print(format_director_delivery_accept_comment())")"
-  gh issue comment "$ISSUE" --repo "$REPO" --body "$accept_body"
-  local rmsg="**Director gate:** Delivery accepted (${source}). Job complete."
-  local rbody
-  rbody="$(python3 "$FORMAT_COMMENT" notice --message "$rmsg" --repo "$SQUAD_ICON_REPO" --ref "$SQUAD_ICON_REF")"
-  gh issue comment "$ISSUE" --repo "$REPO" --body "$rbody"
+  if gh issue view "$ISSUE" --repo "$REPO" --json state -q '.state' 2>/dev/null | grep -qi open; then
+    gh issue close "$ISSUE" --repo "$REPO" --comment "$accept_body"
+  else
+    gh issue comment "$ISSUE" --repo "$REPO" --body "$accept_body"
+  fi
+  echo "Director delivery accepted (${source}) — #${ISSUE} released and closed"
 }
 
 handle_label() {

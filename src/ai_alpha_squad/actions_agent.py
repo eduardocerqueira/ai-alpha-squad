@@ -26,6 +26,7 @@ from ai_alpha_squad.hf_dispatch import (
     fetch_issue_context_with_parent,
     post_issue_comment,
 )
+from ai_alpha_squad.target_build_verify import should_verify_build, verify_workdir
 
 MAX_TURNS = int(os.environ.get("SQUAD_ACTIONS_MAX_TURNS", "50"))
 COMMAND_TIMEOUT = int(os.environ.get("SQUAD_ACTIONS_CMD_TIMEOUT", "300"))
@@ -34,6 +35,8 @@ COMMAND_TIMEOUT = int(os.environ.get("SQUAD_ACTIONS_CMD_TIMEOUT", "300"))
 # another model) instead of grinding all the way to MAX_TURNS.
 MAX_CONSECUTIVE_UNPARSED = int(os.environ.get("SQUAD_ACTIONS_MAX_UNPARSED", "8"))
 MAX_TURNS_NO_PROGRESS = int(os.environ.get("SQUAD_ACTIONS_MAX_STALL", "60"))
+# Abort when the model reads/searches without ever editing (e.g. 20+ read_file turns).
+MAX_READ_ONLY_CHURN = int(os.environ.get("SQUAD_ACTIONS_MAX_READ_CHURN", "14"))
 
 _TOOL_JSON_RE = re.compile(
     r"\{[^{}]*\"tool\"\s*:\s*\"[^\"]+\"[^{}]*\}",
@@ -530,6 +533,7 @@ Output only the JSON object."""
 
     consecutive_unparsed = 0
     turns_since_change = 0
+    read_only_streak = 0
     made_a_change = False
     for _turn in range(MAX_TURNS):
         remaining = MAX_TURNS - _turn
@@ -603,6 +607,17 @@ Output only the JSON object."""
                         + ", ".join(missing[:12]) + ("…" if len(missing) > 12 else "")
                     )
                     continue
+            if should_verify_build(workdir, issue_context):
+                ok, log = verify_workdir(workdir, issue_body=issue_context)
+                if not ok:
+                    print("[actions] finish blocked: build verification failed", file=sys.stderr)
+                    excerpt = log if len(log) <= 2500 else log[-2500:]
+                    history.append(
+                        f"[turn {_turn + 1}] finish REJECTED — build/compile failed. "
+                        f"Fix the errors (run the same build command), then finish again:\n"
+                        f"{excerpt}"
+                    )
+                    continue
             return _finish_summary(tool_args, content), True
         result = execute_tool(workdir, tool_name, tool_args)
         arg_hint = str(tool_args.get("path") or tool_args.get("command") or "").strip()
@@ -614,8 +629,27 @@ Output only the JSON object."""
         if tool_name in ("write_file", "edit_file") and not result.lower().startswith("error"):
             made_a_change = True
             turns_since_change = 0
+            read_only_streak = 0
         else:
             turns_since_change += 1
+            if (
+                not made_a_change
+                and tool_name in ("read_file", "list_dir", "search")
+                and not result.lower().startswith("error")
+            ):
+                read_only_streak += 1
+                if read_only_streak >= MAX_READ_ONLY_CHURN:
+                    print(
+                        f"[actions] ABORT: {read_only_streak} read-only turns "
+                        f"without any edit (>= {MAX_READ_ONLY_CHURN})",
+                        file=sys.stderr,
+                    )
+                    return (
+                        f"Aborted after {_turn + 1} turns: the agent made "
+                        f"{read_only_streak} read/list/search turns without editing any file. "
+                        "Use edit_file on the file named in the task or QA fix list.",
+                        False,
+                    )
         if turns_since_change >= MAX_TURNS_NO_PROGRESS:
             print(
                 f"[actions] ABORT: {turns_since_change} turns with no file change "

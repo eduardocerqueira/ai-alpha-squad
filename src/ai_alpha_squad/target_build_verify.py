@@ -104,6 +104,17 @@ def verify_workdir(
     return run_build_command(workdir, cmd)
 
 
+def format_build_failure_issue_comment(agent: str, log: str) -> str:
+    """Issue comment when the Actions post-loop gate rejects a non-compiling tree."""
+    snippet = log.strip()[-MAX_LOG_CHARS:]
+    slug = agent.replace("-", " ")
+    return (
+        f"**Squad {slug} — build verification failed.**\n\n"
+        "The tree does not compile; no PR was finalized. Fix the errors below and re-run.\n\n"
+        f"```\n{snippet}\n```"
+    )
+
+
 def format_build_gate_qa_fail(log: str) -> str:
     snippet = log.strip()[-MAX_LOG_CHARS:]
     return (

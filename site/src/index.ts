@@ -397,12 +397,27 @@ async function handleDeliveryGate(
       headers,
       body: JSON.stringify({ labels: ["released"] }),
     }).catch(() => {});
-    await postComment(
-      `**Director:** Delivery accepted — job complete.\n\n${DIRECTOR_DELIVERY_ACCEPT_MARKER}`,
-    );
-    await postComment(
-      "**Squad orchestrator:** Director accepted delivery — `released` applied. Job complete.",
-    );
+    const acceptComment = [
+      "Released — job accepted by Director.",
+      "",
+      "**Director:** Delivery accepted. Job complete.",
+      "",
+      DIRECTOR_DELIVERY_ACCEPT_MARKER,
+    ].join("\n");
+    await postComment(acceptComment);
+    const closeRes = await fetch(issueApi, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ state: "closed", state_reason: "completed" }),
+    });
+    if (!closeRes.ok) {
+      const detail = await closeRes.text();
+      console.error("delivery-gate close issue failed:", closeRes.status, detail);
+      return json(
+        { error: "Delivery accepted and labeled released, but could not close the issue." },
+        502,
+      );
+    }
     ctx.waitUntil(
       (async () => {
         try {
