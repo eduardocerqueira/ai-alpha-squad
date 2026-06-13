@@ -1,15 +1,151 @@
 {
-  "generated_at": "2026-06-02T15:30:11Z",
+  "generated_at": "2026-06-13T22:38:34Z",
   "repo": "eduardocerqueira/ai-alpha-squad",
   "counts": {
     "needs_you": 0,
     "in_progress": 0,
-    "stuck": 1,
-    "completed": 9
+    "stuck": 2,
+    "completed": 11
   },
   "needs_you": [],
   "in_progress": [],
   "stuck": [
+    {
+      "number": 180,
+      "title": "[Request]: tests are failing and breaking mvn clean package",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/180",
+      "lifecycle": "director-approved",
+      "active_agent": "",
+      "bucket": "stuck",
+      "blocked": true,
+      "updated_at": "2026-06-03T13:06:31Z",
+      "target_repo": "eduardocerqueira/experimental-jenkins-plugin-quote",
+      "target_pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/4",
+      "target_pr_merged": false,
+      "summary": "Issue closed",
+      "headline": "Issue closed",
+      "director_action": "",
+      "labels": [
+        "blocked",
+        "director-approved",
+        "needs-human"
+      ],
+      "stuck_reasons": [
+        "failure_mode:needs_human"
+      ],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 180,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/180",
+          "detail": "Business analysis posted",
+          "model": "deepseek-ai/DeepSeek-V4-Flash",
+          "model_history": [
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T03:38:12Z",
+              "kind": "result"
+            }
+          ]
+        },
+        {
+          "role": "developer",
+          "status": "blocked",
+          "issue_number": 180,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/180",
+          "detail": "Last run failed \u2014 waiting for retry \u2014 https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/4",
+          "model": "deepseek-ai/DeepSeek-V4-Pro",
+          "model_history": [
+            {
+              "model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+              "at": "2026-06-03T04:22:53Z",
+              "kind": "escalation"
+            },
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T04:53:46Z",
+              "kind": "escalation"
+            },
+            {
+              "model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+              "at": "2026-06-03T04:54:14Z",
+              "kind": "escalation"
+            },
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Pro",
+              "at": "2026-06-03T12:51:56Z",
+              "kind": "escalation"
+            }
+          ]
+        },
+        {
+          "role": "qa",
+          "status": "done",
+          "issue_number": 180,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/180",
+          "detail": "Passed",
+          "model": "deepseek-ai/DeepSeek-V4-Flash",
+          "model_history": [
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T03:51:45Z",
+              "kind": "result"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "key": "new",
+          "title": "Request triaged",
+          "owner": "business-owner",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T03:37:15Z"
+        },
+        {
+          "key": "awaiting-approval",
+          "title": "Business analysis ready",
+          "owner": "Director",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T03:38:12Z"
+        },
+        {
+          "key": "implementation",
+          "title": "Implementation \u2014 PR on target repo",
+          "owner": "developer",
+          "status": "done",
+          "detail": "PR open",
+          "pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/4",
+          "at": "2026-06-03T04:23:41Z"
+        },
+        {
+          "key": "qa",
+          "title": "QA review",
+          "owner": "qa",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T04:23:52Z"
+        },
+        {
+          "key": "release-candidate",
+          "title": "Delivery review",
+          "owner": "Director",
+          "status": "pending",
+          "detail": ""
+        },
+        {
+          "key": "released",
+          "title": "Released",
+          "owner": "Done",
+          "status": "pending",
+          "detail": ""
+        }
+      ]
+    },
     {
       "number": 140,
       "title": "[Request]: Configurable logo + UI modernize for Build Monitor (jenkins-plugin-monitor)",
@@ -30,7 +166,9 @@
         "director-approved",
         "needs-human"
       ],
-      "stuck_reasons": [],
+      "stuck_reasons": [
+        "failure_mode:needs_human"
+      ],
       "suggested_action": "",
       "agents": [
         {
@@ -50,10 +188,10 @@
         },
         {
           "role": "developer",
-          "status": "active",
+          "status": "done",
           "issue_number": 140,
           "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/140",
-          "detail": "QA requested changes \u2014 reworking \u2014 https://github.com/eduardocerqueira/jenkins-plugin-monitor/pull/1",
+          "detail": "Deliverable posted \u2014 https://github.com/eduardocerqueira/jenkins-plugin-monitor/pull/1",
           "model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
           "model_history": [
             {
@@ -80,10 +218,10 @@
         },
         {
           "role": "qa",
-          "status": "active",
+          "status": "waiting",
           "issue_number": 140,
           "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/140",
-          "detail": "Requested changes (round 1/3)",
+          "detail": "Awaiting QA review",
           "model": "deepseek-ai/DeepSeek-V4-Flash",
           "model_history": [
             {
@@ -115,7 +253,7 @@
           "key": "implementation",
           "title": "Implementation \u2014 PR on target repo",
           "owner": "developer",
-          "status": "current",
+          "status": "done",
           "detail": "PR open",
           "pr_url": "https://github.com/eduardocerqueira/jenkins-plugin-monitor/pull/1",
           "at": "2026-06-02T12:07:35Z"
@@ -125,12 +263,11 @@
           "title": "QA review",
           "owner": "qa",
           "status": "current",
-          "detail": "QA requested changes \u2014 developer reworking (1/3)",
-          "at": "2026-06-02T12:08:28Z"
+          "detail": "Reviewing the developer deliverable"
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "pending",
           "detail": ""
@@ -146,6 +283,337 @@
     }
   ],
   "completed": [
+    {
+      "number": 181,
+      "title": "[Request]: add guidance in README for running Jenkins in docker container and installing the hpi plugin",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/181",
+      "lifecycle": "released",
+      "active_agent": "",
+      "bucket": "completed",
+      "blocked": false,
+      "updated_at": "2026-06-03T04:14:16Z",
+      "target_repo": "eduardocerqueira/experimental-jenkins-plugin-quote",
+      "target_pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/5",
+      "target_pr_merged": true,
+      "summary": "This job is done.",
+      "headline": "This job is done.",
+      "director_action": "",
+      "labels": [
+        "released"
+      ],
+      "stuck_reasons": [],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 181,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/181",
+          "detail": "Business analysis posted",
+          "model": "deepseek-ai/DeepSeek-V4-Flash",
+          "model_history": [
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T03:47:34Z",
+              "kind": "result"
+            }
+          ]
+        },
+        {
+          "role": "developer",
+          "status": "done",
+          "issue_number": 181,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/181",
+          "detail": "Delivered \u2014 https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/5",
+          "model": null,
+          "model_history": []
+        },
+        {
+          "role": "qa",
+          "status": "done",
+          "issue_number": 181,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/181",
+          "detail": "Passed",
+          "model": null,
+          "model_history": []
+        }
+      ],
+      "events": [
+        {
+          "key": "new",
+          "title": "Request triaged",
+          "owner": "business-owner",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T03:46:34Z"
+        },
+        {
+          "key": "awaiting-approval",
+          "title": "Business analysis ready",
+          "owner": "Director",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T03:47:34Z"
+        },
+        {
+          "key": "implementation",
+          "title": "Implementation \u2014 PR on target repo",
+          "owner": "developer",
+          "status": "done",
+          "detail": "",
+          "pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/5",
+          "at": "2026-06-03T03:56:18Z"
+        },
+        {
+          "key": "qa",
+          "title": "QA review",
+          "owner": "qa",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T04:13:44Z"
+        },
+        {
+          "key": "release-candidate",
+          "title": "Delivery review",
+          "owner": "Director",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "released",
+          "title": "Released",
+          "owner": "Done",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T04:14:16Z"
+        }
+      ]
+    },
+    {
+      "number": 178,
+      "title": "[Request]: compilation error",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/178",
+      "lifecycle": "released",
+      "active_agent": "",
+      "bucket": "completed",
+      "blocked": false,
+      "updated_at": "2026-06-03T03:27:04Z",
+      "target_repo": "eduardocerqueira/experimental-jenkins-plugin-quote",
+      "target_pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/3",
+      "target_pr_merged": true,
+      "summary": "This job is done.",
+      "headline": "This job is done.",
+      "director_action": "",
+      "labels": [
+        "released"
+      ],
+      "stuck_reasons": [
+        "failure_mode:build_gate"
+      ],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 178,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/178",
+          "detail": "Business analysis posted",
+          "model": "deepseek-ai/DeepSeek-V4-Flash",
+          "model_history": [
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T02:51:55Z",
+              "kind": "result"
+            }
+          ]
+        },
+        {
+          "role": "developer",
+          "status": "done",
+          "issue_number": 178,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/178",
+          "detail": "Delivered \u2014 https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/3",
+          "model": null,
+          "model_history": []
+        },
+        {
+          "role": "qa",
+          "status": "done",
+          "issue_number": 178,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/178",
+          "detail": "Passed",
+          "model": "deepseek-ai/DeepSeek-V4-Flash",
+          "model_history": [
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T03:23:33Z",
+              "kind": "result"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "key": "new",
+          "title": "Request triaged",
+          "owner": "business-owner",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T02:50:58Z"
+        },
+        {
+          "key": "awaiting-approval",
+          "title": "Business analysis ready",
+          "owner": "Director",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T02:51:55Z"
+        },
+        {
+          "key": "implementation",
+          "title": "Implementation \u2014 PR on target repo",
+          "owner": "developer",
+          "status": "done",
+          "detail": "",
+          "pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/3",
+          "at": "2026-06-03T03:22:24Z"
+        },
+        {
+          "key": "qa",
+          "title": "QA review",
+          "owner": "qa",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T03:23:33Z"
+        },
+        {
+          "key": "release-candidate",
+          "title": "Delivery review",
+          "owner": "Director",
+          "status": "done",
+          "detail": ""
+        },
+        {
+          "key": "released",
+          "title": "Released",
+          "owner": "Done",
+          "status": "done",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "number": 177,
+      "title": "[Request]: experimental-jenkins-plugin-quote compilation error",
+      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/177",
+      "lifecycle": "director-approved",
+      "active_agent": "",
+      "bucket": "completed",
+      "blocked": false,
+      "updated_at": "2026-06-03T02:48:50Z",
+      "target_repo": "eduardocerqueira/experimental-jenkins-plugin-quote",
+      "target_pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/2",
+      "target_pr_merged": false,
+      "summary": "This job is done.",
+      "headline": "This job is done.",
+      "director_action": "",
+      "labels": [
+        "developer",
+        "director-approved"
+      ],
+      "stuck_reasons": [],
+      "suggested_action": "",
+      "agents": [
+        {
+          "role": "business-owner",
+          "status": "done",
+          "issue_number": 177,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/177",
+          "detail": "Business analysis posted",
+          "model": "deepseek-ai/DeepSeek-V4-Flash",
+          "model_history": [
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T02:34:58Z",
+              "kind": "result"
+            }
+          ]
+        },
+        {
+          "role": "developer",
+          "status": "done",
+          "issue_number": 177,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/177",
+          "detail": "Deliverable posted \u2014 https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/2",
+          "model": null,
+          "model_history": []
+        },
+        {
+          "role": "qa",
+          "status": "done",
+          "issue_number": 177,
+          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/177",
+          "detail": "Passed",
+          "model": "deepseek-ai/DeepSeek-V4-Flash",
+          "model_history": [
+            {
+              "model": "deepseek-ai/DeepSeek-V4-Flash",
+              "at": "2026-06-03T02:36:32Z",
+              "kind": "result"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "key": "new",
+          "title": "Request triaged",
+          "owner": "business-owner",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T02:34:01Z"
+        },
+        {
+          "key": "awaiting-approval",
+          "title": "Business analysis ready",
+          "owner": "Director",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T02:34:58Z"
+        },
+        {
+          "key": "implementation",
+          "title": "Implementation \u2014 PR on target repo",
+          "owner": "developer",
+          "status": "done",
+          "detail": "PR open",
+          "pr_url": "https://github.com/eduardocerqueira/experimental-jenkins-plugin-quote/pull/2",
+          "at": "2026-06-03T02:36:22Z"
+        },
+        {
+          "key": "qa",
+          "title": "QA review",
+          "owner": "qa",
+          "status": "done",
+          "detail": "",
+          "at": "2026-06-03T02:36:32Z"
+        },
+        {
+          "key": "release-candidate",
+          "title": "Delivery review",
+          "owner": "Director",
+          "status": "pending",
+          "detail": ""
+        },
+        {
+          "key": "released",
+          "title": "Released",
+          "owner": "Done",
+          "status": "pending",
+          "detail": ""
+        }
+      ]
+    },
     {
       "number": 128,
       "title": "[Request]: 4 languages with custom greeting (QA-gate test)",
@@ -243,7 +711,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "done",
           "detail": ""
@@ -355,7 +823,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "done",
           "detail": ""
@@ -467,7 +935,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "done",
           "detail": ""
@@ -572,7 +1040,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "done",
           "detail": ""
@@ -675,7 +1143,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "done",
           "detail": ""
@@ -779,7 +1247,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "done",
           "detail": ""
@@ -811,7 +1279,9 @@
       "labels": [
         "released"
       ],
-      "stuck_reasons": [],
+      "stuck_reasons": [
+        "failure_mode:stall_abort"
+      ],
       "suggested_action": "",
       "agents": [
         {
@@ -889,7 +1359,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "done",
           "detail": ""
@@ -921,7 +1391,9 @@
       "labels": [
         "director-approved"
       ],
-      "stuck_reasons": [],
+      "stuck_reasons": [
+        "failure_mode:stall_abort"
+      ],
       "suggested_action": "",
       "agents": [
         {
@@ -941,10 +1413,10 @@
         },
         {
           "role": "developer",
-          "status": "active",
+          "status": "waiting",
           "issue_number": 94,
           "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/94",
-          "detail": "Implementing on the target repo",
+          "detail": "Awaiting developer implementation",
           "model": "Qwen/Qwen2.5-Coder-32B-Instruct",
           "model_history": [
             {
@@ -998,105 +1470,7 @@
         },
         {
           "key": "release-candidate",
-          "title": "Release candidate",
-          "owner": "Director",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "released",
-          "title": "Released",
-          "owner": "Done",
-          "status": "pending",
-          "detail": ""
-        }
-      ]
-    },
-    {
-      "number": 64,
-      "title": "[Job 1] VS Code extension: Squad Director (GitHub queue + approval gates)",
-      "url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
-      "lifecycle": null,
-      "active_agent": "",
-      "bucket": "completed",
-      "blocked": false,
-      "updated_at": "2026-06-01T16:32:28Z",
-      "target_repo": "eduardocerqueira/vscode-squad-director",
-      "target_pr_url": "https://github.com/eduardocerqueira/vscode-squad-director/pull/1",
-      "target_pr_merged": false,
-      "summary": "This job is done.",
-      "headline": "This job is done.",
-      "director_action": "",
-      "labels": [
-        "implemented",
-        "validation",
-        "medium"
-      ],
-      "stuck_reasons": [],
-      "suggested_action": "",
-      "agents": [
-        {
-          "role": "business-owner",
-          "status": "done",
-          "issue_number": 64,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
-          "detail": "Business analysis posted",
-          "model": null,
-          "model_history": []
-        },
-        {
-          "role": "developer",
-          "status": "waiting",
-          "issue_number": 64,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
-          "detail": "After Director approves the analysis",
-          "model": null,
-          "model_history": []
-        },
-        {
-          "role": "qa",
-          "status": "waiting",
-          "issue_number": 64,
-          "issue_url": "https://github.com/eduardocerqueira/ai-alpha-squad/issues/64",
-          "detail": "After the developer delivers",
-          "model": null,
-          "model_history": []
-        }
-      ],
-      "events": [
-        {
-          "key": "new",
-          "title": "Request triaged",
-          "owner": "business-owner",
-          "status": "done",
-          "detail": "",
-          "at": "2026-06-01T12:38:22Z"
-        },
-        {
-          "key": "awaiting-approval",
-          "title": "Business analysis ready",
-          "owner": "Director",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "implementation",
-          "title": "Implementation \u2014 PR on target repo",
-          "owner": "developer",
-          "status": "pending",
-          "detail": "",
-          "pr_url": "https://github.com/eduardocerqueira/vscode-squad-director/pull/1"
-        },
-        {
-          "key": "qa",
-          "title": "QA review",
-          "owner": "qa",
-          "status": "pending",
-          "detail": ""
-        },
-        {
-          "key": "release-candidate",
-          "title": "Release candidate",
+          "title": "Delivery review",
           "owner": "Director",
           "status": "pending",
           "detail": ""
